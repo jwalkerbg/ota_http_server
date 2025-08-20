@@ -1,6 +1,6 @@
 # OTA Firmware Server
 
-A lightweight Python/Flask-based firmware server for Over-The-Air (OTA) updates.  
+A lightweight Python/Flask-based firmware server for Over-The-Air (OTA) updates.
 Supports **token-based authentication** and can run in two modes:
 
 - **Standalone mode** — Flask runs directly (with optional SSL)
@@ -92,6 +92,7 @@ http://localhost:8070/firmware/projectA/firmware_v1.bin?token=mytoken
 project_root/
 ├── .venv
 ├── http_server.py
+├── ota_start.bat
 ├── certs/
 │   ├── ca_cert.pem
 │   ├── ca_key.pem
@@ -130,6 +131,8 @@ python http_server.py --no-certs --token mytoken --port 8071
 ```
 
 See the virtual host and reverse proxy configurations to figure out ports usage.
+
+If `--no-token` option is given the token is not used event it is supplied at the end of the url.
 
 ## Apache Reverse Proxy Mode
 
@@ -212,6 +215,12 @@ Browsers usually cache this file, so it will only be requested once. Devices ini
 
 ### Example OTA Firmware URL
 
+With token
 ```bash
 https://okto7.com/firmware/projectA/firmware_v1.bin?token=mytoken
+```
+
+Without token
+```bash
+https://okto7.com/firmware/projectA/firmware_v1.bin
 ```
