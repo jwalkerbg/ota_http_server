@@ -2,7 +2,10 @@ from flask import Flask, send_from_directory, request, abort
 import os
 import ssl
 import argparse
-
+import re
+from packaging import version
+from datetime import datetime, timezone
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 def create_app(www_dir="www",
                firmware_dir="firmware",
@@ -14,27 +17,45 @@ def create_app(www_dir="www",
     """
     app = Flask(__name__)
 
+    def check_token(project=None):
+        """
+        Verifies the token from Authorization header or ?token= query param.
+        Aborts with HTTP 401 if token is missing or invalid.
+        Logs success/failure with project name for auditing.
+        """
+        if not use_token:
+            return  # Token check disabled   [%d/%b/%Y %H:%M:%S]
+
+        client_ip = request.remote_addr  # After ProxyFix, this will be the real external IP
+        # Timestamp in ISO 8601 UTC with milliseconds
+        now_utc = datetime.now().strftime("%d/%b/%Y %H:%M:%S")
+        
+        # Try header first
+        header_token = request.headers.get("Authorization")
+        # Then try URL query    
+        url_token = request.args.get("token")
+
+        # Normalize header Bearer token
+        if header_token and header_token.startswith("Bearer "):
+            header_token = header_token[len("Bearer "):]
+
+        token_to_check = header_token or url_token
+        
+        project_info = f" (project={project})" if project else ""
+
+        if not token_to_check:
+            print(f"[{now_utc}] [AUTH] No token provided for {client_ip}{project_info} → Denied")
+            abort(401)
+        elif token_to_check != expected_token:
+            print(f"[{now_utc}] [AUTH] Invalid token from {client_ip}{project_info} → Denied")
+            abort(401)
+
+        # If we get here → token valid
+        print(f"[{now_utc}] [AUTH] Valid token from {client_ip}{project_info} → Granted")
+
     @app.route(f'/{url_firmware}/<project>/<path:filename>')
     def firmware(project, filename):
-        if use_token:
-            # Try header first
-            header_token = request.headers.get("Authorization")
-            # Then try URL query
-            url_token = request.args.get("token")
-
-            # Normalize header Bearer token
-            if header_token and header_token.startswith("Bearer "):
-                header_token = header_token[len("Bearer "):]
-
-            token_to_check = header_token or url_token
-
-            if not token_to_check:
-                print(f"[AUTH] No token provided for {request.remote_addr} → Denied")
-                abort(401)
-            elif token_to_check != expected_token:
-                print(f"[AUTH] Invalid token from {request.remote_addr} → Denied")
-                abort(401)
-
+        check_token(project)
         # Build the physical path dynamically
         project_dir = os.path.join(www_dir, firmware_dir, project)
         return send_from_directory(project_dir, filename)
@@ -46,6 +67,58 @@ def create_app(www_dir="www",
             'favicon.ico',
             mimetype='image/vnd.microsoft.icon'
         )
+
+    @app.route(f'/{url_firmware}/<project>/latest')
+    def latest_firmware(project):
+        check_token(project)
+        """
+        Return the JSON manifest of the latest firmware for a project.
+        """
+        project_dir = os.path.join(www_dir, firmware_dir, project)
+        if not os.path.isdir(project_dir):
+            abort(404, "Project not found")
+
+        # Match files like: prefix01.00.01.json
+        json_files = [f for f in os.listdir(project_dir) if f.endswith(".json")]
+
+        versions = []
+        pattern = re.compile(r"(\d+\.\d+\.\d+)")  # extract version like 01.00.01
+        for f in json_files:
+            m = pattern.search(f)
+            if m:
+                versions.append((f, m.group(1)))
+
+        if not versions:
+            abort(404, "No versions found")
+
+        # Sort by version using packaging.version
+        latest_file, latest_ver = max(versions, key=lambda x: version.parse(x[1]))
+
+        return send_from_directory(project_dir, latest_file, mimetype="application/json")
+
+
+    @app.route(f'/{url_firmware}/<project>/versions')
+    def list_versions(project):
+        check_token(project)
+        """
+        Return a JSON object with a list of all available versions.
+        """
+        project_dir = os.path.join(www_dir, firmware_dir, project)
+        if not os.path.isdir(project_dir):
+            abort(404, "Project not found")
+
+        json_files = [f for f in os.listdir(project_dir) if f.endswith(".json")]
+
+        versions = []
+        pattern = re.compile(r"(\d+\.\d+\.\d+)")
+        for f in json_files:
+            m = pattern.search(f)
+            if m:
+                versions.append(m.group(1))
+
+        versions_sorted = sorted(versions, key=version.parse, reverse=True)
+
+        return {"versions": versions_sorted}
 
     return app
 
@@ -95,6 +168,9 @@ if __name__ == '__main__':
         print(f"  Expected token:    {expected_token}")
         print("  Token sources:     Authorization header OR ?token= in URL")
     print("===========================================\n")
+    
+    # Make Flask respect X-Forwarded-For from Apache
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1)
 
     if args.no_certs:
         # Plain HTTP
