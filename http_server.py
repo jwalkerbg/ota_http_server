@@ -7,11 +7,25 @@ from packaging import version
 from datetime import datetime, timedelta, timezone
 from werkzeug.middleware.proxy_fix import ProxyFix
 import jwt
+import csv
 
-# --- Defaults ---
-JWT_SECRET = "supersecretkey"       # Replace for production
-JWT_ALGORITHM = "HS256"
-ADMIN_SECRET = "admin123"           # Used for token issuing endpoint (replace for production)
+# -------------------------------------------------------------------
+#                   ENVIRONMENT CONFIGURATION
+# -------------------------------------------------------------------
+
+# Environment-based secrets
+JWT_SECRET = os.environ.get("OTA_JWT_SECRET")
+ADMIN_SECRET = os.environ.get("OTA_ADMIN_SECRET")
+
+if not JWT_SECRET:
+    raise RuntimeError("Environment variable OTA_JWT_SECRET is missing!")
+
+if not ADMIN_SECRET:
+    raise RuntimeError("Environment variable OTA_ADMIN_SECRET is missing!")
+
+JWT_ALGORITHM = os.environ.get("OTA_JWT_ALGORITHM", "HS256")
+AUDIT_LOG_FILE = os.environ.get("OTA_AUDIT_LOG", "audit_log.csv")
+
 
 # -------------------------------------------------------------------
 #                       APP FACTORY
@@ -20,12 +34,9 @@ ADMIN_SECRET = "admin123"           # Used for token issuing endpoint (replace f
 def create_app(www_dir="www",
                firmware_dir="firmware",
                url_firmware="firmware",
-               use_jwt=True,
-               jwt_secret=None,
-               jwt_algorithm="HS256",
-               admin_secret=None):
+               use_jwt=True):
     """
-    Flask app factory with JWT authentication and token generation endpoint.
+    Flask app factory with JWT authentication and secure admin endpoint.
     """
     app = Flask(__name__)
 
@@ -34,7 +45,7 @@ def create_app(www_dir="www",
     # ---------------------------------------------------------------
 
     def check_token(project=None):
-        """ Verifies JWT from Authorization header. """
+        """Verifies JWT from Authorization header."""
         if not use_jwt:
             return
 
@@ -44,7 +55,7 @@ def create_app(www_dir="www",
 
         token = auth_header[len("Bearer "):]
         try:
-            payload = jwt.decode(token, jwt_secret or JWT_SECRET, algorithms=[jwt_algorithm])
+            payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
         except jwt.ExpiredSignatureError:
             abort(401, "Token expired")
         except jwt.InvalidTokenError:
@@ -55,12 +66,11 @@ def create_app(www_dir="www",
         if project and token_project != project:
             abort(403, "Token not valid for this project")
 
-        # Optional logging
         device_id = payload.get("sub", "unknown")
         print(f"[{datetime.now(timezone.utc).isoformat()}] [AUTH] Device={device_id}, Project={token_project} OK")
 
     def get_sorted_versions(project):
-        """ Return sorted list of versions for a given project. """
+        """Return sorted list of versions for a given project."""
         project_dir = os.path.join(www_dir, firmware_dir, project)
         if not os.path.isdir(project_dir):
             abort(404, "Project not found")
@@ -85,7 +95,7 @@ def create_app(www_dir="www",
         return project_dir, versions, version_files
 
     def generate_ota_jwt(device_id, project, current_fw="1.0.0", expires_hours=24):
-        """ Generate a timezone-aware JWT for OTA clients (devices). """
+        """Generate a timezone-aware JWT for OTA clients (devices)."""
         now = datetime.now(timezone.utc)
         payload = {
             "sub": device_id,
@@ -96,7 +106,19 @@ def create_app(www_dir="www",
             "jti": f"{device_id}-{int(now.timestamp())}",
             "fw_version": current_fw
         }
-        return jwt.encode(payload, jwt_secret or JWT_SECRET, algorithm=jwt_algorithm), payload
+        return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM), payload
+
+    def log_audit_event(ip, action, details):
+        """Append a token generation audit log entry."""
+        timestamp = datetime.now(timezone.utc).isoformat()
+        os.makedirs(os.path.dirname(AUDIT_LOG_FILE) or ".", exist_ok=True)
+        new_file = not os.path.exists(AUDIT_LOG_FILE)
+        with open(AUDIT_LOG_FILE, "a", newline="", encoding="utf-8") as csvfile:
+            writer = csv.writer(csvfile)
+            if new_file:
+                writer.writerow(["timestamp", "ip", "action", "details"])
+            writer.writerow([timestamp, ip, action, details])
+        print(f"[AUDIT] {timestamp} | {ip} | {action} | {details}")
 
     # ---------------------------------------------------------------
     #                          ROUTES
@@ -143,13 +165,13 @@ def create_app(www_dir="www",
         Requires header: X-Admin-Secret=<ADMIN_SECRET>
         Body JSON:
             {
-              "device_id": "esp32-001",
+              "device_id": "uuid-v4",
               "project": "smart_air",
               "expires_hours": 24
             }
         """
         admin_header = request.headers.get("X-Admin-Secret")
-        if not admin_header or admin_header != (admin_secret or ADMIN_SECRET):
+        if not admin_header or admin_header != ADMIN_SECRET:
             abort(403, "Invalid or missing admin secret")
 
         data = request.get_json(silent=True)
@@ -165,6 +187,14 @@ def create_app(www_dir="www",
             abort(400, "Missing 'device_id' or 'project'")
 
         token, payload = generate_ota_jwt(device_id, project, current_fw, expires_hours)
+
+        # Audit logging
+        log_audit_event(
+            ip=request.remote_addr,
+            action="generate_token",
+            details=f"device={device_id}, project={project}, exp={payload['exp']}"
+        )
+
         return jsonify({
             "token": token,
             "expires_at": datetime.fromtimestamp(payload["exp"], tz=timezone.utc).isoformat(),
@@ -179,14 +209,11 @@ def create_app(www_dir="www",
 # -------------------------------------------------------------------
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="HTTPS OTA server with JWT + admin token generation")
+    parser = argparse.ArgumentParser(description="Secure OTA server with JWT and audit logging")
     parser.add_argument("--cert", default="certs/ca_cert.pem")
     parser.add_argument("--key", default="certs/ca_key.pem")
     parser.add_argument("--no-certs", action="store_true")
     parser.add_argument("--no-jwt", action="store_true")
-    parser.add_argument("--jwt-secret", default=None)
-    parser.add_argument("--jwt-algorithm", default="HS256")
-    parser.add_argument("--admin-secret", default=None)
     parser.add_argument("--host", default="0.0.0.0")
     parser.add_argument("--port", type=int, default=8070)
     parser.add_argument("--www-dir", default="www")
@@ -202,14 +229,12 @@ if __name__ == '__main__':
         firmware_dir=args.firmware_dir,
         url_firmware=args.url_firmware,
         use_jwt=not args.no_jwt,
-        jwt_secret=args.jwt_secret,
-        jwt_algorithm=args.jwt_algorithm,
-        admin_secret=args.admin_secret
     )
 
     print("\n=== OTA Server Configuration ===")
     print(f"Listening on {args.host}:{args.port}")
     print(f"JWT: {'ENABLED' if not args.no_jwt else 'DISABLED'}")
+    print(f"Audit log file: {AUDIT_LOG_FILE}")
     print(f"Admin token endpoint: ENABLED (/admin/generate_token)")
     print("===========================================\n")
 
