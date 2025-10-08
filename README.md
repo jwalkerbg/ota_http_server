@@ -156,11 +156,11 @@ LoadModule ssl_module lib/modules/mod_ssl.so
 </IfModule>
 
 <VirtualHost *:8070>
-    ServerName okto7.com
+    ServerName mycompany.com
 
     SSLEngine on
-    SSLCertificateFile "E:/data/https_server/certs/ca_okto7_cert.pem"
-    SSLCertificateKeyFile "E:/data/https_server/certs/ca_okto7_key.pem"
+    SSLCertificateFile "E:/data/https_server/certs/mycompany.com-chain.pem"
+    SSLCertificateKeyFile "E:/data/https_server/certs/mycompany.com-key.pem"
 
     Include e:/data/vhosts/httpd-proxy-ota.conf
 
@@ -217,10 +217,10 @@ Browsers usually cache this file, so it will only be requested once. Devices ini
 
 With token
 ```bash
-https://okto7.com/firmware/projectA/firmware_v1.bin?token=mytoken
+https://mycompany.com/firmware/projectA/firmware_v1.bin?token=mytoken
 ```
 
 Without token
 ```bash
-https://okto7.com/firmware/projectA/firmware_v1.bin
+https://mycompany.com/firmware/projectA/firmware_v1.bin
 ```
