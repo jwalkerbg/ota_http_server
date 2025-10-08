@@ -3,74 +3,53 @@ import os
 import ssl
 import argparse
 import re
-import json
 from packaging import version
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from werkzeug.middleware.proxy_fix import ProxyFix
+import jwt
+
+# Default secret; in production, keep this safe!
+JWT_SECRET = "supersecretkey"
+JWT_ALGORITHM = "HS256"
 
 def create_app(www_dir="www",
                firmware_dir="firmware",
                url_firmware="firmware",
-               use_token=True,
-               expected_token=None,
-               tokens_file=None):
+               use_jwt=True,
+               jwt_secret=None,
+               jwt_algorithm="HS256"):
     """
-    Flask app factory for both CLI and Apache/mod_wsgi usage.
-    Supports per-project tokens from JSON file + optional global token.
+    Flask app factory with JWT authentication for OTA.
     """
     app = Flask(__name__)
 
     def check_token(project=None):
         """
-        Verifies the token from Authorization header or ?token= query param.
-        Checks per-project token first, then global token as fallback.
-        Reloads tokens.json every request for live updates.
+        Verifies JWT from Authorization header.
         """
-        if not use_token:
-            return  # Token check disabled
+        if not use_jwt:
+            return  # Auth disabled
 
-        # Reload tokens file
-        PROJECT_TOKENS = {}
-        if tokens_file and os.path.isfile(tokens_file):
-            try:
-                with open(tokens_file, "r", encoding="utf-8") as f:
-                    PROJECT_TOKENS = json.load(f)
-            except Exception as e:
-                print(f"[WARN] Failed to load tokens file '{tokens_file}': {e}")
+        auth_header = request.headers.get("Authorization")
+        if not auth_header or not auth_header.startswith("Bearer "):
+            abort(401, "Missing Authorization header")
 
-        client_ip = request.remote_addr
-        now_utc = datetime.now().strftime("%d/%b/%Y %H:%M:%S")
+        token = auth_header[len("Bearer "):]
+        try:
+            payload = jwt.decode(token, jwt_secret or JWT_SECRET, algorithms=[jwt_algorithm])
+        except jwt.ExpiredSignatureError:
+            abort(401, "Token expired")
+        except jwt.InvalidTokenError:
+            abort(401, "Invalid token")
 
-        # Get token from header or query
-        header_token = request.headers.get("Authorization")
-        url_token = request.args.get("token")
-        if header_token and header_token.startswith("Bearer "):
-            header_token = header_token[len("Bearer "):]
-        token_to_check = header_token or url_token
-        project_info = f" (project={project})" if project else ""
-
-        # Check project exists in token mapping
-        expected_for_project = PROJECT_TOKENS.get(project)
-
-        if not expected_for_project and not expected_token:
-            print(f"[{now_utc}] [AUTH] Unknown project '{project}' → Denied")
-            abort(404, "Unknown project")
-
-        if not token_to_check:
-            print(f"[{now_utc}] [AUTH] No token provided for {client_ip}{project_info} → Denied")
-            abort(401)
-
-        # Match against project token or global fallback
-        if token_to_check != expected_for_project and token_to_check != expected_token:
-            print(f"[{now_utc}] [AUTH] Invalid token from {client_ip}{project_info} → Denied")
-            abort(401)
-
-        print(f"[{now_utc}] [AUTH] Valid token from {client_ip}{project_info} → Granted")
+        # Verify project claim
+        token_project = payload.get("project")
+        if project and token_project != project:
+            abort(403, "Token not valid for this project")
 
     def get_sorted_versions(project):
         """
         Return sorted list of versions for a given project.
-        Raises 404 if project does not exist or no versions found.
         """
         project_dir = os.path.join(www_dir, firmware_dir, project)
         if not os.path.isdir(project_dir):
@@ -96,6 +75,7 @@ def create_app(www_dir="www",
 
         return project_dir, versions, version_files
 
+    # Routes
     @app.route(f'/{url_firmware}/<project>/<path:filename>')
     def firmware(project, filename):
         check_token(project)
@@ -128,39 +108,53 @@ def create_app(www_dir="www",
         }
         return jsonify(result)
 
+    @app.route("/status")
+    def status():
+        return jsonify({"status": "ok", "time": datetime.utcnow().isoformat()})
+
     return app
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Simple HTTPS file server with optional token authentication")
+    parser = argparse.ArgumentParser(description="HTTPS OTA server with JWT authentication")
     parser.add_argument("--cert", default="certs/ca_cert.pem", help="Path to certificate file")
     parser.add_argument("--key", default="certs/ca_key.pem", help="Path to private key file")
-    parser.add_argument("--no-certs", action="store_true", help="Disable SSL certificates (use plain HTTP)")
-    parser.add_argument("--no-token", action="store_true", help="Disable token authentication")
-    parser.add_argument("--token", help="Global fallback token value to expect")
-    parser.add_argument("--tokens-file", default="tokens.json", help="JSON file with per-project tokens")
+    parser.add_argument("--no-certs", action="store_true", help="Disable SSL (use HTTP)")
+    parser.add_argument("--no-jwt", action="store_true", help="Disable JWT authentication")
+    parser.add_argument("--jwt-secret", default=None, help="JWT secret key")
+    parser.add_argument("--jwt-algorithm", default="HS256", help="JWT signing algorithm")
     parser.add_argument("--host", default="0.0.0.0", help="Listening host")
     parser.add_argument("--port", type=int, default=8070, help="Listening port")
-    parser.add_argument("--www-dir", default="www", help="Root directory for files (default 'www')")
-    parser.add_argument("--firmware-dir", default="firmware", help="Subdirectory for firmware files (default 'firmware')")
-    parser.add_argument("--url-firmware", default="firmware", help="The URL path segment for firmware (default 'firmware')")
+    parser.add_argument("--www-dir", default="www", help="Root directory for files")
+    parser.add_argument("--firmware-dir", default="firmware", help="Subdirectory for firmware")
+    parser.add_argument("--url-firmware", default="firmware", help="URL path segment for firmware")
     return parser.parse_args()
+
+def generate_jwt(project: str, expires_hours=24, secret=JWT_SECRET, algorithm=JWT_ALGORITHM):
+    """
+    Helper function to generate JWT tokens for devices/projects.
+    """
+    now = datetime.now(timezone.utc)  # timezone-aware UTC
+    payload = {
+        "project": project,
+        "iat": int(now.timestamp()),
+        "exp": int((now + timedelta(hours=expires_hours)).timestamp())
+    }
+    return jwt.encode(payload, secret, algorithm=algorithm)
 
 if __name__ == '__main__':
     args = parse_args()
-    use_token = not args.no_token
-    expected_token = args.token  # Optional global fallback
-    tokens_file = args.tokens_file
+    use_jwt = not args.no_jwt
 
     app = create_app(
         www_dir=args.www_dir,
         firmware_dir=args.firmware_dir,
         url_firmware=args.url_firmware,
-        use_token=use_token,
-        expected_token=expected_token,
-        tokens_file=tokens_file
+        use_jwt=use_jwt,
+        jwt_secret=args.jwt_secret,
+        jwt_algorithm=args.jwt_algorithm
     )
 
-    print("\n=== Firmware Server Configuration ===")
+    print("\n=== OTA Server Configuration ===")
     print(f"  Listening on:      {args.host}:{args.port}")
     if not args.no_certs:
         print(f"  Certificate:       {args.cert}")
@@ -170,15 +164,13 @@ if __name__ == '__main__':
     print(f"  Root directory:    {args.www_dir}")
     print(f"  Firmware subdir:   {args.firmware_dir}")
     print(f"  URL firmware path: /{args.url_firmware}/<project>/<filename>")
-    print(f"  Token auth:        {'ENABLED' if use_token else 'DISABLED'}")
-    if use_token:
-        print(f"  Tokens file:       {tokens_file}")
-        if expected_token:
-            print(f"  Global token:      {expected_token}")
-        print("  Token sources:     Authorization header OR ?token= in URL")
+    print(f"  JWT auth:          {'ENABLED' if use_jwt else 'DISABLED'}")
     print("===========================================\n")
 
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1)
+
+    jwt_token = generate_jwt("smart_fan", secret=args.jwt_secret or JWT_SECRET, algorithm=args.jwt_algorithm)
+    print(f"  JWT Token:        {jwt_token}")
 
     if args.no_certs:
         app.run(host=args.host, port=args.port)
