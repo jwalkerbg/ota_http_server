@@ -8,27 +8,35 @@ from datetime import datetime, timedelta, timezone
 from werkzeug.middleware.proxy_fix import ProxyFix
 import jwt
 
-# Default secret; in production, replace this securely
-JWT_SECRET = "supersecretkey"
+# --- Defaults ---
+JWT_SECRET = "supersecretkey"       # Replace for production
 JWT_ALGORITHM = "HS256"
+ADMIN_SECRET = "admin123"           # Used for token issuing endpoint (replace for production)
+
+# -------------------------------------------------------------------
+#                       APP FACTORY
+# -------------------------------------------------------------------
 
 def create_app(www_dir="www",
                firmware_dir="firmware",
                url_firmware="firmware",
                use_jwt=True,
                jwt_secret=None,
-               jwt_algorithm="HS256"):
+               jwt_algorithm="HS256",
+               admin_secret=None):
     """
-    Flask app factory with JWT authentication for OTA updates.
+    Flask app factory with JWT authentication and token generation endpoint.
     """
     app = Flask(__name__)
 
+    # ---------------------------------------------------------------
+    #                       HELPER FUNCTIONS
+    # ---------------------------------------------------------------
+
     def check_token(project=None):
-        """
-        Verifies JWT from Authorization header.
-        """
+        """ Verifies JWT from Authorization header. """
         if not use_jwt:
-            return  # Auth disabled
+            return
 
         auth_header = request.headers.get("Authorization")
         if not auth_header or not auth_header.startswith("Bearer "):
@@ -42,21 +50,17 @@ def create_app(www_dir="www",
         except jwt.InvalidTokenError:
             abort(401, "Invalid token")
 
-        # Verify project claim
+        # Verify project
         token_project = payload.get("project")
         if project and token_project != project:
             abort(403, "Token not valid for this project")
 
-        # Optional logging (device ID, roles, etc.)
+        # Optional logging
         device_id = payload.get("sub", "unknown")
-        roles = payload.get("roles", [])
-        print(f"[{datetime.now(timezone.utc).isoformat()}] [AUTH] "
-              f"Device={device_id} Project={token_project} Roles={roles} → OK")
+        print(f"[{datetime.now(timezone.utc).isoformat()}] [AUTH] Device={device_id}, Project={token_project} OK")
 
     def get_sorted_versions(project):
-        """
-        Return sorted list of versions for a given project.
-        """
+        """ Return sorted list of versions for a given project. """
         project_dir = os.path.join(www_dir, firmware_dir, project)
         if not os.path.isdir(project_dir):
             abort(404, "Project not found")
@@ -78,24 +82,31 @@ def create_app(www_dir="www",
 
         versions.sort(key=lambda s: list(map(int, s.split('.'))))
         version_files.sort(key=lambda x: version.parse(x[1]))
-
         return project_dir, versions, version_files
 
-    # --- Routes ---
+    def generate_ota_jwt(device_id, project, current_fw="1.0.0", expires_hours=24):
+        """ Generate a timezone-aware JWT for OTA clients (devices). """
+        now = datetime.now(timezone.utc)
+        payload = {
+            "sub": device_id,
+            "project": project,
+            "roles": ["device", "ota_client"],
+            "iat": int(now.timestamp()),
+            "exp": int((now + timedelta(hours=expires_hours)).timestamp()),
+            "jti": f"{device_id}-{int(now.timestamp())}",
+            "fw_version": current_fw
+        }
+        return jwt.encode(payload, jwt_secret or JWT_SECRET, algorithm=jwt_algorithm), payload
+
+    # ---------------------------------------------------------------
+    #                          ROUTES
+    # ---------------------------------------------------------------
 
     @app.route(f'/{url_firmware}/<project>/<path:filename>')
     def firmware(project, filename):
         check_token(project)
         project_dir = os.path.join(www_dir, firmware_dir, project)
         return send_from_directory(project_dir, filename)
-
-    @app.route('/favicon.ico')
-    def favicon():
-        return send_from_directory(
-            www_dir,
-            'favicon.ico',
-            mimetype='image/vnd.microsoft.icon'
-        )
 
     @app.route(f'/{url_firmware}/<project>/latest')
     def latest_firmware(project):
@@ -108,78 +119,98 @@ def create_app(www_dir="www",
     def list_versions(project):
         check_token(project)
         _, versions, _ = get_sorted_versions(project)
-        result = {
+        return jsonify({
             "versions": versions,
             "count": len(versions),
             "latest": versions[-1]
-        }
-        return jsonify(result)
+        })
 
     @app.route("/status")
     def status():
-        return jsonify({"status": "ok", "time": datetime.now(timezone.utc).isoformat()})
+        return jsonify({
+            "status": "ok",
+            "time": datetime.now(timezone.utc).isoformat()
+        })
+
+    # ---------------------------------------------------------------
+    #                      ADMIN TOKEN GENERATOR
+    # ---------------------------------------------------------------
+
+    @app.route("/admin/generate_token", methods=["POST"])
+    def admin_generate_token():
+        """
+        Generates a JWT dynamically for a device.
+        Requires header: X-Admin-Secret=<ADMIN_SECRET>
+        Body JSON:
+            {
+              "device_id": "esp32-001",
+              "project": "smart_air",
+              "expires_hours": 24
+            }
+        """
+        admin_header = request.headers.get("X-Admin-Secret")
+        if not admin_header or admin_header != (admin_secret or ADMIN_SECRET):
+            abort(403, "Invalid or missing admin secret")
+
+        data = request.get_json(silent=True)
+        if not data:
+            abort(400, "Missing JSON body")
+
+        device_id = data.get("device_id")
+        project = data.get("project")
+        expires_hours = data.get("expires_hours", 24)
+        current_fw = data.get("current_fw", "1.0.0")
+
+        if not device_id or not project:
+            abort(400, "Missing 'device_id' or 'project'")
+
+        token, payload = generate_ota_jwt(device_id, project, current_fw, expires_hours)
+        return jsonify({
+            "token": token,
+            "expires_at": datetime.fromtimestamp(payload["exp"], tz=timezone.utc).isoformat(),
+            "payload": payload
+        })
 
     return app
 
 
+# -------------------------------------------------------------------
+#                       ENTRY POINT
+# -------------------------------------------------------------------
+
 def parse_args():
-    parser = argparse.ArgumentParser(description="HTTPS OTA server with JWT authentication (UTC-safe)")
-    parser.add_argument("--cert", default="certs/ca_cert.pem", help="Path to certificate file")
-    parser.add_argument("--key", default="certs/ca_key.pem", help="Path to private key file")
-    parser.add_argument("--no-certs", action="store_true", help="Disable SSL (use HTTP)")
-    parser.add_argument("--no-jwt", action="store_true", help="Disable JWT authentication")
-    parser.add_argument("--jwt-secret", default=None, help="JWT secret key")
-    parser.add_argument("--jwt-algorithm", default="HS256", help="JWT signing algorithm")
-    parser.add_argument("--host", default="0.0.0.0", help="Listening host")
-    parser.add_argument("--port", type=int, default=8070, help="Listening port")
-    parser.add_argument("--www-dir", default="www", help="Root directory for files")
-    parser.add_argument("--firmware-dir", default="firmware", help="Subdirectory for firmware")
-    parser.add_argument("--url-firmware", default="firmware", help="URL path segment for firmware")
+    parser = argparse.ArgumentParser(description="HTTPS OTA server with JWT + admin token generation")
+    parser.add_argument("--cert", default="certs/ca_cert.pem")
+    parser.add_argument("--key", default="certs/ca_key.pem")
+    parser.add_argument("--no-certs", action="store_true")
+    parser.add_argument("--no-jwt", action="store_true")
+    parser.add_argument("--jwt-secret", default=None)
+    parser.add_argument("--jwt-algorithm", default="HS256")
+    parser.add_argument("--admin-secret", default=None)
+    parser.add_argument("--host", default="0.0.0.0")
+    parser.add_argument("--port", type=int, default=8070)
+    parser.add_argument("--www-dir", default="www")
+    parser.add_argument("--firmware-dir", default="firmware")
+    parser.add_argument("--url-firmware", default="firmware")
     return parser.parse_args()
-
-
-def generate_ota_jwt(device_id, project, current_fw="1.0.0", expires_hours=24,
-                     secret=JWT_SECRET, algorithm=JWT_ALGORITHM):
-    """
-    Generate a timezone-aware JWT for OTA clients (devices).
-    """
-    now = datetime.now(timezone.utc)
-    payload = {
-        "sub": device_id,
-        "project": project,
-        "roles": ["device", "ota_client"],
-        "iat": int(now.timestamp()),  # issued-at UTC
-        "exp": int((now + timedelta(hours=expires_hours)).timestamp()),  # expiry UTC
-        "jti": f"{device_id}-{int(now.timestamp())}",
-        "fw_version": current_fw
-    }
-    return jwt.encode(payload, secret, algorithm=algorithm)
 
 
 if __name__ == '__main__':
     args = parse_args()
-    use_jwt = not args.no_jwt
-
     app = create_app(
         www_dir=args.www_dir,
         firmware_dir=args.firmware_dir,
         url_firmware=args.url_firmware,
-        use_jwt=use_jwt,
+        use_jwt=not args.no_jwt,
         jwt_secret=args.jwt_secret,
-        jwt_algorithm=args.jwt_algorithm
+        jwt_algorithm=args.jwt_algorithm,
+        admin_secret=args.admin_secret
     )
 
     print("\n=== OTA Server Configuration ===")
-    print(f"  Listening on:      {args.host}:{args.port}")
-    if not args.no_certs:
-        print(f"  Certificate:       {args.cert}")
-        print(f"  Private key:       {args.key}")
-    else:
-        print("  SSL:               DISABLED (plain HTTP)")
-    print(f"  Root directory:    {args.www_dir}")
-    print(f"  Firmware subdir:   {args.firmware_dir}")
-    print(f"  URL firmware path: /{args.url_firmware}/<project>/<filename>")
-    print(f"  JWT auth:          {'ENABLED' if use_jwt else 'DISABLED'}")
+    print(f"Listening on {args.host}:{args.port}")
+    print(f"JWT: {'ENABLED' if not args.no_jwt else 'DISABLED'}")
+    print(f"Admin token endpoint: ENABLED (/admin/generate_token)")
     print("===========================================\n")
 
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1)
