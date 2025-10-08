@@ -26,6 +26,7 @@ if not ADMIN_SECRET:
 JWT_ALGORITHM = os.environ.get("OTA_JWT_ALGORITHM", "HS256")
 AUDIT_LOG_FILE = os.environ.get("OTA_AUDIT_LOG", "audit_log.csv")
 
+JWT_DEFAULT_EXPIRY_MINUTES = int(os.environ.get("OTA_JWT_EXPIRY_MINUTES", "30"))
 
 # -------------------------------------------------------------------
 #                       APP FACTORY
@@ -94,7 +95,7 @@ def create_app(www_dir="www",
         version_files.sort(key=lambda x: version.parse(x[1]))
         return project_dir, versions, version_files
 
-    def generate_ota_jwt(device_id, project, current_fw="1.0.0", expires_hours=24):
+    def generate_ota_jwt(device_id, project, current_fw="1.0.0", expires_minutes=JWT_DEFAULT_EXPIRY_MINUTES):
         """Generate a timezone-aware JWT for OTA clients (devices)."""
         now = datetime.now(timezone.utc)
         payload = {
@@ -102,7 +103,7 @@ def create_app(www_dir="www",
             "project": project,
             "roles": ["device", "ota_client"],
             "iat": int(now.timestamp()),
-            "exp": int((now + timedelta(hours=expires_hours)).timestamp()),
+            "exp": int((now + timedelta(minutes=expires_minutes)).timestamp()),
             "jti": f"{device_id}-{int(now.timestamp())}",
             "fw_version": current_fw
         }
@@ -167,7 +168,7 @@ def create_app(www_dir="www",
             {
               "device_id": "uuid-v4",
               "project": "smart_air",
-              "expires_hours": 24
+              "expires_minutes": $JWT_DEFAULT_EXPIRY_MINUTES
             }
         """
         admin_header = request.headers.get("X-Admin-Secret")
@@ -180,13 +181,13 @@ def create_app(www_dir="www",
 
         device_id = data.get("device_id")
         project = data.get("project")
-        expires_hours = data.get("expires_hours", 24)
+        expires_minutes = data.get("expires_minutes", JWT_DEFAULT_EXPIRY_MINUTES)
         current_fw = data.get("current_fw", "1.0.0")
 
         if not device_id or not project:
             abort(400, "Missing 'device_id' or 'project'")
 
-        token, payload = generate_ota_jwt(device_id, project, current_fw, expires_hours)
+        token, payload = generate_ota_jwt(device_id, project, current_fw, expires_minutes)
 
         # Audit logging
         log_audit_event(
