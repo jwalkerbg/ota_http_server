@@ -8,7 +8,7 @@ from datetime import datetime, timedelta, timezone
 from werkzeug.middleware.proxy_fix import ProxyFix
 import jwt
 
-# Default secret; in production, keep this safe!
+# Default secret; in production, replace this securely
 JWT_SECRET = "supersecretkey"
 JWT_ALGORITHM = "HS256"
 
@@ -19,7 +19,7 @@ def create_app(www_dir="www",
                jwt_secret=None,
                jwt_algorithm="HS256"):
     """
-    Flask app factory with JWT authentication for OTA.
+    Flask app factory with JWT authentication for OTA updates.
     """
     app = Flask(__name__)
 
@@ -46,6 +46,12 @@ def create_app(www_dir="www",
         token_project = payload.get("project")
         if project and token_project != project:
             abort(403, "Token not valid for this project")
+
+        # Optional logging (device ID, roles, etc.)
+        device_id = payload.get("sub", "unknown")
+        roles = payload.get("roles", [])
+        print(f"[{datetime.now(timezone.utc).isoformat()}] [AUTH] "
+              f"Device={device_id} Project={token_project} Roles={roles} → OK")
 
     def get_sorted_versions(project):
         """
@@ -75,7 +81,8 @@ def create_app(www_dir="www",
 
         return project_dir, versions, version_files
 
-    # Routes
+    # --- Routes ---
+
     @app.route(f'/{url_firmware}/<project>/<path:filename>')
     def firmware(project, filename):
         check_token(project)
@@ -110,12 +117,13 @@ def create_app(www_dir="www",
 
     @app.route("/status")
     def status():
-        return jsonify({"status": "ok", "time": datetime.utcnow().isoformat()})
+        return jsonify({"status": "ok", "time": datetime.now(timezone.utc).isoformat()})
 
     return app
 
+
 def parse_args():
-    parser = argparse.ArgumentParser(description="HTTPS OTA server with JWT authentication")
+    parser = argparse.ArgumentParser(description="HTTPS OTA server with JWT authentication (UTC-safe)")
     parser.add_argument("--cert", default="certs/ca_cert.pem", help="Path to certificate file")
     parser.add_argument("--key", default="certs/ca_key.pem", help="Path to private key file")
     parser.add_argument("--no-certs", action="store_true", help="Disable SSL (use HTTP)")
@@ -129,17 +137,24 @@ def parse_args():
     parser.add_argument("--url-firmware", default="firmware", help="URL path segment for firmware")
     return parser.parse_args()
 
-def generate_jwt(project: str, expires_hours=24, secret=JWT_SECRET, algorithm=JWT_ALGORITHM):
+
+def generate_ota_jwt(device_id, project, current_fw="1.0.0", expires_hours=24,
+                     secret=JWT_SECRET, algorithm=JWT_ALGORITHM):
     """
-    Helper function to generate JWT tokens for devices/projects.
+    Generate a timezone-aware JWT for OTA clients (devices).
     """
-    now = datetime.now(timezone.utc)  # timezone-aware UTC
+    now = datetime.now(timezone.utc)
     payload = {
+        "sub": device_id,
         "project": project,
-        "iat": int(now.timestamp()),
-        "exp": int((now + timedelta(hours=expires_hours)).timestamp())
+        "roles": ["device", "ota_client"],
+        "iat": int(now.timestamp()),  # issued-at UTC
+        "exp": int((now + timedelta(hours=expires_hours)).timestamp()),  # expiry UTC
+        "jti": f"{device_id}-{int(now.timestamp())}",
+        "fw_version": current_fw
     }
     return jwt.encode(payload, secret, algorithm=algorithm)
+
 
 if __name__ == '__main__':
     args = parse_args()
@@ -168,9 +183,6 @@ if __name__ == '__main__':
     print("===========================================\n")
 
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1)
-
-    jwt_token = generate_jwt("smart_fan", secret=args.jwt_secret or JWT_SECRET, algorithm=args.jwt_algorithm)
-    print(f"  JWT Token:        {jwt_token}")
 
     if args.no_certs:
         app.run(host=args.host, port=args.port)
