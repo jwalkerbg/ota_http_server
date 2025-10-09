@@ -46,15 +46,35 @@ def create_app(www_dir="www",
     # ---------------------------------------------------------------
 
     def check_token(project=None):
-        """Verifies JWT from Authorization header."""
+        """Verifies JWT from Authorization header or ?token= query param.
+        Allows query param only for safe (GET, HEAD) requests.
+        """
         if not use_jwt:
             return
 
-        auth_header = request.headers.get("Authorization")
-        if not auth_header or not auth_header.startswith("Bearer "):
-            abort(401, "Missing Authorization header")
+        token = None
+        source = None
 
-        token = auth_header[len("Bearer "):]
+        # 1️⃣ Try Authorization header first
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            token = auth_header[len("Bearer "):]
+            source = "header"
+
+        # 2️⃣ Fallback to ?token= only if header missing
+        if not token:
+            token = request.args.get("token")
+            if token:
+                source = "query"
+                # Allow query tokens only for safe requests (GET, HEAD)
+                if request.method not in ("GET", "HEAD"):
+                    abort(405, "Query token not allowed for this method")
+
+        # 3️⃣ If no token found at all
+        if not token:
+            abort(401, "Missing token (Authorization header or ?token=)")
+
+        # 4️⃣ Decode and verify JWT
         try:
             payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
         except jwt.ExpiredSignatureError:
@@ -62,13 +82,15 @@ def create_app(www_dir="www",
         except jwt.InvalidTokenError:
             abort(401, "Invalid token")
 
-        # Verify project
+        # 5️⃣ Verify project match
         token_project = payload.get("project")
         if project and token_project != project:
             abort(403, "Token not valid for this project")
 
+        # 6️⃣ Log successful authentication
         device_id = payload.get("sub", "unknown")
-        print(f"[{datetime.now(timezone.utc).isoformat()}] [AUTH] Device={device_id}, Project={token_project} OK")
+        now = datetime.now(timezone.utc).isoformat()
+        print(f"[{now}] [AUTH] OK - Device={device_id}, Project={token_project}, Source={source}")
 
     def get_sorted_versions(project):
         """Return sorted list of versions for a given project."""
