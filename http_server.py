@@ -211,15 +211,15 @@ def create_app(www_dir="www",
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Secure OTA server with JWT and audit logging")
-    parser.add_argument("--cert", default="certs/ca_cert.pem")
-    parser.add_argument("--key", default="certs/ca_key.pem")
-    parser.add_argument("--no-certs", action="store_true")
-    parser.add_argument("--no-jwt", action="store_true")
-    parser.add_argument("--host", default="0.0.0.0")
-    parser.add_argument("--port", type=int, default=8070)
-    parser.add_argument("--www-dir", default="www")
-    parser.add_argument("--firmware-dir", default="firmware")
-    parser.add_argument("--url-firmware", default="firmware")
+    parser.add_argument("--cert", default="certs/ca_cert.pem", help="Path to certificate file")
+    parser.add_argument("--key", default="certs/ca_key.pem", help="Path to private key file")
+    parser.add_argument("--no-certs", action="store_true", help="Disable SSL certificates (use plain HTTP)")
+    parser.add_argument("--no-jwt", action="store_true", help="Disable JWT authentication (not recommended)")
+    parser.add_argument("--host", default="0.0.0.0", help="Listening host")
+    parser.add_argument("--port", type=int, default=8070, help="Listening port")
+    parser.add_argument("--www-dir", default="www", help="Root directory for files (default 'www')")
+    parser.add_argument("--firmware-dir", default="firmware", help="Subdirectory for firmware files (default 'firmware')")
+    parser.add_argument("--url-firmware", default="firmware", help="The URL path segment for firmware (default 'firmware', corresponds with `firmware-dir`)")
     return parser.parse_args()
 
 
