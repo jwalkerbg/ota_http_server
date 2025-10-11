@@ -1,0 +1,74 @@
+[tool.poetry]
+name = "ota_http_server"
+version = "1.9.1"
+description = "A sample project driven by poetry, using C and Cython extensions"
+license = "MIT"
+authors = ["Ivan Cenov <i_cenov@botevgrad.com>"]
+repository = "https://github.com/jwalkerbg/ota_http_server.git"
+readme = "README.md"
+packages = [{include = "ota_http_server", from = "src"}]
+# Additional files that should be added to sdist and wheel distributions.
+include = [
+    "pyproject.toml",
+    "build.py",
+    "README.md",
+    "src/ota_http_server/extensions/*"
+]  # Compiled extensions
+
+# Runtime dependencies
+[tool.poetry.dependencies]
+python = ">=3.12"
+cython = ">=3.0"
+setuptools = ">=68.0.0"
+tomli = { version = "*", markers = "python_version < '3.11'" }
+jsonschema = "*"
+types-jsonschema = "*"
+rfc3986 = "*"
+Flask = ">=3.1.2"
+packaging = ">=25.0"
+PyJWT = ">=2.10.1"
+Werkzeug = ">=3.1.3"
+
+# Development dependencies
+[tool.poetry.group.dev.dependencies]
+mypy = "^1.5.1"  # Static type checker
+pathlib = ">=1.0"
+pylint = "^3.3.3"
+
+# Test dependencies
+[tool.poetry.group.test.dependencies]
+pytest = ">=8.0.0"
+pytest-cov = ">=6.0.0"
+pytest-mock = ">=3.0.0"
+
+# CLI entry points
+[tool.poetry.scripts]
+ota_http_server = "ota_http_server.cli.app:main"
+
+# Definitions, specific for this project.
+[tool.build.config]
+# path where Cython and C extensions live, each extension in a separate directory
+extensions_path = "src/ota_http_server/extensions"
+# directories where C extensions can search for C header files
+include_dirs = ["src/ota_http_server/include", "src/include"]
+# This specifies the name of the libraries to link against, without the lib prefix or file extension.
+# Example: If you have a shared library named `libmylib.so` (Linux) or `mylib.dll` (Windows), you would specify libraries=["mylib"].
+libraries = []
+# activate logging in build.py
+build_log = true
+
+[build-system]
+requires = ["poetry-core", "setuptools", "Cython"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.build]
+generate-setup-file = true
+script = 'build.py'
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = "src"
+
+[tool.pylint]
+disable = "missing-docstring"
+max-line-length = 200

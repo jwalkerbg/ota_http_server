@@ -1,0 +1,15 @@
+# config.toml
+
+# Sample of parameters in the program
+[parameters]
+no-certs = true
+port = 8071
+www-dir = "www"
+firmware-dir = "firmware"
+url-firmware = "firmware"
+
+[metadata]
+#version = true
+
+[logging]
+verbose = true
