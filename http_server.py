@@ -189,8 +189,9 @@ def create_app(www_dir="www",
         Body JSON:
             {
               "device_id": "uuid-v4",
-              "project": "smart_air",
+              "project": "project_name",
               "expires_minutes": $JWT_DEFAULT_EXPIRY_MINUTES
+              "current_fw": "1.0.0"
             }
         """
         admin_header = request.headers.get("X-Admin-Secret")

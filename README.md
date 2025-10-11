@@ -1,7 +1,7 @@
 # OTA Firmware Server
 
 A lightweight Python/Flask-based firmware server for Over-The-Air (OTA) updates.
-Supports **token-based authentication** and can run in two modes:
+Supports optional **JWT-based authentication** and can run in two modes:
 
 - **Standalone mode** — Flask runs directly (with optional SSL)
 - **Reverse proxy mode** — Behind Apache (HTTP or HTTPS) with load balancing
@@ -52,7 +52,7 @@ python -m venv .venv
 ```
 3. **Install dependencies**:
 ```bash
-pip install flask
+pip install flask packaging PyJWT
 ```
 4. Create directories:
 ```bash
@@ -70,17 +70,17 @@ copy my_favicon.ico www\favicon.ico
 copy my_favicon.ico www/favicon.ico
 7. Run the server (no SSL):
 ```bash
-python http_server.py --no-certs --token mytoken --port 8070
+python http_server.py --no-certs --port 8071
 ```
 8. Access firmware:
 ```bash
-http://localhost:8070/firmware/projectA/firmware_v1.bin?token=mytoken
+http://localhost:8071/firmware/projectA/firmware_v1.bin?token=JWT_token
 ```
 
 ## Features
 
 * Serve firmware files from a defined directory structure
-* Optional token authentication (Authorization: Bearer <token> or ?token=<token>)
+* Optional JWT token authentication (Authorization: Bearer <JWT> or ?token=<JWT>)
 * HTTPS support in standalone mode
 * Easy integration behind Apache reverse proxy
 * Built-in favicon.ico serving
@@ -116,7 +116,6 @@ You can run the server directly with Python.
 python http_server.py \
     --cert certs/ca_cert.pem \
     --key certs/ca_key.pem \
-    --token mytoken \
     --host 0.0.0.0 \
     --port 8070 \
     --www-dir www \
@@ -127,12 +126,12 @@ python http_server.py \
 ### Start without SSL (for Apache reverse proxy)
 
 ```bash
-python http_server.py --no-certs --token mytoken --port 8071
+python http_server.py --no-certs --port 8071
 ```
 
 See the virtual host and reverse proxy configurations to figure out ports usage.
 
-If `--no-token` option is given the token is not used event it is supplied at the end of the url.
+If `--no-jwt` option is given JWT token is not used even it is supplied in the header Bearer or at the end of the url.
 
 ## Apache Reverse Proxy Mode
 
@@ -141,9 +140,9 @@ If `--no-token` option is given the token is not used event it is supplied at th
 You can place multiple instances of ```http_server.py``` behind Apache for load balancing.
 
 ```bash
-python http_server.py --no-certs --token mytoken --port 8071
-python http_server.py --no-certs --token mytoken --port 8072
-python http_server.py --no-certs --token mytoken --port 8073
+python http_server.py --no-certs --port 8071
+python http_server.py --no-certs --port 8072
+python http_server.py --no-certs --port 8073
 ```
 
 ### Apache VirtualHost configuration
@@ -202,10 +201,10 @@ ProxyPassReverse "/" "balancer://flaskcluster/"
 
 3. Authentication
 
-Token authentication is enabled by default. Clients can pass the token as URL parameter.
+JWT authentication is enabled by default. Clients can pass JWT in the header or as an URL parameter.
 
 ```
-GET /firmware/projectA/firmware_v1.bin?token=mytoken
+GET /firmware/projectA/firmware_v1.bin?token=<JWT>
 ```
 
 ## Favicon
@@ -217,7 +216,7 @@ Browsers usually cache this file, so it will only be requested once. Devices ini
 
 With token
 ```bash
-https://mycompany.com/firmware/projectA/firmware_v1.bin?token=mytoken
+https://mycompany.com/firmware/projectA/firmware_v1.bin?token=<JWT>
 ```
 
 Without token
