@@ -1,5 +1,28 @@
 # OTA Firmware Server
 
+- [OTA Firmware Server](#ota-firmware-server)
+  - [🗺 Architecture](#-architecture)
+  - [🚀 Quick Start](#-quick-start)
+  - [Features](#features)
+  - [Directory Structure](#directory-structure)
+  - [Standalone Mode](#standalone-mode)
+    - [Start with SSL (default)](#start-with-ssl-default)
+    - [Start without SSL (for Apache reverse proxy)](#start-without-ssl-for-apache-reverse-proxy)
+  - [Apache Reverse Proxy Mode](#apache-reverse-proxy-mode)
+    - [Running multiple http\_server.py](#running-multiple-http_serverpy)
+    - [Apache VirtualHost configuration](#apache-virtualhost-configuration)
+    - [httpd-proxy-ota.conf:](#httpd-proxy-otaconf)
+  - [JWT-Based Authentication for OTA Access](#jwt-based-authentication-for-ota-access)
+    - [Token Generation](#token-generation)
+    - [JWT Payload Fields](#jwt-payload-fields)
+    - [JWT Generation Logic](#jwt-generation-logic)
+    - [Token Usage (Devices)](#token-usage-devices)
+    - [Audit Logging](#audit-logging)
+    - [Security Notes](#security-notes)
+  - [Favicon](#favicon)
+    - [Example OTA Firmware URL](#example-ota-firmware-url)
+
+
 A lightweight Python/Flask-based firmware server for Over-The-Air (OTA) updates.
 Supports optional **JWT-based authentication** and can run in two modes:
 
@@ -206,6 +229,152 @@ JWT authentication is enabled by default. Clients can pass JWT in the header or 
 ```
 GET /firmware/projectA/firmware_v1.bin?token=<JWT>
 ```
+
+## JWT-Based Authentication for OTA Access
+
+The OTA server uses JSON Web Tokens (JWTs) instead of static tokens.
+Each device (ESP32, etc.) must present a valid JWT when requesting firmware files or version information.
+
+JWTs are short-lived, cryptographically signed tokens that the OTA server verifies using a secret key.
+This improves security, enables per-device authorization, and supports expiration and revocation.
+
+By default JWT tokens are used. The OTA server may be commanded to not use them with the command line option `--no-jwt`.
+
+### Token Generation
+
+Tokens are issued dynamically via the admin endpoint:
+
+```html
+POST /admin/generate_token
+```
+**Request headers**
+
+Header | Description
+-------|------------
+| X-Admin-Secret | The administrator secret (must match the server’s ADMIN_SECRET environment variable). |
+| Content-Type | Must be application/json. |
+
+**Request body**
+```json
+{
+  "device_id": "e6f87d77-4216-4be1-ab83-b5fa6792b747",
+  "project": "smart_fan",
+  "expires_minutes": 30,
+  "current_fw": "1.0.0"
+}
+```
+* `device_id` — The unique UUID of the device that will perform OTA.
+* `project` — The firmware project name (must match the folder name under /firmware/).
+* `expires_minutes` (optional) — Token lifetime in minutes (default: value of JWT_DEFAULT_EXPIRY_MINUTES).
+* `current_fw` (optional) — Current firmware version; stored in the token for auditing.
+
+**Example curl command (Linux/macOS)**
+```bash
+curl -X POST https://yourserver:8070/admin/generate_token \
+  -H "X-Admin-Secret: $OTA_ADMIN_SECRET" \
+  -H "Content-Type: application/json" \
+  -d '{
+        "device_id": "e6f87d77-4216-4be1-ab83-b5fa6792b747",
+        "project": "smart_fan"
+      }'
+```
+
+The response contains a signed JWT and metadata:
+```json
+{
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9....",
+  "expires_at": "2025-10-09T15:34:12+00:00",
+  "payload": {
+    "sub": "e6f87d77-4216-4be1-ab83-b5fa6792b747",
+    "project": "smart_fan",
+    "roles": ["device", "ota_client"],
+    "iat": 1739083200,
+    "exp": 1739085000,
+    "jti": "e6f87d77-4216-4be1-ab83-b5fa6792b747-1739083200",
+    "fw_version": "1.0.0"
+  }
+}
+```
+
+### JWT Payload Fields
+
+Field | Description
+------|------------
+| `sub` | Device unique identifier (UUIDv4). Identifies which device the token belongs to. |
+| `project` | Project name — firmware group or directory name. Used to verify access. |
+| `roles` | List of logical roles; currently includes "device" and "ota_client". |
+| `iat` | Issued-At timestamp (UNIX time). |
+| `exp` | Expiration time — after this the token becomes invalid. |
+| `jti` | Unique token ID (JWT ID). Helps detect re-use or revoke individual tokens. |
+| `fw_version` | Current firmware version reported when the token was generated. |
+
+### JWT Generation Logic
+
+Internally, the server uses:
+
+```python
+def generate_ota_jwt(device_id, project, current_fw="1.0.0",
+                     expires_minutes=JWT_DEFAULT_EXPIRY_MINUTES):
+    now = datetime.now(timezone.utc)
+    payload = {
+        "sub": device_id,
+        "project": project,
+        "roles": ["device", "ota_client"],
+        "iat": int(now.timestamp()),
+        "exp": int((now + timedelta(minutes=expires_minutes)).timestamp()),
+        "jti": f"{device_id}-{int(now.timestamp())}",
+        "fw_version": current_fw
+    }
+    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM), payload
+```
+
+### Token Usage (Devices)
+
+Each OTA-capable device must include its token in every request to the OTA server:
+
+**Authorization header**
+
+```html
+Authorization: Bearer <jwt_token_here>
+```
+or equivalently as a query parameter:
+```
+?token=<jwt_token_here>
+```
+
+**Example firmware download**
+
+```html
+GET /firmware/projectA/projectA-01.00.02.bin
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+```
+or
+```html
+GET /firmware/projectA/projectA-01.00.02.bin?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+```
+
+### Audit Logging
+
+Each successful token generation is logged for traceability:
+
+```
+[2025-10-09T15:34:12Z] [AUDIT] Action=generate_token IP=203.0.113.7 device=e6f87d77-4216-4be1-ab83-b5fa6792b747 project=projectA exp=1739085000
+```
+
+This allows tracking which admin generated which tokens and when.
+
+### Security Notes
+
+* he admin secret (X-Admin-Secret) must never be hardcoded.
+It is read from the environment variable OTA_ADMIN_SECRET.
+Set it securely before starting the server:
+
+```bash
+export OTA_ADMIN_SECRET="your-very-long-secret-value"
+```
+* Always use HTTPS when issuing or using tokens.
+* Tokens are short-lived by design; keep expiry short (5–60 minutes).
+* Devices should request a new token only when needed, not store them permanently.
 
 ## Favicon
 
