@@ -37,7 +37,7 @@ class Config:
             'no-certs': False,
             'no-jwt': False,
             'host': "0.0.0.0",
-            'port': 8070,
+            'port': 8071,
             'www-dir': "www",
             'firmware-dir': "firmware",
             'url-firmware': "firmware",
