@@ -77,25 +77,27 @@ python -m venv .venv
 ```bash
 pip install flask packaging PyJWT
 ```
-4. Create directories:
+Note: Do not use the old `jwt` package. Use `PyJWT`. If `jwt` has been already installed, uninstall it from the virtual environment and `then` install fresh `PyJWT`.
+
+4. **Create directories**:
 ```bash
 mkdir -p www\firmware\projectA
 ```
-5. Add a firmware file:
+5. **Add a firmware file**:
 ```bash
 echo "dummy firmware data" > www\firmware\projectA\firmware_v1.bin
 ```
-6. Add a favicon (optional but recommended):
+6. **Add a favicon (optional but recommended)**:
 ```bash
 # Example: copy any 16x16 or 32x32 .ico file
 copy my_favicon.ico www\favicon.ico
 # Example: copy any 16x16 or 32x32 .ico file
 copy my_favicon.ico www/favicon.ico
-7. Run the server (no SSL):
+7. **Run the server (no SSL)**:
 ```bash
 python http_server.py --no-certs --port 8071
 ```
-8. Access firmware:
+8. **Access firmware**:
 ```bash
 http://localhost:8071/firmware/projectA/firmware_v1.bin?token=JWT_token
 ```
