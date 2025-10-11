@@ -12,6 +12,7 @@ from datetime import datetime, timedelta, timezone
 from werkzeug.middleware.proxy_fix import ProxyFix
 import jwt
 import csv
+from importlib.metadata import version as pkg_version
 
 import ota_http_server
 from ota_http_server.core.config import Config
@@ -78,7 +79,7 @@ def main():
 
     # Step 5: Show version info or run the application with collected configuration
     if cfg.config['metadata']['version']:
-        app_version = version("ota_http_server")
+        app_version = pkg_version("ota_http_server")
         print(f"ota_http_server {app_version}")
     else:
         run_app(cfg)
