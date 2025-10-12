@@ -43,18 +43,30 @@ def parse_args():
                                  const=False, help='Disable verbose mode')
 
     # application options & parameters
-    parser.add_argument("--cert", help="Path to certificate file")
-    parser.add_argument("--key", help="Path to private key file")
-    parser.add_argument("--no-certs", action="store_true", help="Disable SSL certificates (use plain HTTP)")
-    parser.add_argument("--no-jwt", action="store_true", help="Disable JWT authentication (not recommended)")
-    parser.add_argument("--host", help="Listening host")
-    parser.add_argument("--port", type=int, help="Listening port")
-    parser.add_argument("--www-dir", help="Root directory for files (default 'www')")
-    parser.add_argument("--firmware-dir", help="Subdirectory for firmware files (default 'firmware')")
-    parser.add_argument("--url-firmware", help="The URL path segment for firmware (default 'firmware', corresponds with `firmware-dir`)")
-    parser.add_argument("--log-file", help="Log file name (default 'ota_http_server.log')")
-    parser.add_argument("--log-level",choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"], help="Logging level (default 'INFO')")
-    parser.add_argument("--audit-log-file", help="Audit log file name (default 'audit.log')")
+
+    certs_group = parser.add_argument_group("Certificates")
+    certs_ex_group = certs_group.add_mutually_exclusive_group()
+    certs_ex_group.add_argument("--no-certs", dest="no_certs", action="store_const", const=True, help="Disable SSL certificates (use plain HTTP)")
+    certs_ex_group.add_argument("--certs", dest="no_certs", action="store_const", const=False, help="Enable SSL certificates (use plain HTTP)")
+    certs_group.add_argument("--cert", help="Path to certificate file")
+    certs_group.add_argument("--key", help="Path to private key file")
+
+    jwt_group = parser.add_argument_group("JWT")
+    jwt_ex_group = jwt_group.add_mutually_exclusive_group()
+    jwt_ex_group.add_argument("--no-jwt", action="store_const", const=True, help="Disable JWT authentication (not recommended)")
+    jwt_ex_group.add_argument("--jwt", action="store_const", const=False, help="Enable JWT authentication")
+
+    server_group = parser.add_argument_group("Server")
+    server_group.add_argument("--host", help="Listening host")
+    server_group.add_argument("--port", type=int, help="Listening port")
+    server_group.add_argument("--www-dir", help="Root directory for files (default 'www')")
+    server_group.add_argument("--firmware-dir", help="Subdirectory for firmware files (default 'firmware')")
+    server_group.add_argument("--url-firmware", help="The URL path segment for firmware (default 'firmware', corresponds with `firmware-dir`)")
+
+    server_log_group = parser.add_argument_group("Logging")
+    server_log_group.add_argument("--log-file", help="Log file name (default 'ota_http_server.log')")
+    server_log_group.add_argument("--log-level",choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"], help="Logging level (default 'INFO')")
+    server_log_group.add_argument("--audit-log-file", help="Audit log file name (default 'audit.log')")
 
     return parser.parse_args()
 
