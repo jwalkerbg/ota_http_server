@@ -45,8 +45,7 @@ def create_app(www_dir="www",
     """
     Flask app factory with JWT authentication and secure admin endpoint.
     """
-    app = Flask(__name__)
-    logger.info("Creating Flask app")
+    app = Flask(__name__.split('.')[0])
 
     # ---------------------------------------------------------------
     #                       HELPER FUNCTIONS
