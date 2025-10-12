@@ -95,34 +95,34 @@ def main():
 # This will be moved in a separate module later
 
 # CLI application main function with collected options & configuration
-def run_app(config:Config) -> None:
+def run_app(cfg:Config) -> None:
     try:
         # Add real application code here.
         logger.info("Running run_app")
-        logger.info("config = %s",str(config.config))
+        logger.info("config = %s",str(cfg.config))
 
         app = create_app(
-            www_dir=config.config['parameters']['www-dir'],
-            firmware_dir=config.config['parameters']['firmware-dir'],
-            url_firmware=config.config['parameters']['url-firmware'],
-            use_jwt=not config.config['parameters']['no-jwt'],
+            www_dir=cfg.config['parameters']['www-dir'],
+            firmware_dir=cfg.config['parameters']['firmware-dir'],
+            url_firmware=cfg.config['parameters']['url-firmware'],
+            use_jwt=not cfg.config['parameters']['no-jwt'],
         )
 
         print("\n=== OTA Server Configuration ===")
-        print(f"Listening on {config.config['parameters']['host']}:{config.config['parameters']['port']}")
-        print(f"JWT: {'ENABLED' if not config.config['parameters']['no-jwt'] else 'DISABLED'}")
+        print(f"Listening on {cfg.config['parameters']['host']}:{cfg.config['parameters']['port']}")
+        print(f"JWT: {'ENABLED' if not cfg.config['parameters']['no-jwt'] else 'DISABLED'}")
         print(f"Audit log file: {AUDIT_LOG_FILE}")
         print(f"Admin token endpoint: ENABLED (/admin/generate_token)")
         print("===========================================\n")
 
         app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1)
 
-        if config.config['parameters']['no-certs']:
-            app.run(host=config.config['parameters']['host'], port=config.config['parameters']['port'])
+        if cfg.config['parameters']['no-certs']:
+            app.run(host=cfg.config['parameters']['host'], port=cfg.config['parameters']['port'])
         else:
             context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-            context.load_cert_chain(config.config['parameters']['cert'], config.config['parameters']['key'])
-            app.run(host=config.config['parameters']['host'], port=config.config['parameters']['port'], ssl_context=context)
+            context.load_cert_chain(cfg.config['parameters']['cert'], cfg.config['parameters']['key'])
+            app.run(host=cfg.config['parameters']['host'], port=cfg.config['parameters']['port'], ssl_context=context)
 
     finally:
         logger.info("Exiting run_app")
