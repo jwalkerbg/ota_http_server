@@ -43,18 +43,18 @@ def parse_args():
                                  const=False, help='Disable verbose mode')
 
     # application options & parameters
-    parser.add_argument("--cert", default="certs/ca_cert.pem", help="Path to certificate file")
-    parser.add_argument("--key", default="certs/ca_key.pem", help="Path to private key file")
+    parser.add_argument("--cert", help="Path to certificate file")
+    parser.add_argument("--key", help="Path to private key file")
     parser.add_argument("--no-certs", action="store_true", help="Disable SSL certificates (use plain HTTP)")
     parser.add_argument("--no-jwt", action="store_true", help="Disable JWT authentication (not recommended)")
-    parser.add_argument("--host", default="0.0.0.0", help="Listening host")
-    parser.add_argument("--port", type=int, default=8070, help="Listening port")
-    parser.add_argument("--www-dir", default="www", help="Root directory for files (default 'www')")
-    parser.add_argument("--firmware-dir", default="firmware", help="Subdirectory for firmware files (default 'firmware')")
-    parser.add_argument("--url-firmware", default="firmware", help="The URL path segment for firmware (default 'firmware', corresponds with `firmware-dir`)")
-    parser.add_argument("--log-file", default="ota_http_server.log", help="Log file name (default 'ota_http_server.log')")
-    parser.add_argument("--log-level", default="INFO", choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"], help="Logging level (default 'INFO')")
-    parser.add_argument("--audit-log-file", default="audit.log", help="Audit log file name (default 'audit.log')")
+    parser.add_argument("--host", help="Listening host")
+    parser.add_argument("--port", type=int, help="Listening port")
+    parser.add_argument("--www-dir", help="Root directory for files (default 'www')")
+    parser.add_argument("--firmware-dir", help="Subdirectory for firmware files (default 'firmware')")
+    parser.add_argument("--url-firmware", help="The URL path segment for firmware (default 'firmware', corresponds with `firmware-dir`)")
+    parser.add_argument("--log-file", help="Log file name (default 'ota_http_server.log')")
+    parser.add_argument("--log-level",choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"], help="Logging level (default 'INFO')")
+    parser.add_argument("--audit-log-file", help="Audit log file name (default 'audit.log')")
 
     return parser.parse_args()
 
