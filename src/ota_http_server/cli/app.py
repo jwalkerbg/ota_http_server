@@ -16,7 +16,7 @@ from importlib.metadata import version as pkg_version
 
 import ota_http_server
 from ota_http_server.core.config import Config
-from ota_http_server.core.server import create_app, JWT_DEFAULT_EXPIRY_MINUTES, AUDIT_LOG_FILE
+from ota_http_server.core.server import create_app, AUDIT_LOG_FILE
 from ota_http_server.logger import get_app_logger
 
 logger = get_app_logger(__name__)
@@ -62,11 +62,6 @@ def parse_args():
     server_group.add_argument("--www-dir", help="Root directory for files (default 'www')")
     server_group.add_argument("--firmware-dir", help="Subdirectory for firmware files (default 'firmware')")
     server_group.add_argument("--url-firmware", help="The URL path segment for firmware (default 'firmware', corresponds with `firmware-dir`)")
-
-    server_log_group = parser.add_argument_group("Logging")
-    server_log_group.add_argument("--log-file", help="Log file name (default 'ota_http_server.log')")
-    server_log_group.add_argument("--log-level",choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"], help="Logging level (default 'INFO')")
-    server_log_group.add_argument("--audit-log-file", help="Audit log file name (default 'audit.log')")
 
     return parser.parse_args()
 

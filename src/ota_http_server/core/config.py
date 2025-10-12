@@ -40,10 +40,7 @@ class Config:
             'port': 8071,
             'www-dir': "www",
             'firmware-dir': "firmware",
-            'url-firmware': "firmware",
-            'log-file': "ota_http_server.log",
-            'log-level': "INFO",
-            'audit-log-file': "audit.log"
+            'url-firmware': "firmware"
         }
     }
 
@@ -98,15 +95,6 @@ class Config:
                         "type": "string"
                     },
                     "url-firmware": {
-                        "type": "string"
-                    },
-                    "log-file": {
-                        "type": "string"
-                    },
-                    "log-level": {
-                        "type": "string"
-                    },
-                    "audit-log-file": {
                         "type": "string"
                     }
                 },
@@ -213,11 +201,5 @@ class Config:
                 self.config['parameters']['firmware-dir'] = config_cli.firmware_dir
             if config_cli.url_firmware is not None:
                 self.config['parameters']['url-firmware'] = config_cli.url_firmware
-            if config_cli.log_file is not None:
-                self.config['parameters']['log-file'] = config_cli.log_file
-            if config_cli.log_level is not None:
-                self.config['parameters']['log-level'] = config_cli.log_level
-            if config_cli.audit_log_file is not None:
-                self.config['parameters']['audit-log-file'] = config_cli.audit_log_file
 
         return self.config
