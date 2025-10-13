@@ -134,10 +134,12 @@ def run_app(cfg:Config) -> None:
             context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
             context.load_cert_chain(cfg.config['parameters']['cert'], cfg.config['parameters']['key'])
             app.run(host=cfg.config['parameters']['host'], port=cfg.config['parameters']['port'], ssl_context=context)
-
+    except ValueError as e:
+        logger.error("Error in application run: %s",str(e))
+    except Exception as e:
+        logger.error("Unexpected error in application run: %s",str(e))
     finally:
         logger.info("Exiting run_app")
-
 
 if __name__ == "__main__":
     main()
