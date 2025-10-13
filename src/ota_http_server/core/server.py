@@ -16,32 +16,27 @@ from ota_http_server.logger import get_app_logger
 logger = get_app_logger(__name__)
 
 # -------------------------------------------------------------------
-#                   ENVIRONMENT CONFIGURATION
-# -------------------------------------------------------------------
-
-# Environment-based secrets
-JWT_SECRET = os.environ.get("OTA_JWT_SECRET")
-ADMIN_SECRET = os.environ.get("OTA_ADMIN_SECRET")
-
-if not JWT_SECRET:
-    raise RuntimeError("Environment variable OTA_JWT_SECRET is missing!")
-
-if not ADMIN_SECRET:
-    raise RuntimeError("Environment variable OTA_ADMIN_SECRET is missing!")
-
-JWT_ALGORITHM = os.environ.get("OTA_JWT_ALGORITHM", "HS256")
-AUDIT_LOG_FILE = os.environ.get("OTA_AUDIT_LOG", "audit_log.csv")
-
-JWT_DEFAULT_EXPIRY_MINUTES = int(os.environ.get("OTA_JWT_EXPIRY_MINUTES", "30"))
-
-# -------------------------------------------------------------------
 #                       APP FACTORY
 # -------------------------------------------------------------------
 
 def create_app(www_dir="www",
-               firmware_dir="firmware",
-               url_firmware="firmware",
-               use_jwt=True):
+               firmware_dir:str="firmware",
+               url_firmware:str="firmware",
+               use_jwt:bool=True,
+               jwt_algorithm:str="HS256",
+               jwt_expiry:int=30,
+               jwt_secret:str=None,
+               admin_secret:str=None,
+               ota_audit_log:str=None) -> Flask:
+
+    # Print argument names and values
+    print("create_app() called with:")
+    for name, value in locals().items():
+        print(f"  {name} = {value!r}")
+
+    if use_jwt and (not jwt_secret or not admin_secret):
+        raise ValueError("JWT is enabled but jwt_secret or admin_secret is not set")
+
     """
     Flask app factory with JWT authentication and secure admin endpoint.
     """
@@ -82,7 +77,7 @@ def create_app(www_dir="www",
 
         # 4️⃣ Decode and verify JWT
         try:
-            payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+            payload = jwt.decode(token, jwt_secret, algorithms=[jwt_algorithm])
         except jwt.ExpiredSignatureError:
             abort(401, "Token expired")
         except jwt.InvalidTokenError:
@@ -123,7 +118,7 @@ def create_app(www_dir="www",
         version_files.sort(key=lambda x: version.parse(x[1]))
         return project_dir, versions, version_files
 
-    def generate_ota_jwt(device_id, project, current_fw="1.0.0", expires_minutes=JWT_DEFAULT_EXPIRY_MINUTES):
+    def generate_ota_jwt(device_id, project, current_fw="1.0.0", expires_minutes=jwt_expiry):
         """Generate a timezone-aware JWT for OTA clients (devices)."""
         now = datetime.now(timezone.utc)
         payload = {
@@ -135,14 +130,14 @@ def create_app(www_dir="www",
             "jti": f"{device_id}-{int(now.timestamp())}",
             "fw_version": current_fw
         }
-        return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM), payload
+        return jwt.encode(payload, jwt_secret, algorithm=jwt_algorithm), payload
 
     def log_audit_event(ip, action, details):
         """Append a token generation audit log entry."""
         timestamp = datetime.now(timezone.utc).isoformat()
-        os.makedirs(os.path.dirname(AUDIT_LOG_FILE) or ".", exist_ok=True)
-        new_file = not os.path.exists(AUDIT_LOG_FILE)
-        with open(AUDIT_LOG_FILE, "a", newline="", encoding="utf-8") as csvfile:
+        os.makedirs(os.path.dirname(ota_audit_log) or ".", exist_ok=True)
+        new_file = not os.path.exists(ota_audit_log)
+        with open(ota_audit_log, "a", newline="", encoding="utf-8") as csvfile:
             writer = csv.writer(csvfile)
             if new_file:
                 writer.writerow(["timestamp", "ip", "action", "details"])
@@ -196,12 +191,12 @@ def create_app(www_dir="www",
             {
               "device_id": "uuid-v4",
               "project": "project_name",
-              "expires_minutes": $JWT_DEFAULT_EXPIRY_MINUTES
+              "expires_minutes": jwt_expiry,
               "current_fw": "1.0.0"
             }
         """
         admin_header = request.headers.get("X-Admin-Secret")
-        if not admin_header or admin_header != ADMIN_SECRET:
+        if not admin_header or admin_header != admin_secret:
             abort(403, "Invalid or missing admin secret")
 
         data = request.get_json(silent=True)
@@ -210,7 +205,7 @@ def create_app(www_dir="www",
 
         device_id = data.get("device_id")
         project = data.get("project")
-        expires_minutes = data.get("expires_minutes", JWT_DEFAULT_EXPIRY_MINUTES)
+        expires_minutes = data.get("expires_minutes", jwt_expiry)
         current_fw = data.get("current_fw", "1.0.0")
 
         if not device_id or not project:

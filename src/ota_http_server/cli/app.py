@@ -2,21 +2,13 @@
 import argparse
 from importlib.metadata import version
 
-from flask import Flask, send_from_directory, request, abort, jsonify
-import os
 import ssl
 import argparse
-import re
-from packaging import version
-from datetime import datetime, timedelta, timezone
 from werkzeug.middleware.proxy_fix import ProxyFix
-import jwt
-import csv
 from importlib.metadata import version as pkg_version
 
-import ota_http_server
 from ota_http_server.core.config import Config
-from ota_http_server.core.server import create_app, AUDIT_LOG_FILE
+from ota_http_server.core.server import create_app
 from ota_http_server.logger import get_app_logger
 
 logger = get_app_logger(__name__)
@@ -48,20 +40,27 @@ def parse_args():
     certs_ex_group = certs_group.add_mutually_exclusive_group()
     certs_ex_group.add_argument("--no-certs", dest="no_certs", action="store_const", const=True, help="Disable SSL certificates (use plain HTTP)")
     certs_ex_group.add_argument("--certs", dest="no_certs", action="store_const", const=False, help="Enable SSL certificates (use plain HTTP)")
-    certs_group.add_argument("--cert", help="Path to certificate file")
-    certs_group.add_argument("--key", help="Path to private key file")
+    certs_group.add_argument("--cert", dest="cert", help="Path to certificate file")
+    certs_group.add_argument("--key", dest="key", help="Path to private key file")
 
     jwt_group = parser.add_argument_group("JWT")
     jwt_ex_group = jwt_group.add_mutually_exclusive_group()
-    jwt_ex_group.add_argument("--no-jwt", action="store_const", const=True, help="Disable JWT authentication (not recommended)")
-    jwt_ex_group.add_argument("--jwt", action="store_const", const=False, help="Enable JWT authentication")
+    jwt_ex_group.add_argument("--no-jwt", dest="no_jwt", action="store_const", const=True, help="Disable JWT authentication (not recommended)")
+    jwt_ex_group.add_argument("--jwt", dest="no_jwt", action="store_const", const=False, help="Enable JWT authentication")
+    jwt_group.add_argument("--jwt-alg", dest="jwt_alg", type=str, help="JWT algorithm to use (default 'HS256'), overrides OTA_JWT_ALGORITHM environment variable")
+    jwt_group.add_argument("--jwt-expiry", dest="jwt_expiry", type=int, help="JWT expiry time in minutes (default 30), overrides OTA_JWT_EXPIRY_MINUTES environment variable")
+    jwt_group.add_argument("--jwt-secret", dest="jwt_secret", type=str, help="JWT secret key, overrides OTA_JWT_SECRET environment variable")
+    jwt_group.add_argument("--admin-secret", dest="admin_secret", type=str, help="Admin secret key, overrides OTA_ADMIN_SECRET environment variable")
 
     server_group = parser.add_argument_group("Server")
-    server_group.add_argument("--host", help="Listening host")
-    server_group.add_argument("--port", type=int, help="Listening port")
-    server_group.add_argument("--www-dir", help="Root directory for files (default 'www')")
-    server_group.add_argument("--firmware-dir", help="Subdirectory for firmware files (default 'firmware')")
-    server_group.add_argument("--url-firmware", help="The URL path segment for firmware (default 'firmware', corresponds with `firmware-dir`)")
+    server_group.add_argument("--host", dest="host", help="Listening host")
+    server_group.add_argument("--port", dest="port", type=int, help="Listening port")
+    server_group.add_argument("--www-dir", dest="www_dir", help="Root directory for files (default 'www')")
+    server_group.add_argument("--firmware-dir", dest="firmware_dir", help="Subdirectory for firmware files (default 'firmware')")
+    server_group.add_argument("--url-firmware", dest="url_firmware", help="The URL path segment for firmware (default 'firmware', corresponds with `firmware-dir`)")
+
+    logging_group = parser.add_argument_group("Logging")
+    logging_group.add_argument("--ota-audit-log", dest="ota_audit_log", help="Path to the OTA audit log file (default 'ota_audit_log.csv'), overrides OTA_AUDIT_LOG environment variable")
 
     return parser.parse_args()
 
@@ -80,6 +79,13 @@ def main():
         cfg.load_config_file(config_file)
     except Exception as e:
         logger.info("Error with loading configuration file. Giving up.\n%s",str(e))
+        return
+
+    # Load config from environment variables (if set)
+    try:
+        cfg.load_config_env()
+    except Exception as e:
+        logger.info("Error with loading environment variables. Giving up.\n%s",str(e))
         return
 
     # Step 4: Merge default config, config.json, and command-line arguments
@@ -106,12 +112,17 @@ def run_app(cfg:Config) -> None:
             firmware_dir=cfg.config['parameters']['firmware-dir'],
             url_firmware=cfg.config['parameters']['url-firmware'],
             use_jwt=not cfg.config['parameters']['no-jwt'],
+            jwt_algorithm=cfg.config['parameters']['jwt-alg'],
+            jwt_expiry=cfg.config['parameters']['jwt-expiry'],
+            jwt_secret=cfg.config['parameters']['jwt-secret'],
+            admin_secret=cfg.config['parameters']['admin-secret'],
+            ota_audit_log=cfg.config['parameters']['ota-audit-log']
         )
 
         print("\n=== OTA Server Configuration ===")
         print(f"Listening on {cfg.config['parameters']['host']}:{cfg.config['parameters']['port']}")
         print(f"JWT: {'ENABLED' if not cfg.config['parameters']['no-jwt'] else 'DISABLED'}")
-        print(f"Audit log file: {AUDIT_LOG_FILE}")
+        print(f"Audit log file: {cfg.config['parameters']['ota-audit-log']}")
         print(f"Admin token endpoint: ENABLED (/admin/generate_token)")
         print("===========================================\n")
 

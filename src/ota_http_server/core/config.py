@@ -1,6 +1,7 @@
 # core/config.py
 
 import sys
+import os
 from typing import Dict, Any
 import argparse
 from jsonschema import validate, ValidationError
@@ -36,11 +37,16 @@ class Config:
             'key': "key.pem",
             'no-certs': False,
             'no-jwt': False,
+            'jwt-alg': None,
+            'jwt-expiry': 12,
+            'jwt-secret': None,
+            'admin-secret': None,
             'host': "0.0.0.0",
             'port': 8071,
             'www-dir': "www",
             'firmware-dir': "firmware",
-            'url-firmware': "firmware"
+            'url-firmware': "firmware",
+            'ota-audit-log': "ota_audit_log.csv"
         }
     }
 
@@ -82,6 +88,18 @@ class Config:
                     "no-jwt": {
                         "type": "boolean"
                     },
+                    "jwt-alg": {
+                        "type": "string"
+                    },
+                    "jwt-expiry": {
+                        "type": "number"
+                    },
+                    "jwt-secret": {
+                        "type": ["string", "null"]
+                    },
+                    "admin-secret": {
+                        "type": ["string", "null"]
+                    },
                     "host": {
                         "type": "string"
                     },
@@ -95,6 +113,9 @@ class Config:
                         "type": "string"
                     },
                     "url-firmware": {
+                        "type": "string"
+                    },
+                    "ota-audit-log": {
                         "type": "string"
                     }
                 },
@@ -171,9 +192,27 @@ class Config:
                 # Otherwise, update the key with the new value from config_file
                 config[key] = value
 
+    def load_config_env(self) -> Dict:
+        """
+        Load configuration from environment variables.
+
+        :return: Updated configuration dictionary
+        """
+        env_overrides = {
+            "parameters": {
+                "jwt-alg": os.getenv("OTA_JWT_ALGORITHM"),
+                "jwt-expiry": os.getenv("OTA_JWT_EXPIRY_MINUTES"),
+                "jwt-secret": os.getenv("OTA_JWT_SECRET"),
+                "admin-secret": os.getenv("OTA_ADMIN_SECRET"),
+                "ota-audit-log": os.getenv("OTA_AUDIT_LOG")
+            }
+        }
+        self.deep_update(config=self.config, config_file=env_overrides)
+
+        return self.config
+
     def merge_options(self, config_cli:argparse.Namespace=None) -> Dict:
         # handle CLI options if started from CLI interface
-        # replace param1 and param2 with actual parameters, defined in app:parse_args()
         if config_cli:
 
             if config_cli.app_version is not None:
@@ -191,6 +230,15 @@ class Config:
                 self.config['parameters']['no-certs'] = config_cli.no_certs
             if config_cli.no_jwt is not None:
                 self.config['parameters']['no-jwt'] = config_cli.no_jwt
+            if config_cli.jwt_alg is not None:
+                self.config['parameters']['jwt-alg'] = config_cli.jwt_alg
+            if config_cli.jwt_expiry is not None:
+                self.config['parameters']['jwt-expiry'] = config_cli.jwt_expiry
+            if config_cli.jwt_secret is not None:
+                self.config['parameters']['jwt-secret'] = config_cli.jwt_secret
+            if config_cli.admin_secret is not None:
+                self.config['parameters']['admin-secret'] = config_cli.admin_secret
+            # server parameters
             if config_cli.host is not None:
                 self.config['parameters']['host'] = config_cli.host
             if config_cli.port is not None:
@@ -201,5 +249,8 @@ class Config:
                 self.config['parameters']['firmware-dir'] = config_cli.firmware_dir
             if config_cli.url_firmware is not None:
                 self.config['parameters']['url-firmware'] = config_cli.url_firmware
+            # logging parameters
+            if config_cli.ota_audit_log is not None:
+                self.config['parameters']['ota-audit-log'] = config_cli.ota_audit_log
 
         return self.config
