@@ -41,6 +41,46 @@ pytest = ">=8.0.0"
 pytest-cov = ">=6.0.0"
 pytest-mock = ">=3.0.0"
 
+[tool.mypy]
+# --- General settings ---
+python_version = "3.13"
+files = ["src"]
+namespace_packages = true
+ignore_missing_imports = false
+# --- Error reporting & strictness ---
+warn_return_any = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+warn_unused_configs = true
+warn_unreachable = true
+# --- Enforce type discipline ---
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = false
+disallow_any_generics = false
+no_implicit_optional = true
+strict_equality = true
+# --- Optional handling ---
+strict_optional = true
+# --- Misc behaviour ---
+pretty = true
+show_error_codes = true
+show_column_numbers = true
+follow_imports = "silent"
+exclude = [
+    "tests/.*",
+    "build/.*",
+    "dist/.*",
+    "venv/.*",
+    ".venv/.*",
+    "www/*"
+]
+# --- Plugin support (Flask, Pydantic, etc.) ---
+plugins = []
+# --- Incremental mode cache ---
+cache_dir = ".mypy_cache"
+
 # CLI entry points
 [tool.poetry.scripts]
 ota_http_server = "ota_http_server.cli.app:main"
