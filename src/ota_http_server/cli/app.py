@@ -126,7 +126,7 @@ def run_app(cfg:Config) -> None:
         print(f"Admin token endpoint: ENABLED (/admin/generate_token)")
         print("===========================================\n")
 
-        app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1)
+        app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1)   # type: ignore[method-assign]
 
         if cfg.config['parameters']['no-certs']:
             app.run(host=cfg.config['parameters']['host'], port=cfg.config['parameters']['port'])

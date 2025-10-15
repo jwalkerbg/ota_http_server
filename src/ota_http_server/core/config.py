@@ -125,7 +125,7 @@ class Config:
         "additionalProperties": False
     }
 
-    def load_toml(self,file_path) -> Dict:
+    def load_toml(self,file_path:str) -> Dict[str, Any]:
         """
         Load a TOML file with exception handling.
 
@@ -149,7 +149,7 @@ class Config:
             logger.error("An unexpected error occurred while loading the TOML file: %s",str(e))
             raise e  # Catch-all for any other unexpected exceptions
 
-    def load_config_file(self, file_path: str="config.toml") -> Dict:
+    def load_config_file(self, file_path: str="config.toml") -> Dict[str, Any]:
         # skip the configuration file if an empty name is given
         if file_path == '':
             return {}
@@ -192,7 +192,7 @@ class Config:
                 # Otherwise, update the key with the new value from config_file
                 config[key] = value
 
-    def load_config_env(self) -> Dict:
+    def load_config_env(self) -> Dict[str, Any]:
         """
         Load configuration from environment variables.
 
@@ -211,7 +211,7 @@ class Config:
 
         return self.config
 
-    def merge_options(self, config_cli:argparse.Namespace=None) -> Dict:
+    def merge_options(self, config_cli: argparse.Namespace | None = None) -> Dict[str, Any]:
         # handle CLI options if started from CLI interface
         if config_cli:
 

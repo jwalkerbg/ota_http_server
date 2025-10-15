@@ -1,6 +1,7 @@
 # core/server.py
 
-from flask import Flask, send_from_directory, request, abort, jsonify
+from typing import Any, Dict
+from flask import Flask, Response, send_from_directory, request, abort, jsonify
 import os
 import ssl
 import re
@@ -19,15 +20,15 @@ logger = get_app_logger(__name__)
 #                       APP FACTORY
 # -------------------------------------------------------------------
 
-def create_app(www_dir="www",
-               firmware_dir:str="firmware",
-               url_firmware:str="firmware",
-               use_jwt:bool=True,
-               jwt_algorithm:str="HS256",
-               jwt_expiry:int=30,
-               jwt_secret:str=None,
-               admin_secret:str=None,
-               ota_audit_log:str=None) -> Flask:
+def create_app(www_dir:str,
+               firmware_dir:str,
+               url_firmware:str,
+               use_jwt:bool,
+               jwt_algorithm:str,
+               jwt_expiry:int,
+               jwt_secret:str|None,
+               admin_secret:str|None,
+               ota_audit_log:str) -> Flask:
 
     # Print argument names and values
     print("create_app() called with:")
@@ -46,7 +47,7 @@ def create_app(www_dir="www",
     #                       HELPER FUNCTIONS
     # ---------------------------------------------------------------
 
-    def check_token(project=None):
+    def check_token(project:str|None=None) -> None:
         """Verifies JWT from Authorization header or ?token= query param.
         Allows query param only for safe (GET, HEAD) requests.
         """
@@ -93,7 +94,7 @@ def create_app(www_dir="www",
         now = datetime.now(timezone.utc).isoformat()
         print(f"[{now}] [AUTH] OK - Device={device_id}, Project={token_project}, Source={source}")
 
-    def get_sorted_versions(project):
+    def get_sorted_versions(project:str) -> tuple[str, list[str], list[tuple[str, str]]]:
         """Return sorted list of versions for a given project."""
         project_dir = os.path.join(www_dir, firmware_dir, project)
         if not os.path.isdir(project_dir):
@@ -118,7 +119,7 @@ def create_app(www_dir="www",
         version_files.sort(key=lambda x: version.parse(x[1]))
         return project_dir, versions, version_files
 
-    def generate_ota_jwt(device_id, project, current_fw="1.0.0", expires_minutes=jwt_expiry):
+    def generate_ota_jwt(device_id:str, project:str, current_fw:str="1.0.0", expires_minutes:int=jwt_expiry) -> tuple[str, Dict[str, Any]]:
         """Generate a timezone-aware JWT for OTA clients (devices)."""
         now = datetime.now(timezone.utc)
         payload = {
@@ -132,7 +133,7 @@ def create_app(www_dir="www",
         }
         return jwt.encode(payload, jwt_secret, algorithm=jwt_algorithm), payload
 
-    def log_audit_event(ip, action, details):
+    def log_audit_event(ip:str|None, action:str, details:str) -> None:
         """Append a token generation audit log entry."""
         timestamp = datetime.now(timezone.utc).isoformat()
         os.makedirs(os.path.dirname(ota_audit_log) or ".", exist_ok=True)
@@ -149,20 +150,20 @@ def create_app(www_dir="www",
     # ---------------------------------------------------------------
 
     @app.route(f'/{url_firmware}/<project>/<path:filename>')
-    def firmware(project, filename):
+    def firmware(project:str, filename:str) -> Response:
         check_token(project)
         project_dir = os.path.join(www_dir, firmware_dir, project)
         return send_from_directory(project_dir, filename)
 
     @app.route(f'/{url_firmware}/<project>/latest')
-    def latest_firmware(project):
+    def latest_firmware(project:str) -> Response:
         check_token(project)
         project_dir, _, version_files = get_sorted_versions(project)
         latest_file, _ = version_files[-1]
         return send_from_directory(project_dir, latest_file, mimetype="application/json")
 
     @app.route(f'/{url_firmware}/<project>/versions')
-    def list_versions(project):
+    def list_versions(project:str) -> Response:
         check_token(project)
         _, versions, _ = get_sorted_versions(project)
         return jsonify({
@@ -172,7 +173,7 @@ def create_app(www_dir="www",
         })
 
     @app.route("/status")
-    def status():
+    def status() -> Response:
         return jsonify({
             "status": "ok",
             "time": datetime.now(timezone.utc).isoformat()
@@ -183,7 +184,7 @@ def create_app(www_dir="www",
     # ---------------------------------------------------------------
 
     @app.route("/admin/generate_token", methods=["POST"])
-    def admin_generate_token():
+    def admin_generate_token() -> Response:
         """
         Generates a JWT dynamically for a device.
         Requires header: X-Admin-Secret=<ADMIN_SECRET>
