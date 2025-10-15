@@ -2,7 +2,7 @@
 
 import sys
 import os
-from typing import Dict, Any
+from typing import Dict, Any, Mapping, TypedDict
 import argparse
 from jsonschema import validate, ValidationError
 
@@ -16,18 +16,51 @@ if sys.version_info >= (3, 11):
 else:
     import tomli as toml # Use the external tomli for Python 3.7 to 3.10
 
+class TemplateConfig(TypedDict, total=False):
+    template_name: str
+    template_version: str
+    template_description: Dict[str, Any]
+
+class MetaDataConfig(TypedDict, total=False):
+    version: str
+
+class LoggingConfig(TypedDict, total=False):
+    verbose: bool
+
+class ParametersConfig(TypedDict, total=False):
+    cert: str
+    key: str
+    no_certs: bool
+    no_jwt: bool
+    jwt_alg: str
+    jwt_expiry: int
+    jwt_secret: str | None
+    admin_secret: str | None
+    host: str
+    port: int
+    www_dir: str
+    firmware_dir: str
+    url_firmware: str
+    ota_audit_log: str
+
+class ConfigDict(TypedDict):
+    template: TemplateConfig
+    metadata: MetaDataConfig
+    logging: LoggingConfig
+    parameters: ParametersConfig
+
 class Config:
     def __init__(self) -> None:
-        self.config = self.DEFAULT_CONFIG
+        self.config: ConfigDict = self.DEFAULT_CONFIG
 
-    DEFAULT_CONFIG = {
+    DEFAULT_CONFIG: ConfigDict = {
         'template': {
             'template_name': "pymodule",
             'template_version': "3.1.3",
             'template_description': { 'text': """Template with CLI interface, configuration options in a file, logger and unit tests""", 'content-type': "text/plain" }
         },
         'metadata': {
-            'version': False
+            'version': "2.0.1"
         },
         'logging': {
             'verbose': False
@@ -35,18 +68,18 @@ class Config:
         'parameters': {
             'cert': "cert.pem",
             'key': "key.pem",
-            'no-certs': False,
-            'no-jwt': False,
-            'jwt-alg': None,
-            'jwt-expiry': 12,
-            'jwt-secret': None,
-            'admin-secret': None,
+            'no_certs': False,
+            'no_jwt': False,
+            'jwt_alg': "HS256",
+            'jwt_expiry': 12,
+            'jwt_secret': None,
+            'admin_secret': None,
             'host': "0.0.0.0",
             'port': 8071,
-            'www-dir': "www",
-            'firmware-dir': "firmware",
-            'url-firmware': "firmware",
-            'ota-audit-log': "ota_audit_log.csv"
+            'www_dir': "www",
+            'firmware_dir': "firmware",
+            'url_firmware': "firmware",
+            'ota_audit_log': "ota_audit_log.csv"
         }
     }
 
@@ -82,22 +115,22 @@ class Config:
                     "key": {
                         "type": "string"
                     },
-                    "no-certs": {
+                    "no_certs": {
                         "type": "boolean"
                     },
-                    "no-jwt": {
+                    "no_jwt": {
                         "type": "boolean"
                     },
-                    "jwt-alg": {
+                    "jwt_alg": {
                         "type": "string"
                     },
-                    "jwt-expiry": {
+                    "jwt_expiry": {
                         "type": "number"
                     },
-                    "jwt-secret": {
+                    "jwt_secret": {
                         "type": ["string", "null"]
                     },
-                    "admin-secret": {
+                    "admin_secret": {
                         "type": ["string", "null"]
                     },
                     "host": {
@@ -106,16 +139,16 @@ class Config:
                     "port": {
                         "type": "number"
                     },
-                    "www-dir": {
+                    "www_dir": {
                         "type": "string"
                     },
-                    "firmware-dir": {
+                    "firmware_dir": {
                         "type": "string"
                     },
-                    "url-firmware": {
+                    "url_firmware": {
                         "type": "string"
                     },
-                    "ota-audit-log": {
+                    "ota_audit_log": {
                         "type": "string"
                     }
                 },
@@ -171,7 +204,7 @@ class Config:
 
         return config_file
 
-    def deep_update(self,config: Dict[str, Any], config_file: Dict[str, Any]) -> None:
+    def deep_update(self,config:Mapping[str, Any], config_file: Dict[str, Any]) -> None:
         """
         Recursively updates a dictionary (`config`) with the contents of another dictionary (`config_file`).
         It performs a deep merge, meaning that if a key contains a nested dictionary in both `config`
@@ -192,7 +225,7 @@ class Config:
                 # Otherwise, update the key with the new value from config_file
                 config[key] = value
 
-    def load_config_env(self) -> Dict[str, Any]:
+    def load_config_env(self) -> ConfigDict:
         """
         Load configuration from environment variables.
 
@@ -200,18 +233,18 @@ class Config:
         """
         env_overrides = {
             "parameters": {
-                "jwt-alg": os.getenv("OTA_JWT_ALGORITHM"),
-                "jwt-expiry": os.getenv("OTA_JWT_EXPIRY_MINUTES"),
-                "jwt-secret": os.getenv("OTA_JWT_SECRET"),
-                "admin-secret": os.getenv("OTA_ADMIN_SECRET"),
-                "ota-audit-log": os.getenv("OTA_AUDIT_LOG")
+                "jwt_alg": os.getenv("OTA_JWT_ALGORITHM"),
+                "jwt_expiry": os.getenv("OTA_JWT_EXPIRY_MINUTES"),
+                "jwt_secret": os.getenv("OTA_JWT_SECRET"),
+                "admin_secret": os.getenv("OTA_ADMIN_SECRET"),
+                "ota_audit_log": os.getenv("OTA_AUDIT_LOG")
             }
         }
         self.deep_update(config=self.config, config_file=env_overrides)
 
         return self.config
 
-    def merge_options(self, config_cli: argparse.Namespace | None = None) -> Dict[str, Any]:
+    def merge_options(self, config_cli: argparse.Namespace | None = None) -> ConfigDict:
         # handle CLI options if started from CLI interface
         if config_cli:
 
@@ -227,30 +260,30 @@ class Config:
             if config_cli.key is not None:
                 self.config['parameters']['key'] = config_cli.key
             if config_cli.no_certs is not None:
-                self.config['parameters']['no-certs'] = config_cli.no_certs
+                self.config['parameters']['no_certs'] = config_cli.no_certs
             if config_cli.no_jwt is not None:
-                self.config['parameters']['no-jwt'] = config_cli.no_jwt
+                self.config['parameters']['no_jwt'] = config_cli.no_jwt
             if config_cli.jwt_alg is not None:
-                self.config['parameters']['jwt-alg'] = config_cli.jwt_alg
+                self.config['parameters']['jwt_alg'] = config_cli.jwt_alg
             if config_cli.jwt_expiry is not None:
-                self.config['parameters']['jwt-expiry'] = config_cli.jwt_expiry
+                self.config['parameters']['jwt_expiry'] = config_cli.jwt_expiry
             if config_cli.jwt_secret is not None:
-                self.config['parameters']['jwt-secret'] = config_cli.jwt_secret
+                self.config['parameters']['jwt_secret'] = config_cli.jwt_secret
             if config_cli.admin_secret is not None:
-                self.config['parameters']['admin-secret'] = config_cli.admin_secret
+                self.config['parameters']['admin_secret'] = config_cli.admin_secret
             # server parameters
             if config_cli.host is not None:
                 self.config['parameters']['host'] = config_cli.host
             if config_cli.port is not None:
                 self.config['parameters']['port'] = config_cli.port
             if config_cli.www_dir is not None:
-                self.config['parameters']['www-dir'] = config_cli.www_dir
+                self.config['parameters']['www_dir'] = config_cli.www_dir
             if config_cli.firmware_dir is not None:
-                self.config['parameters']['firmware-dir'] = config_cli.firmware_dir
+                self.config['parameters']['firmware_dir'] = config_cli.firmware_dir
             if config_cli.url_firmware is not None:
-                self.config['parameters']['url-firmware'] = config_cli.url_firmware
+                self.config['parameters']['url_firmware'] = config_cli.url_firmware
             # logging parameters
             if config_cli.ota_audit_log is not None:
-                self.config['parameters']['ota-audit-log'] = config_cli.ota_audit_log
+                self.config['parameters']['ota_audit_log'] = config_cli.ota_audit_log
 
         return self.config

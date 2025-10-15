@@ -2,11 +2,11 @@
 
 # Sample of parameters in the program
 [parameters]
-no-certs = true
+no_certs = true
 port = 8071
-www-dir = "www"
-firmware-dir = "firmware"
-url-firmware = "firmware"
+www_dir = "www"
+firmware_dir = "firmware"
+url_firmware = "firmware"
 
 [metadata]
 #version = true

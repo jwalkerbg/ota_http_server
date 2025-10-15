@@ -108,27 +108,27 @@ def run_app(cfg:Config) -> None:
         logger.info("config = %s",str(cfg.config))
 
         app = create_app(
-            www_dir=cfg.config['parameters']['www-dir'],
-            firmware_dir=cfg.config['parameters']['firmware-dir'],
-            url_firmware=cfg.config['parameters']['url-firmware'],
-            use_jwt=not cfg.config['parameters']['no-jwt'],
-            jwt_algorithm=cfg.config['parameters']['jwt-alg'],
-            jwt_expiry=cfg.config['parameters']['jwt-expiry'],
-            jwt_secret=cfg.config['parameters']['jwt-secret'],
-            admin_secret=cfg.config['parameters']['admin-secret'],
-            ota_audit_log=cfg.config['parameters']['ota-audit-log']
+            www_dir=cfg.config['parameters']['www_dir'],
+            firmware_dir=cfg.config['parameters']['firmware_dir'],
+            url_firmware=cfg.config['parameters']['url_firmware'],
+            use_jwt=not cfg.config['parameters']['no_jwt'],
+            jwt_algorithm=cfg.config['parameters']['jwt_alg'],
+            jwt_expiry=cfg.config['parameters']['jwt_expiry'],
+            jwt_secret=cfg.config['parameters']['jwt_secret'],
+            admin_secret=cfg.config['parameters']['admin_secret'],
+            ota_audit_log=cfg.config['parameters']['ota_audit_log']
         )
 
         print("\n=== OTA Server Configuration ===")
         print(f"Listening on {cfg.config['parameters']['host']}:{cfg.config['parameters']['port']}")
-        print(f"JWT: {'ENABLED' if not cfg.config['parameters']['no-jwt'] else 'DISABLED'}")
-        print(f"Audit log file: {cfg.config['parameters']['ota-audit-log']}")
+        print(f"JWT: {'ENABLED' if not cfg.config['parameters']['no_jwt'] else 'DISABLED'}")
+        print(f"Audit log file: {cfg.config['parameters']['ota_audit_log']}")
         print(f"Admin token endpoint: ENABLED (/admin/generate_token)")
         print("===========================================\n")
 
         app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1)   # type: ignore[method-assign]
 
-        if cfg.config['parameters']['no-certs']:
+        if cfg.config['parameters']['no_certs']:
             app.run(host=cfg.config['parameters']['host'], port=cfg.config['parameters']['port'])
         else:
             context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
