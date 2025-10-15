@@ -13,7 +13,7 @@ from ota_http_server.logger import get_app_logger
 
 logger = get_app_logger(__name__)
 
-def parse_args():
+def parse_args() -> argparse.Namespace:
     """Parse command-line arguments, including nested options for mqtt and MS Protocol."""
     parser = argparse.ArgumentParser(description='Secure OTA server with JWT and audit logging')
 
@@ -64,7 +64,7 @@ def parse_args():
 
     return parser.parse_args()
 
-def main():
+def main() -> None:
     """Main entry point of the CLI."""
 
     # Step 1: Create config object with default configuration
