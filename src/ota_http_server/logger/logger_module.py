@@ -8,18 +8,18 @@ TAGNAME = "pymodule"
 
 # Custom Formatter
 class CustomFormatter(logging.Formatter):
-    def format(self, record) -> str:
+    def format(self, record: logging.LogRecord) -> str:
         log_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         log_message = f"{log_time} - {record.name} - {record.levelname} - {record.getMessage()}"
         return log_message
 
 # Custom Logging Handler
 class StringHandler(logging.Handler):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
-        self.log_messages = []
+        self.log_messages: list[str] = []
 
-    def emit(self, record) -> None:
+    def emit(self, record: logging.LogRecord) -> None:
         log_entry = self.format(record)
         self.log_messages.append(log_entry)
 
