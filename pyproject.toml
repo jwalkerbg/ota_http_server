@@ -106,8 +106,93 @@ generate-setup-file = true
 script = 'build.py'
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
-pythonpath = "src"
+# ---------------------------------------------------------------------------
+# 🧩 Test discovery
+# ---------------------------------------------------------------------------
+# Directories where pytest will look for tests
+testpaths = [
+    "tests"
+]
+
+# Add your source folder to the Python path (so imports like `from core import ...` work)
+pythonpath = [
+    "src"
+]
+
+# File patterns pytest should treat as tests
+python_files = [
+    "test_*.py",
+    "*_test.py"
+]
+
+# Class and function name patterns to match tests
+python_classes = [
+    "Test*"
+]
+python_functions = [
+    "test_*"
+]
+
+# ---------------------------------------------------------------------------
+# ⚙️ General behavior
+# ---------------------------------------------------------------------------
+# Stop after first failure (optional)
+# addopts = "-x"
+
+# Verbose output + coverage + show summary of skipped/xfailed tests
+addopts = [
+    "-v",                        # verbose output
+    "--tb=short",                # shorter tracebacks
+    "--strict-markers",          # enforce marker names
+    "--disable-warnings",        # hide warnings (optional)
+    "--cov=src",                 # measure code coverage on your source folder
+    "--cov-report=term-missing", # show lines not covered
+    "--cov-branch",              # enable branch coverage (if supported)
+    "--durations=10",            # show 10 slowest tests
+]
+
+# ---------------------------------------------------------------------------
+# 🧪 Markers (custom test categories)
+# ---------------------------------------------------------------------------
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: integration-level test",
+    "unit: unit test",
+    "network: requires network access",
+    "xfail: expected failure"
+]
+
+# ---------------------------------------------------------------------------
+# 🧯 Logging & Warnings
+# ---------------------------------------------------------------------------
+log_cli = true
+log_cli_level = "INFO"
+log_cli_format = "%(asctime)s [%(levelname)s] %(message)s"
+log_date_format = "%H:%M:%S"
+
+# Ignore or handle specific warnings (optional)
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::PendingDeprecationWarning"
+]
+
+# ---------------------------------------------------------------------------
+# 🧱 Coverage plugin configuration
+# ---------------------------------------------------------------------------
+[tool.coverage.run]
+branch = true
+source = ["src"]
+omit = [
+    "*/__init__.py",
+    "*/tests/*",
+    "build.py",
+    "src/ota_http_server/extensions/*"
+]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+precision = 1
 
 [tool.pylint]
 disable = "missing-docstring"
