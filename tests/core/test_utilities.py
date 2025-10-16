@@ -18,6 +18,6 @@ class TestUtilsPytest:
     def test_hello_from_utils_pytest(self):
         assert "1" == "1"
 
-    #@pytest.mark.xfail(reason="demonstrating a failing test")
+    @pytest.mark.xfail(reason="demonstrating a failing test")
     def test_hello_from_utils_failed_pytest(self):
         assert "1" == "8"
