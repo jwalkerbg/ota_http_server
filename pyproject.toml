@@ -195,5 +195,72 @@ skip_covered = false
 precision = 1
 
 [tool.pylint]
-disable = "missing-docstring"
+
+[tool.pylint.messages_control]
+# Disable trivial warnings that are often noisy in small projects or tests
+disable = [
+    "C0114",  # missing-module-docstring
+    "C0115",  # missing-class-docstring
+    "C0116",  # missing-function-docstring
+    "R0903",  # too-few-public-methods (common for simple classes)
+]
+
+[tool.pylint.basic]
+# Naming conventions
+variable-naming-style = "snake_case"
+function-naming-style = "snake_case"
+class-naming-style = "PascalCase"
+const-naming-style = "UPPER_CASE"
+attr-naming-style = "snake_case"
+
+[tool.pylint.format]
+# Max line length
 max-line-length = 200
+# Allow hanging indents for readability
+indent-string = "    "
+
+[tool.pylint.typecheck]
+# Ignore missing type info from third-party packages
+ignored-modules = ["pytest"]
+ignored-classes = ["ABC"]
+
+[tool.pylint.master]
+# Files/directories to ignore
+ignore = ["tests", "build", "venv", ".venv", "dist", "src/ota_http_server/extensions", "www"]
+jobs = 0  # auto-detect CPU cores for parallel linting
+
+[tool.pylint.reports]
+# Disable the full report summary at the end (CI-friendly)
+reports = false
+
+[tool.pylint.similarities]
+# Minimum lines for duplicate code detection
+min-similarity-lines = 4
+
+[tool.pylint.design]
+# Allow up to 15 arguments per function (increase if necessary)
+max-args = 15
+# Allow up to 10 attributes per class
+max-attributes = 10
+
+[tool.pylint.logging]
+# Use recommended logging format
+logging-format-style = "old"
+logging-modules = ["logging"]
+[tool.pylint.imports]
+
+[tool.pylint.miscellaneous]
+# Standard library modules for import-order recognition
+known-standard-library = [
+    "abc",
+    "os",
+    "sys",
+    "re",
+    "json",
+    "logging",
+    "pathlib",
+    "unittest",
+    "functools",
+    "typing",
+    "http",
+]
