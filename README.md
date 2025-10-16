@@ -2,9 +2,18 @@
 
 - [OTA Firmware Server](#ota-firmware-server)
   - [🗺 Architecture](#-architecture)
-  - [🚀 Quick Start](#-quick-start)
+  - [🚀 Quick Start (source installation)](#-quick-start-source-installation)
+    - [Prerequisites](#prerequisites)
+    - [Installing `ota_http_server` as a editable project](#installing-ota_http_server-as-a-editable-project)
+    - [Run the server.](#run-the-server)
   - [Features](#features)
-  - [Directory Structure](#directory-structure)
+  - [Editable project - directory Structure](#editable-project---directory-structure)
+  - [Configuration](#configuration)
+    - [Default Hardcoded Values (Lowest Priority).](#default-hardcoded-values-lowest-priority)
+    - [Configuration File (`config.toml`)](#configuration-file-configtoml)
+    - [Environment Variables.](#environment-variables)
+    - [Command-Line Options (Highest Priority)](#command-line-options-highest-priority)
+    - [Configuration Hierarchy (Visual)](#configuration-hierarchy-visual)
   - [Standalone Mode](#standalone-mode)
     - [Start with SSL (default)](#start-with-ssl-default)
     - [Start without SSL (for Apache reverse proxy)](#start-without-ssl-for-apache-reverse-proxy)
@@ -24,6 +33,7 @@
 
 
 A lightweight Python/Flask-based firmware server for Over-The-Air (OTA) updates.
+The project is organized as a `pyproject.toml` `poetry` driven project.
 Supports optional **JWT-based authentication** and can run in two modes:
 
 - **Standalone mode** — Flask runs directly (with optional SSL)
@@ -56,71 +66,59 @@ Supports optional **JWT-based authentication** and can run in two modes:
 +-------------+ +-------------+ +-------------+
                       |
                       v
-       +-------------------------------+
-       |     Firmware Files (www/)     |
-       |/firmware/<project>/<bin file> |
-       +-------------------------------+
+ +-------------------------------------------+
+ | Firmware Files (www/<project>/<bin file>) |
+ |  url path /firmware/<project>/<bin file>  |
+ +-------------------------------------------+
 ```
-
 
 ---
 
-## 🚀 Quick Start
+## 🚀 Quick Start (source installation)
 
-1. **Clone or copy the files** into a working directory.
-2. Create local python environment (Python 3.13+ required)
-```bash
-python -m venv .venv
-.venv\Scripts\activate.bat
-```
-3. **Install dependencies**:
-```bash
-pip install flask packaging PyJWT
-```
-Note: Do not use the old `jwt` package. Use `PyJWT`. If `jwt` has been already installed, uninstall it from the virtual environment and `then` install fresh `PyJWT`.
+### Prerequisites
 
-4. **Create directories**:
-```bash
-mkdir -p www\firmware\projectA
-```
-5. **Add a firmware file**:
-```bash
-echo "dummy firmware data" > www\firmware\projectA\firmware_v1.bin
-```
-6. **Add a favicon (optional but recommended)**:
-```bash
-# Example: copy any 16x16 or 32x32 .ico file
-copy my_favicon.ico www\favicon.ico
-# Example: copy any 16x16 or 32x32 .ico file
-copy my_favicon.ico www/favicon.ico
-7. **Run the server (no SSL)**:
+1. Install `Python version >= 3.12`
+2. Install pipx
+3. Using pipx install poetry.
+
+### Installing `ota_http_server` as a editable project
+
+1. Clone teh repository from https://github.com/jwalkerbg/ota_http_server.git.
+2. Execute `poetry install -vvv` in the repository root.
+3. Activate python environment with `poetry env activate`. The will activate the environment or emit a command that shall be executed.
+
+### Run the server.
+
+1. **Run the server (no SSL)**:
 ```bash
 python http_server.py --no-certs --port 8071
-```
-8. **Access firmware**:
-```bash
-http://localhost:8071/firmware/projectA/firmware_v1.bin?token=JWT_token
 ```
 
 ## Features
 
 * Serve firmware files from a defined directory structure
 * Optional JWT token authentication (Authorization: Bearer <JWT> or ?token=<JWT>)
+* JWT Token generation through administrative route with admin token/password
 * HTTPS support in standalone mode
 * Easy integration behind Apache reverse proxy
 * Built-in favicon.ico serving
 * Load balancing for multiple Flask instances
 
-## Directory Structure
+## Editable project - directory Structure
 
 ```
 project_root/
-├── .venv
-├── http_server.py
-├── ota_start.bat
+├── src/
+│   └── ota_http_server
+│       ├── cli/
+│       ├── core/
+│       ├── logger/
+│       └── extensions/
+├── tests/
 ├── certs/
-│   ├── ca_cert.pem
-│   ├── ca_key.pem
+│   ├── gen
+│   ├── gen.bat
 ├── www/
 │   ├── favicon.ico
 │   └── firmware/
@@ -129,6 +127,86 @@ project_root/
 │       └── projectB/
 │           ├── firmware_v1.bin
 │           └── firmware_v2.bin
+├── build.py
+├── pyproject.toml
+├── config.toml
+├── ota_start.bat
+└── README.md
+```
+
+## Configuration
+
+The `OTA HTTP Server` is fully configurable with a `four-level configuration hierarchy`, from lowest-priority defaults to highest-priority overrides:
+
+### Default Hardcoded Values (Lowest Priority).
+
+The server ships with `built-in default values` for all configuration parameters. These serve as a fallback when no other configuration source provides a value.
+
+Example defaults include:
+
+* JWT algorithm: "HS256"
+* JWT expiry: 30 minutes
+* Audit log file: "ota_audit.log"
+* Firmware directories: "firmware", "www"
+
+### Configuration File (`config.toml`)
+
+Users can override defaults by providing a `TOML configuration file` (`config.toml`). This allows persistent, project-wide configuration without touching the CLI.
+
+Example `config.toml`:
+```
+[parameters]
+host = "0.0.0.0"
+port = 8080
+no_certs = false
+no_jwt = false
+jwt_alg = "HS512"
+jwt_expiry = 60
+jwt_secret = "supersecret"
+admin_secret = "adminsecret"
+www_dir = "www"
+firmware_dir = "firmware"
+url_firmware = "firmware"
+ota_audit_log = "ota_audit.log"
+```
+Note: In the configuration file, keys use `underscores` (`_`), while the corresponding CLI options use `hyphens` (`-`).
+
+### Environment Variables.
+
+For `dynamic runtime overrides`, the server can read environment variables. These are read on server start only, not on every http(s) request afterwards. These take precedence over values defined in `config.toml`. These variables are as follows:
+
+* "jwt_alg": os.getenv("OTA_JWT_ALGORITHM"),
+* "jwt_expiry": os.getenv("OTA_JWT_EXPIRY_MINUTES"),
+* "jwt_secret": os.getenv("OTA_JWT_SECRET"),
+* "admin_secret": os.getenv("OTA_ADMIN_SECRET"),
+* "ota_audit_log": os.getenv("OTA_AUDIT_LOG")
+
+Above is a code snippet from `core/config.py` and correspondence between the `environment variables` and the `options` can be seen.
+
+Note: Environment variables allow system-level or containerized overrides without editing files.
+
+### Command-Line Options (Highest Priority)
+
+The `CLI options` override all other configuration sources. This is ideal for temporary adjustments or one-off executions.
+
+Example usage:
+
+```
+ota_http_server --host 0.0.0.0 --port 8071 --no-certs --no-jwt --jwt-expiry 5
+```
+
+### Configuration Hierarchy (Visual)
+
+Highest priority → Lowest priority:
+
+```
+CLI Options        → override everything
+    ↑
+Environment Vars   → override config.toml & defaults
+    ↑
+config.toml        → override hardcoded defaults
+    ↑
+Default Hardcoded  → fallback values
 ```
 
 ## Standalone Mode
@@ -153,6 +231,8 @@ python http_server.py \
 ```bash
 python http_server.py --no-certs --port 8071
 ```
+
+Execute `ota_http_server --help` to see all options.
 
 See the virtual host and reverse proxy configurations to figure out ports usage.
 
@@ -367,12 +447,17 @@ This allows tracking which admin generated which tokens and when.
 
 ### Security Notes
 
-* he admin secret (X-Admin-Secret) must never be hardcoded.
-It is read from the environment variable OTA_ADMIN_SECRET.
+* The admin secret (X-Admin-Secret) must never be hardcoded.
+It is read from the environment variable `OTA_ADMIN_SECRET`.
 Set it securely before starting the server:
 
 ```bash
+Linux:
 export OTA_ADMIN_SECRET="your-very-long-secret-value"
+```
+```bash
+Windows:
+setx OTA_ADMIN_SECRET "your-very-long-secret-value"
 ```
 * Always use HTTPS when issuing or using tokens.
 * Tokens are short-lived by design; keep expiry short (5–60 minutes).
