@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "ota_http_server"
 version = "2.0.1"
-description = "A sample project driven by poetry, using C and Cython extensions"
+description = "OTA http(s) server"
 license = "MIT"
 authors = ["Ivan Cenov <i_cenov@botevgrad.com>"]
 repository = "https://github.com/jwalkerbg/ota_http_server.git"
