@@ -222,8 +222,9 @@ class Config:
                 # If both values are dictionaries, recurse to merge deeply
                 self.deep_update(config[key], value)
             else:
-                # Otherwise, update the key with the new value from config_file
-                config[key] = value
+                # Otherwise, update the key with the new value from config_file if it is present there
+                if value is not None:
+                    config[key] = value
 
     def load_config_env(self) -> ConfigDict:
         """
