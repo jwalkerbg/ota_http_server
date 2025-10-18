@@ -30,6 +30,11 @@
     - [Security Notes](#security-notes)
   - [Favicon](#favicon)
     - [Example OTA Firmware URL](#example-ota-firmware-url)
+  - [Code Quality and Static Analysis](#code-quality-and-static-analysis)
+    - [🧠 Type Checking with `mypy`](#-type-checking-with-mypy)
+    - [🧹 Code Linting with pylint](#-code-linting-with-pylint)
+    - [🧩 `mypy` vs `pylint` — Comparison Overview](#-mypy-vs-pylint--comparison-overview)
+    - [✅ Summary](#-summary)
 
 
 A lightweight Python/Flask-based firmware server for Over-The-Air (OTA) updates.
@@ -479,3 +484,132 @@ Without token
 ```bash
 https://mycompany.com/firmware/projectA/firmware_v1.bin
 ```
+
+## Code Quality and Static Analysis
+
+This project uses **static analysis** tools to ensure consistent, clean, and type-safe Python code.
+All tools are fully integrated with **Poetry**, so they can be run directly from the project environment.
+
+---
+
+### 🧠 Type Checking with `mypy`
+
+[`mypy`](https://mypy.readthedocs.io/) performs **static type checking** for Python.
+It validates type hints, detects inconsistencies, and helps prevent many runtime errors.
+
+**Configuration** is defined in `pyproject.toml` under the `[tool.mypy]` section.
+
+Example configuration:
+```toml
+[tool.mypy]
+python_version = "3.13"
+warn_return_any = true
+warn_unused_ignores = true
+disallow_untyped_defs = true
+strict_optional = true
+check_untyped_defs = true
+show_error_codes = true
+pretty = true
+
+[[tool.mypy.overrides]]
+module = ["tests.*"]
+ignore_errors = true
+```
+See `mypy` sections in `pyproject.toml` too.
+
+Usage:
+
+```bash
+poetry run mypy --strict
+```
+
+✅ Good practice:
+
+* Always include type hints for all function parameters and return types.
+* Use `dict[str, Any]` instead of `Dict` for new code.
+* Use `Optional[T]` or `T | None` for nullable types.
+
+### 🧹 Code Linting with pylint
+
+`pylint` checks for `style, formatting, and common logic issues`.
+It enforces coding conventions (PEP 8) and helps maintain consistent quality across the project.
+
+`Configuration` is defined in `pyproject.toml` under `[tool.pylint]`.
+
+Example configuration:
+
+```toml
+[tool.pylint.'MESSAGES CONTROL']
+disable = [
+    "missing-module-docstring",
+    "missing-class-docstring",
+    "missing-function-docstring"
+]
+
+[tool.pylint.BASIC]
+good-names = ["i", "j", "k", "x", "y", "z", "cfg"]
+
+[tool.pylint.FORMAT]
+max-line-length = 100
+```
+
+**Usage:**
+
+```bash
+poetry run pylint src/ota_http_server
+```
+
+✅ **Good practice:**
+
+* Fix reported warnings progressively — not everything needs to be perfect at once.
+* Use clear variable names and keep functions small and focused.
+* Disable specific warnings sparingly, using inline comments (e.g. `# pylint: disable=too-many-locals`).
+
+🧩 **Integration Tips**
+
+* Both tools can run in `CI/CD pipelines` or `pre-commit hooks` to automatically enforce quality.
+* You can run both together:
+
+```bash
+poetry run mypy --strict && poetry run pylint src/ota_http_server
+```
+
+* For local development, most editors (including `VS Code`) support real-time integration with both `mypy` and `pylint`.
+
+⚙️ **Why This Matters**
+
+These tools teach and enforce good engineering habits:
+
+* `mypy` helps think in `types and contracts`
+* `pylint` promotes `clarity and maintainability`
+* Combined, they create a foundation for `professional, production-ready Python`
+
+🧭 This project intentionally includes both tools so that it presents practices for structuring, typing, and linting real-world Python code.
+
+### 🧩 `mypy` vs `pylint` — Comparison Overview
+
+| Feature / Aspect                     | 🧠 **mypy**                                            | 🧹 **pylint**                                             |
+|-------------------------------------|--------------------------------------------------------|-----------------------------------------------------------|
+| **Main Purpose**                    | Static **type checking**                              | Static **code style and logic checking**                  |
+| **Focus**                           | Type correctness, annotations, consistency             | Code quality, readability, and common mistakes            |
+| **Analyzes**                        | Type hints (`int`, `str`, `dict[str, Any]`, etc.)      | Code structure, naming, formatting, and logic patterns    |
+| **Detects Issues Like**             | - Type mismatches<br>- Missing return types<br>- Invalid assignments | - Unused variables<br>- Bad naming<br>- Missing docstrings<br>- Complex functions |
+| **Driven by**                       | Type annotations (`PEP 484`, `PEP 561`)                | PEP 8 style guide and internal rules                      |
+| **Requires Type Hints**             | ✅ Yes — essential for accurate checking               | ⚙️ No — works even without type hints                     |
+| **Output Example**                  | `error: Incompatible types in assignment`              | `warning: Unused variable 'temp'`                         |
+| **Configuration Section**           | `[tool.mypy]`                                          | `[tool.pylint]`                                           |
+| **Strict Mode Available**           | ✅ `--strict`                                           | ⚙️ Configurable rules via disable/enable lists             |
+| **Integration with Editors**        | Excellent (VS Code, PyCharm, etc.)                     | Excellent (VS Code, PyCharm, etc.)                        |
+| **When to Use**                     | To **validate type correctness** before runtime        | To **enforce coding standards** and catch bad patterns    |
+| **Example Command**                 | `poetry run mypy --strict`                             | `poetry run pylint src/ota_http_server`                   |
+| **Typical Output Tone**             | Precise and technical                                  | Descriptive and advisory                                  |
+| **Teaches You**                     | Thinking in **data types and contracts**               | Writing **clean, maintainable Python code**               |
+| **Recommended Usage**               | Always run before linting                              | Run after mypy to check code style and structure           |
+
+---
+
+### ✅ Summary
+
+- **Use `mypy`** to ensure your types and interfaces are correct.
+- **Use `pylint`** to ensure your code is clean, readable, and follows conventions.
+- Together, they form a **complete quality gate** for professional Python development.
