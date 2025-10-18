@@ -1,17 +1,14 @@
 # core/server.py
 
 from typing import Any, Dict
-from flask import Flask, Response, send_from_directory, request, abort, jsonify
-import os
-import ssl
-import re
-from packaging import version
-from datetime import datetime, timedelta, timezone
-from werkzeug.middleware.proxy_fix import ProxyFix
-import jwt
 import csv
+import os
+import re
+from datetime import datetime, timedelta, timezone
+from flask import Flask, Response, send_from_directory, request, abort, jsonify
+from packaging import version
+import jwt
 
-from ota_http_server.core.config import Config
 from ota_http_server.logger import get_app_logger
 
 logger = get_app_logger(__name__)
@@ -20,7 +17,7 @@ logger = get_app_logger(__name__)
 #                       APP FACTORY
 # -------------------------------------------------------------------
 
-def create_app(www_dir:str,
+def create_app(www_dir:str,                 # pylint: disable=too-many-positional-arguments,too-many-locals,too-many-statements
                firmware_dir:str,
                url_firmware:str,
                use_jwt:bool,
@@ -38,10 +35,10 @@ def create_app(www_dir:str,
     if use_jwt and (not jwt_secret or not admin_secret):
         raise ValueError("JWT is enabled but jwt_secret or admin_secret is not set")
 
-    """
-    Flask app factory with JWT authentication and secure admin endpoint.
-    """
-    app = Flask(__name__.split('.')[0])
+    #
+    # Flask app factory with JWT authentication and secure admin endpoint.
+    #
+    app = Flask(__name__.split('.', maxsplit=1)[0])
 
     # ---------------------------------------------------------------
     #                       HELPER FUNCTIONS
@@ -228,5 +225,3 @@ def create_app(www_dir:str,
         })
 
     return app
-
-

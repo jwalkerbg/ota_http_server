@@ -244,7 +244,7 @@ class Config:
 
         return self.config
 
-    def merge_options(self, config_cli: argparse.Namespace | None = None) -> ConfigDict:
+    def merge_options(self, config_cli: argparse.Namespace | None = None) -> ConfigDict:    # pylint: disable=too-many-branches
         # handle CLI options if started from CLI interface
         if config_cli:
 

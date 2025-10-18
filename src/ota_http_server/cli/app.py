@@ -1,11 +1,9 @@
 # src/cli/app.py
 import argparse
-from importlib.metadata import version
 
 import ssl
-import argparse
-from werkzeug.middleware.proxy_fix import ProxyFix
 from importlib.metadata import version as pkg_version
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 from ota_http_server.core.config import Config
 from ota_http_server.core.server import create_app
@@ -123,7 +121,7 @@ def run_app(cfg:Config) -> None:
         print(f"Listening on {cfg.config['parameters']['host']}:{cfg.config['parameters']['port']}")
         print(f"JWT: {'ENABLED' if not cfg.config['parameters']['no_jwt'] else 'DISABLED'}")
         print(f"Audit log file: {cfg.config['parameters']['ota_audit_log']}")
-        print(f"Admin token endpoint: ENABLED (/admin/generate_token)")
+        print("Admin token endpoint: ENABLED (/admin/generate_token)")
         print("===========================================\n")
 
         app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1)   # type: ignore[method-assign]
