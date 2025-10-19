@@ -26,6 +26,7 @@ class MetaDataConfig(TypedDict, total=False):
 
 class LoggingConfig(TypedDict, total=False):
     verbose: bool
+    version_option: bool
 
 class ParametersConfig(TypedDict, total=False):
     cert: str
@@ -63,7 +64,8 @@ class Config:
             'version': "2.0.2"
         },
         'logging': {
-            'verbose': False
+            'verbose': False,
+            'version_option': False
         },
         'parameters': {
             'cert': "cert.pem",
@@ -92,7 +94,7 @@ class Config:
                 "type": "object",
                 "properties": {
                     "version": {
-                        "type": "boolean"
+                        "type": "string"
                     }
                 },
                 "additionalProperties": False
@@ -101,6 +103,9 @@ class Config:
                 "type": "object",
                 "properties": {
                     "verbose": {
+                        "type": "boolean"
+                    },
+                    "version_option": {
                         "type": "boolean"
                     }
                 },
@@ -245,12 +250,12 @@ class Config:
 
         return self.config
 
-    def merge_options(self, config_cli: argparse.Namespace | None = None) -> ConfigDict:    # pylint: disable=too-many-branches
+    def merge_cli_options(self, config_cli: argparse.Namespace | None = None) -> ConfigDict:    # pylint: disable=too-many-branches
         # handle CLI options if started from CLI interface
         if config_cli:
+            if config_cli.version_option is not None:
+                self.config['logging']['version_option'] = config_cli.version_option
 
-            if config_cli.app_version is not None:
-                self.config['metadata']['version'] = config_cli.app_version
             # Handle general options
             if config_cli.verbose is not None:
                 self.config['logging']['verbose'] = config_cli.verbose
@@ -288,3 +293,89 @@ class Config:
                 self.config['parameters']['ota_audit_log'] = config_cli.ota_audit_log
 
         return self.config
+
+def parse_args() -> argparse.Namespace:
+    """Parse command-line arguments, including nested options for mqtt and MS Protocol."""
+    parser = argparse.ArgumentParser(description='Secure OTA server with JWT and audit logging')
+
+    # configuration file name
+    parser.add_argument('--config', type=str, dest='config', default='config.toml',\
+                        help="Name of the configuration file, default is 'config.toml'")
+    parser.add_argument('--no-config', action='store_const', const='', dest='config',\
+                        help="Do not use a configuration file (only defaults & options)")
+
+    # version
+    parser.add_argument('-v', dest='version_option', action='store_true', default = False, help='Show version information of the module')
+
+    # Verbosity option
+    verbosity_group = parser.add_mutually_exclusive_group()
+    verbosity_group.add_argument('--verbose', dest='verbose', action='store_const',\
+                                 const=True, help='Enable verbose mode')
+    verbosity_group.add_argument('--no-verbose', dest='verbose', action='store_const',\
+                                 const=False, help='Disable verbose mode')
+
+    # application options & parameters
+
+    certs_group = parser.add_argument_group("Certificates")
+    certs_ex_group = certs_group.add_mutually_exclusive_group()
+    certs_ex_group.add_argument("--no-certs", dest="no_certs", action="store_const", const=True, help="Disable SSL certificates (use plain HTTP)")
+    certs_ex_group.add_argument("--certs", dest="no_certs", action="store_const", const=False, help="Enable SSL certificates (use plain HTTP)")
+    certs_group.add_argument("--cert", dest="cert", help="Path to certificate file")
+    certs_group.add_argument("--key", dest="key", help="Path to private key file")
+
+    jwt_group = parser.add_argument_group("JWT")
+    jwt_ex_group = jwt_group.add_mutually_exclusive_group()
+    jwt_ex_group.add_argument("--no-jwt", dest="no_jwt", action="store_const", const=True, help="Disable JWT authentication (not recommended)")
+    jwt_ex_group.add_argument("--jwt", dest="no_jwt", action="store_const", const=False, help="Enable JWT authentication")
+    jwt_group.add_argument("--jwt-alg", dest="jwt_alg", type=str, help="JWT algorithm to use (default 'HS256'), overrides OTA_JWT_ALGORITHM environment variable")
+    jwt_group.add_argument("--jwt-expiry", dest="jwt_expiry", type=int, help="JWT expiry time in minutes (default 30), overrides OTA_JWT_EXPIRY_MINUTES environment variable")
+    jwt_group.add_argument("--jwt-secret", dest="jwt_secret", type=str, help="JWT secret key, overrides OTA_JWT_SECRET environment variable")
+    jwt_group.add_argument("--admin-secret", dest="admin_secret", type=str, help="Admin secret key, overrides OTA_ADMIN_SECRET environment variable")
+
+    server_group = parser.add_argument_group("Server")
+    server_group.add_argument("--host", dest="host", help="Listening host")
+    server_group.add_argument("--port", dest="port", type=int, help="Listening port")
+    server_group.add_argument("--www-dir", dest="www_dir", help="Root directory for files (default 'www')")
+    server_group.add_argument("--firmware-dir", dest="firmware_dir", help="Subdirectory for firmware files (default 'firmware')")
+    server_group.add_argument("--url-firmware", dest="url_firmware", help="The URL path segment for firmware (default 'firmware', corresponds with `firmware-dir`)")
+
+    logging_group = parser.add_argument_group("Logging")
+    logging_group.add_argument("--ota-audit-log", dest="ota_audit_log", help="Path to the OTA audit log file (default 'ota_audit_log.csv'), overrides OTA_AUDIT_LOG environment variable")
+
+    return parser.parse_args()
+
+def get_app_configuration() -> ConfigDict:
+    """Get the application configuration.
+
+    This function initializes the Config class, loads the configuration file,
+    applies environment variable overrides, and returns the final configuration.
+
+    Returns:
+        ConfigDict: The final application configuration.
+    """
+
+    # Step 1: Create config object with default configuration
+    config_instance = Config()
+
+    # Step 2: Parse command-line arguments
+    args = parse_args()
+
+    # Step 3: Try to load configuration from configuration file
+    config_file = args.config
+    try:
+        config_instance.load_config_file(config_file)
+    except Exception as e:
+        logger.info("Error with loading configuration file. Giving up.\n%s",str(e))
+        raise
+
+    # Step 4: Load config from environment variables (if set)
+    try:
+        config_instance.load_config_env()
+    except Exception as e:
+        logger.info("Error with loading environment variables. Giving up.\n%s",str(e))
+        raise
+
+    # Step 5: Merge default config, config.json, and command-line arguments
+    config_instance.merge_cli_options(args)
+
+    return config_instance
