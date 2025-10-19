@@ -60,7 +60,7 @@ class Config:
             'template_description': { 'text': """Template with CLI interface, configuration options in a file, logger and unit tests""", 'content-type': "text/plain" }
         },
         'metadata': {
-            'version': "2.0.1"
+            'version': "2.0.2"
         },
         'logging': {
             'verbose': False
