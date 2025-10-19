@@ -111,7 +111,7 @@ def run_app(cfg:Config) -> None:
             url_firmware=cfg.config['parameters']['url_firmware'],
             use_jwt=not cfg.config['parameters']['no_jwt'],
             jwt_algorithm=cfg.config['parameters']['jwt_alg'],
-            jwt_expiry=cfg.config['parameters']['jwt_expiry'],
+            jwt_expiry=int(cfg.config['parameters']['jwt_expiry']),
             jwt_secret=cfg.config['parameters']['jwt_secret'],
             admin_secret=cfg.config['parameters']['admin_secret'],
             ota_audit_log=cfg.config['parameters']['ota_audit_log']
