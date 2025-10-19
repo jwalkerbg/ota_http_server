@@ -365,6 +365,13 @@ curl -X POST https://yourserver:8070/admin/generate_token \
         "project": "smart_fan"
       }'
 ```
+**Example curl command (Windows)**
+```bash
+curl -X POST https://yourserver:8070/admin/generate_token ^
+  -H "X-Admin-Secret: %OTA_ADMIN_SECRET%" ^
+  -H "Content-Type: application/json" ^
+  -d "{\"device_id\": \"e6f87d77-4216-4be1-ab83-b5fa6792b747\", \"project\": \"smart_fan\"}"
+```
 
 The response contains a signed JWT and metadata:
 ```json
