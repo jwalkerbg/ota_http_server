@@ -9,7 +9,7 @@ firmware_dir = "firmware"
 url_firmware = "firmware"
 
 [metadata]
-#version = true
+#version_option = true
 
 [logging]
 verbose = true
