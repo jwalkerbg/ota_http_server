@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "ota_http_server"
-version = "2.0.2"
+version = "2.0.3"
 description = "OTA http(s) server"
 license = "MIT"
 authors = ["Ivan Cenov <i_cenov@botevgrad.com>"]
