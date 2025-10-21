@@ -229,7 +229,7 @@ class Config:
             else:
                 # Otherwise, update the key with the new value from config_file if it is present there
                 if value is not None:
-                    config[key] = value
+                    config[key] = value     # type: ignore[index]
 
     def load_config_env(self) -> ConfigDict:
         """
@@ -344,7 +344,7 @@ def parse_args() -> argparse.Namespace:
 
     return parser.parse_args()
 
-def get_app_configuration() -> ConfigDict:
+def get_app_configuration() -> Config:
     """Get the application configuration.
 
     This function initializes the Config class, loads the configuration file,
