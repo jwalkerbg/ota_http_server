@@ -85,13 +85,16 @@ Supports optional **JWT-based authentication** and can run in two modes:
 
 1. Install `Python version >= 3.12`
 2. Install pipx
+   1. pip install pipx
+   2. pipx ensurepath
 3. Using pipx install poetry.
+   1. pipx install poetry
 
 ### Installing `ota_http_server` as a editable project
 
 1. Clone teh repository from https://github.com/jwalkerbg/ota_http_server.git.
 2. Execute `poetry install -vvv` in the repository root.
-3. Activate python environment with `poetry env activate`. The will activate the environment or emit a command that shall be executed.
+3. Activate python environment with `poetry env activate`. The command will activate the environment or emit a command that shall be executed.
 
 ### Run the server.
 
