@@ -18,7 +18,7 @@
     - [Start with SSL (default)](#start-with-ssl-default)
     - [Start without SSL (for Apache reverse proxy)](#start-without-ssl-for-apache-reverse-proxy)
   - [Apache Reverse Proxy Mode](#apache-reverse-proxy-mode)
-    - [Running multiple http\_server.py](#running-multiple-http_serverpy)
+    - [Running multiple ota\_http\_server](#running-multiple-ota_http_server)
     - [Apache VirtualHost configuration](#apache-virtualhost-configuration)
     - [httpd-proxy-ota.conf:](#httpd-proxy-otaconf)
   - [JWT-Based Authentication for OTA Access](#jwt-based-authentication-for-ota-access)
@@ -224,7 +224,7 @@ You can run the server directly with Python.
 ### Start with SSL (default)
 
 ```bash
-python http_server.py \
+ota_http_server \
     --cert certs/ca_cert.pem \
     --key certs/ca_key.pem \
     --host 0.0.0.0 \
@@ -237,7 +237,7 @@ python http_server.py \
 ### Start without SSL (for Apache reverse proxy)
 
 ```bash
-python http_server.py --no-certs --port 8071
+ota_http_server --no-certs --port 8071
 ```
 
 Execute `ota_http_server --help` to see all options.
@@ -248,14 +248,14 @@ If `--no-jwt` option is given JWT token is not used even it is supplied in the h
 
 ## Apache Reverse Proxy Mode
 
-### Running multiple http_server.py
+### Running multiple ota_http_server
 
-You can place multiple instances of ```http_server.py``` behind Apache for load balancing.
+You can place multiple instances of ```ota_http_server``` behind Apache for load balancing.
 
 ```bash
-python http_server.py --no-certs --port 8071
-python http_server.py --no-certs --port 8072
-python http_server.py --no-certs --port 8073
+ota_http_server --no-certs --port 8071
+ota_http_server --no-certs --port 8072
+ota_http_server --no-certs --port 8073
 ```
 
 ### Apache VirtualHost configuration
@@ -401,7 +401,7 @@ Field | Description
 | `project` | Project name — firmware group or directory name. Used to verify access. |
 | `roles` | List of logical roles; currently includes "device" and "ota_client". |
 | `iat` | Issued-At timestamp (UNIX time). |
-| `exp` | Expiration time — after this the token becomes invalid. |
+| `exp` | Expiration time — after this time the token becomes invalid. |
 | `jti` | Unique token ID (JWT ID). Helps detect re-use or revoke individual tokens. |
 | `fw_version` | Current firmware version reported when the token was generated. |
 
@@ -422,7 +422,7 @@ def generate_ota_jwt(device_id, project, current_fw="1.0.0",
         "jti": f"{device_id}-{int(now.timestamp())}",
         "fw_version": current_fw
     }
-    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM), payload
+    return jwt.encode(payload, jwt_secret, algorithm=jwt_algorithm), payload
 ```
 
 ### Token Usage (Devices)
@@ -487,12 +487,12 @@ Browsers usually cache this file, so it will only be requested once. Devices ini
 
 With token
 ```bash
-https://mycompany.com/firmware/projectA/firmware_v1.bin?token=<JWT>
+https://mycompany.com/firmware/projectA/firmware_01.00.02.bin?token=<JWT>
 ```
 
 Without token
 ```bash
-https://mycompany.com/firmware/projectA/firmware_v1.bin
+https://mycompany.com/firmware/projectA/firmware_01.00.02.bin
 ```
 
 ## Code Quality and Static Analysis
