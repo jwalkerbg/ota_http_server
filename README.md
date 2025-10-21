@@ -92,7 +92,7 @@ Supports optional **JWT-based authentication** and can run in two modes:
 
 ### Installing `ota_http_server` as a editable project
 
-1. Clone teh repository from https://github.com/jwalkerbg/ota_http_server.git.
+1. Clone the repository from https://github.com/jwalkerbg/ota_http_server.git.
 2. Execute `poetry install -vvv` in the repository root.
 3. Activate python environment with `poetry env activate`. The command will activate the environment or emit a command that shall be executed.
 
