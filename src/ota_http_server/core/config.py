@@ -359,6 +359,10 @@ def get_app_configuration() -> Config:
 
     # Step 2: Parse command-line arguments
     args = parse_args()
+    if args.version_option:
+        # If version option is requested, skip loading other configurations
+        config_instance.config['logging']['version_option'] = True
+        return config_instance
 
     # Step 3: Try to load configuration from configuration file
     config_file = args.config
