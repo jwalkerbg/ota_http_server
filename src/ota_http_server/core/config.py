@@ -46,7 +46,6 @@ class ParametersConfig(TypedDict, total=False):
 
 class ConfigDict(TypedDict):
     template: TemplateConfig
-    metadata: MetaDataConfig
     logging: LoggingConfig
     parameters: ParametersConfig
 
@@ -59,9 +58,6 @@ class Config:
             'template_name': "pymodule",
             'template_version': "3.1.3",
             'template_description': { 'text': """Template with CLI interface, configuration options in a file, logger and unit tests""", 'content-type': "text/plain" }
-        },
-        'metadata': {
-            'version': "2.0.2"
         },
         'logging': {
             'verbose': False,
@@ -90,15 +86,6 @@ class Config:
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
-            "metadata": {
-                "type": "object",
-                "properties": {
-                    "version": {
-                        "type": "string"
-                    }
-                },
-                "additionalProperties": False
-            },
             "logging": {
                 "type": "object",
                 "properties": {

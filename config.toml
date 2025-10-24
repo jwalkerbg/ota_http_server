@@ -8,8 +8,6 @@ www_dir = "www"
 firmware_dir = "firmware"
 url_firmware = "firmware"
 
-[metadata]
-#version_option = true
-
 [logging]
 verbose = true
+#version_option = true
