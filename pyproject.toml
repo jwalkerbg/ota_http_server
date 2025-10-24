@@ -41,6 +41,32 @@ pytest = ">=8.4.0"
 pytest-cov = ">=7.0.0"
 pytest-mock = ">=3.0.0"
 
+# CLI entry points
+[tool.poetry.scripts]
+ota_http_server = "ota_http_server.cli.app:main"
+
+# Definitions, specific for this project.
+[tool.build.config]
+# path where Cython and C extensions live, each extension in a separate directory
+extensions_path = "src/ota_http_server/extensions"
+# directories where C extensions can search for C header files
+include_dirs = ["src/ota_http_server/include", "src/include"]
+# This specifies the name of the libraries to link against, without the lib prefix or file extension.
+# Example: If you have a shared library named `libmylib.so` (Linux) or `mylib.dll` (Windows), you would specify libraries=["mylib"].
+libraries = []
+# activate logging in build.py
+build_log = true
+
+[build-system]
+requires = ["poetry-core", "setuptools", "Cython"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.build]
+generate-setup-file = true
+script = 'build.py'
+
+# mypy section ==============================================================
+
 [tool.mypy]
 # --- General settings ---
 python_version = "3.13"
@@ -81,29 +107,80 @@ plugins = []
 # --- Incremental mode cache ---
 cache_dir = ".mypy_cache"
 
-# CLI entry points
-[tool.poetry.scripts]
-ota_http_server = "ota_http_server.cli.app:main"
+# pylint section ============================================================
 
-# Definitions, specific for this project.
-[tool.build.config]
-# path where Cython and C extensions live, each extension in a separate directory
-extensions_path = "src/ota_http_server/extensions"
-# directories where C extensions can search for C header files
-include_dirs = ["src/ota_http_server/include", "src/include"]
-# This specifies the name of the libraries to link against, without the lib prefix or file extension.
-# Example: If you have a shared library named `libmylib.so` (Linux) or `mylib.dll` (Windows), you would specify libraries=["mylib"].
-libraries = []
-# activate logging in build.py
-build_log = true
+[tool.pylint]
 
-[build-system]
-requires = ["poetry-core", "setuptools", "Cython"]
-build-backend = "poetry.core.masonry.api"
+[tool.pylint.messages_control]
+# Disable trivial warnings that are often noisy in small projects or tests
+disable = [
+    "C0114",  # missing-module-docstring
+    "C0115",  # missing-class-docstring
+    "C0116",  # missing-function-docstring
+    "R0903",  # too-few-public-methods (common for simple classes)
+]
 
-[tool.poetry.build]
-generate-setup-file = true
-script = 'build.py'
+[tool.pylint.basic]
+# Naming conventions
+variable-naming-style = "snake_case"
+function-naming-style = "snake_case"
+class-naming-style = "PascalCase"
+const-naming-style = "UPPER_CASE"
+attr-naming-style = "snake_case"
+
+[tool.pylint.format]
+# Max line length
+max-line-length = 200
+# Allow hanging indents for readability
+indent-string = "    "
+
+[tool.pylint.typecheck]
+# Ignore missing type info from third-party packages
+ignored-modules = ["pytest"]
+ignored-classes = ["ABC"]
+
+[tool.pylint.master]
+# Files/directories to ignore
+ignore = ["tests", "build", "venv", ".venv", "dist", "src/ota_http_server/extensions", "www"]
+jobs = 0  # auto-detect CPU cores for parallel linting
+
+[tool.pylint.reports]
+# Disable the full report summary at the end (CI-friendly)
+reports = false
+
+[tool.pylint.similarities]
+# Minimum lines for duplicate code detection
+min-similarity-lines = 4
+
+[tool.pylint.design]
+# Allow up to 15 arguments per function (increase if necessary)
+max-args = 15
+# Allow up to 10 attributes per class
+max-attributes = 10
+
+[tool.pylint.logging]
+# Use recommended logging format
+logging-format-style = "old"
+logging-modules = ["logging"]
+[tool.pylint.imports]
+
+[tool.pylint.miscellaneous]
+# Standard library modules for import-order recognition
+known-standard-library = [
+    "abc",
+    "os",
+    "sys",
+    "re",
+    "json",
+    "logging",
+    "pathlib",
+    "unittest",
+    "functools",
+    "typing",
+    "http",
+]
+
+# pytest section ============================================================
 
 [tool.pytest.ini_options]
 # ---------------------------------------------------------------------------
@@ -193,74 +270,3 @@ omit = [
 show_missing = true
 skip_covered = false
 precision = 1
-
-[tool.pylint]
-
-[tool.pylint.messages_control]
-# Disable trivial warnings that are often noisy in small projects or tests
-disable = [
-    "C0114",  # missing-module-docstring
-    "C0115",  # missing-class-docstring
-    "C0116",  # missing-function-docstring
-    "R0903",  # too-few-public-methods (common for simple classes)
-]
-
-[tool.pylint.basic]
-# Naming conventions
-variable-naming-style = "snake_case"
-function-naming-style = "snake_case"
-class-naming-style = "PascalCase"
-const-naming-style = "UPPER_CASE"
-attr-naming-style = "snake_case"
-
-[tool.pylint.format]
-# Max line length
-max-line-length = 200
-# Allow hanging indents for readability
-indent-string = "    "
-
-[tool.pylint.typecheck]
-# Ignore missing type info from third-party packages
-ignored-modules = ["pytest"]
-ignored-classes = ["ABC"]
-
-[tool.pylint.master]
-# Files/directories to ignore
-ignore = ["tests", "build", "venv", ".venv", "dist", "src/ota_http_server/extensions", "www"]
-jobs = 0  # auto-detect CPU cores for parallel linting
-
-[tool.pylint.reports]
-# Disable the full report summary at the end (CI-friendly)
-reports = false
-
-[tool.pylint.similarities]
-# Minimum lines for duplicate code detection
-min-similarity-lines = 4
-
-[tool.pylint.design]
-# Allow up to 15 arguments per function (increase if necessary)
-max-args = 15
-# Allow up to 10 attributes per class
-max-attributes = 10
-
-[tool.pylint.logging]
-# Use recommended logging format
-logging-format-style = "old"
-logging-modules = ["logging"]
-[tool.pylint.imports]
-
-[tool.pylint.miscellaneous]
-# Standard library modules for import-order recognition
-known-standard-library = [
-    "abc",
-    "os",
-    "sys",
-    "re",
-    "json",
-    "logging",
-    "pathlib",
-    "unittest",
-    "functools",
-    "typing",
-    "http",
-]
