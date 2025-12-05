@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "ota_http_server"
-version = "2.0.3"
+version = "3.0.1"
 description = "OTA http(s) server"
 license = "MIT"
 authors = ["Ivan Cenov <i_cenov@botevgrad.com>"]
@@ -12,8 +12,23 @@ include = [
     "pyproject.toml",
     "build.py",
     "README.md",
-    "src/ota_http_server/extensions/*"
-]  # Compiled extensions
+    "src/ota_http_server/**"
+]
+exclude = [
+]
+
+# Custom package indexes to take precedency over official https://pypi.org/simple
+# To use this a pypi server must be hosted internally at the specified URL.
+# Good simple however working choice is to use pypiserver (https://pypi.org/project/pypiserver/)
+# Edit below URL to match your internal pypi server address.
+# poetry will first try to fetch packages from this server before going to the official PyPI.
+# This is useful for companies that want to cache packages internally or host private packages.
+# Make sure to configure authentication if your pypi server requires it.
+# See Poetry documentation for more details: https://python-poetry.org/docs/repositories/#using-private-repositories
+[[tool.poetry.source]]
+name = "okto7-pypi"
+url = "http://pypi.okto7.com/simple"
+priority = "primary"
 
 # Runtime dependencies
 [tool.poetry.dependencies]
@@ -31,7 +46,7 @@ Werkzeug = ">=3.1.3"
 
 # Development dependencies
 [tool.poetry.group.dev.dependencies]
-mypy = "^1.5.1"  # Static type checker
+mypy = "^1.18.2"  # Static type checker
 pathlib = ">=1.0"
 pylint = "^4.0"
 
@@ -58,7 +73,7 @@ libraries = []
 build_log = true
 
 [build-system]
-requires = ["poetry-core", "setuptools", "Cython"]
+requires = ["poetry-core", "setuptools", "Cython", "build"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.build]
@@ -100,6 +115,7 @@ exclude = [
     "dist/.*",
     "venv/.*",
     ".venv/.*",
+    "src/ota_http_server/extensions/.*",
     "www/*"
 ]
 # --- Plugin support (Flask, Pydantic, etc.) ---

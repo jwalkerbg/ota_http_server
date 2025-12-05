@@ -84,21 +84,21 @@ def build_cython_extensions():
     extensions = []
     patterns = ["*.c", "*.pyx"]
     for subdir in root_path.iterdir():
-        c_files = []
-        if subdir.is_dir():
-            # Recursively get all .c and .pyx files for the current module
-            c_files = [file for pattern in patterns for file in subdir.rglob(pattern)]
-        if c_files:
-            ext_dirs.append(subdir)
-            extensions.append(
-                Extension(
-                    str(subdir.name),
-                    [str(c_file) for c_file in c_files],
-                    include_dirs=include_dirs,
-                    extra_compile_args=extra_compile_args,
-                    language="c"
-                )
+        if not subdir.is_dir():
+            continue
+        c_files = [file for pattern in patterns for file in subdir.rglob(pattern)]
+        if not c_files:
+            continue
+        ext_name = f"pymodule.extensions.{subdir.name}.{subdir.name}"
+        extensions.append(
+            Extension(
+                ext_name,
+                [str(f) for f in c_files],
+                include_dirs=include_dirs,
+                extra_compile_args=extra_compile_args,
+                language="c",
             )
+        )
 
     # Log discovered extensions
     if build_log:
@@ -119,13 +119,6 @@ def build_cython_extensions():
     cmd = build_ext(dist)
     cmd.ensure_finalized()
     cmd.run()
-
-    for output, src_path in zip(cmd.get_outputs(),ext_dirs):
-        output = Path(output)
-        src_relative_path = src_path / output.name
-        shutil.copyfile(output, src_relative_path)
-        if build_log:
-            logger.info(f"Copied {output} to {src_relative_path}")
 
 def build(setup_kwargs):
     try:

@@ -11,8 +11,6 @@ from ota_http_server.logger import get_app_logger
 logger = get_app_logger(__name__)
 
 # CLI application main function with collected options & configuration
-# This function is application specific and should be modified to run the actual application logic.
-# Because it is started with configuration object, it does not depend on how the application is started.
 def run_app(cfg:Config) -> None:
     try:
         # Add real application code here.

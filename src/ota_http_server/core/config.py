@@ -1,7 +1,7 @@
 # core/config.py
 
-import sys
 import os
+import sys
 from typing import Dict, Any, Mapping, TypedDict
 import argparse
 from jsonschema import validate, ValidationError
@@ -21,11 +21,11 @@ class TemplateConfig(TypedDict, total=False):
     template_version: str
     template_description: Dict[str, Any]
 
-class MetaDataConfig(TypedDict, total=False):
-    version: str
-
 class LoggingConfig(TypedDict, total=False):
-    verbose: bool
+    verbose: int
+    log_prefix: bool
+    use_color: bool
+    use_string_handler: bool
     version_option: bool
 
 class ParametersConfig(TypedDict, total=False):
@@ -56,11 +56,14 @@ class Config:
     DEFAULT_CONFIG: ConfigDict = {
         'template': {
             'template_name': "pymodule",
-            'template_version': "3.1.3",
+            'template_version': "4.0.2",
             'template_description': { 'text': """Template with CLI interface, configuration options in a file, logger and unit tests""", 'content-type': "text/plain" }
         },
         'logging': {
-            'verbose': False,
+            'verbose': 3,
+            'log_prefix': True,
+            'use_color': True,
+            'use_string_handler': False,
             'version_option': False
         },
         'parameters': {
@@ -90,6 +93,17 @@ class Config:
                 "type": "object",
                 "properties": {
                     "verbose": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 6
+                    },
+                    "log_prefix": {
+                        "type": "boolean"
+                    },
+                    "use_color": {
+                        "type": "boolean"
+                    },
+                    "use_string_handler": {
                         "type": "boolean"
                     },
                     "version_option": {
@@ -216,7 +230,7 @@ class Config:
             else:
                 # Otherwise, update the key with the new value from config_file if it is present there
                 if value is not None:
-                    config[key] = value     # type: ignore[index]
+                    config[key] = value
 
     def load_config_env(self) -> ConfigDict:
         """
@@ -240,12 +254,19 @@ class Config:
     def merge_cli_options(self, config_cli: argparse.Namespace | None = None) -> ConfigDict:    # pylint: disable=too-many-branches
         # handle CLI options if started from CLI interface
         if config_cli:
+
             if config_cli.version_option is not None:
                 self.config['logging']['version_option'] = config_cli.version_option
 
             # Handle general options
             if config_cli.verbose is not None:
                 self.config['logging']['verbose'] = config_cli.verbose
+            if config_cli.log_prefix is not None:
+                self.config['logging']['log_prefix'] = config_cli.log_prefix
+            if config_cli.use_color is not None:
+                self.config['logging']['use_color'] = config_cli.use_color
+            if config_cli.use_string_handler is not None:
+                self.config['logging']['use_string_handler'] = config_cli.use_string_handler
 
             # sample parameters that should be changed in real applications
             if config_cli.cert is not None:
@@ -285,21 +306,89 @@ def parse_args() -> argparse.Namespace:
     """Parse command-line arguments, including nested options for mqtt and MS Protocol."""
     parser = argparse.ArgumentParser(description='Secure OTA server with JWT and audit logging')
 
-    # configuration file name
-    parser.add_argument('--config', type=str, dest='config', default='config.toml',\
-                        help="Name of the configuration file, default is 'config.toml'")
-    parser.add_argument('--no-config', action='store_const', const='', dest='config',\
-                        help="Do not use a configuration file (only defaults & options)")
+    # -------------------
+    # General options
+    # -------------------
+    general_group = parser.add_argument_group("General Options")
+    general_group.add_argument(
+        '--config',
+        type=str,
+        dest='config',
+        default='config.toml',
+        help="Name of the configuration file, default is 'config.toml'"
+    )
+    general_group.add_argument(
+        '--no-config',
+        action='store_const',
+        const='',
+        dest='config',
+        help="Do not use a configuration file (only defaults & options)"
+    )
+    general_group.add_argument(
+        '-v',
+        dest='version_option',
+        action='store_true',
+        default=False,
+        help='Show version information of the module'
+    )
 
-    # version
-    parser.add_argument('-v', dest='version_option', action='store_true', default = False, help='Show version information of the module')
+    # -------------------
+    # Logging options
+    # -------------------
+    logging_group = parser.add_argument_group("Logging Options")
+    logging_group.add_argument(
+        '--verbose',
+        type=int,
+        choices=[0, 1, 2, 3, 4, 5, 6],
+        dest='verbose',
+        help="Verbosity level: 0=CRITICAL, 1=ERROR, 2=WARNING, 3=QUIET, 4=INFO, 5=VERBOSE, 6=DEBUG. Default hardcoded is 3 or taken from config file/environment variable."
+    )
+    prefix_group = logging_group.add_mutually_exclusive_group()
+    prefix_group.add_argument(
+        "--log-prefix",
+        action="store_const",
+        const=True,
+        dest="log_prefix",
+        help="Enable log prefixes (timestamp, module, level)"
+    )
+    prefix_group.add_argument(
+        "--no-log-prefix",
+        action="store_const",
+        const=False,
+        dest="log_prefix",
+        help="Disable log prefixes (print only the message)"
+    )
+    color_group = logging_group.add_mutually_exclusive_group()
+    color_group.add_argument(
+        "--use-color",
+        action="store_const",
+        const=True,
+        dest="use_color",
+        help="Enable colored log output"
+    )
+    color_group.add_argument(
+        "--no-use-color",
+        action="store_const",
+        const=False,
+        dest="use_color",
+        help="Disable colored log output"
+    )
+    string_handler_group = logging_group.add_mutually_exclusive_group()
+    string_handler_group.add_argument(
+        "--use-string-handler",
+        action="store_const",
+        const=True,
+        dest="use_string_handler",
+        help="Enable string handler to store logs in an internal buffer"
+    )
+    string_handler_group.add_argument(
+        "--no-use-string-handler",
+        action="store_const",
+        const=False,
+        dest="use_string_handler",
+        help="Disable string handler to store logs in an internal buffer"
+    )
 
-    # Verbosity option
-    verbosity_group = parser.add_mutually_exclusive_group()
-    verbosity_group.add_argument('--verbose', dest='verbose', action='store_const',\
-                                 const=True, help='Enable verbose mode')
-    verbosity_group.add_argument('--no-verbose', dest='verbose', action='store_const',\
-                                 const=False, help='Disable verbose mode')
 
     # application options & parameters
 
