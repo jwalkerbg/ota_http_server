@@ -5,6 +5,7 @@
   - [🚀 Quick Start (source installation)](#-quick-start-source-installation)
     - [Prerequisites](#prerequisites)
     - [Installing `ota_http_server` as a editable project](#installing-ota_http_server-as-a-editable-project)
+    - [Producing distributable package](#producing-distributable-package)
     - [Run the server.](#run-the-server)
   - [Features](#features)
   - [Editable project - directory Structure](#editable-project---directory-structure)
@@ -93,14 +94,20 @@ Supports optional **JWT-based authentication** and can run in two modes:
 ### Installing `ota_http_server` as a editable project
 
 1. Clone the repository from https://github.com/jwalkerbg/ota_http_server.git.
-2. Execute `poetry install -vvv` in the repository root.
-3. Activate python environment with `poetry env activate`. The command will activate the environment or emit a command that shall be executed.
+2. Execute `poetry update`
+3. Execute `poetry install -vvv` in the repository root.
+4. Activate python environment with `poetry env activate`. The command will activate the environment or emit a command that shall be executed. This activates editable environment for developers.
+
+### Producing distributable package
+
+1. Execute `poetry build -vvv` in the repository root. This will produce distributable packages in `dist` subfolder.
+2. Open new shell and execute `cd dist` then `pipx install ota_http_server-3.0.1-cp314-cp314-win_amd64.whl` (if executed in Windows environment). See the exact name of the `whl` file. This will install `ota_http_server` system wide. Similar command will install the server in Linux environment. Remember: use `pipx`, not `pip`. If you want to see what `pipx` does execute `pipx` with option `-vvv`.
 
 ### Run the server.
 
-1. **Run the server (no SSL)**:
+1. **Run the server**:
 ```bash
-python http_server.py --no-certs --port 8071
+ota_http_server --help
 ```
 
 ## Features
