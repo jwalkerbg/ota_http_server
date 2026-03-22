@@ -15,6 +15,7 @@
     - [Environment Variables.](#environment-variables)
     - [Command-Line Options (Highest Priority)](#command-line-options-highest-priority)
     - [Configuration Hierarchy (Visual)](#configuration-hierarchy-visual)
+  - [Structure of OTA URL](#structure-of-ota-url)
   - [Standalone Mode](#standalone-mode)
     - [Start with SSL (default)](#start-with-ssl-default)
     - [Start without SSL (for Apache reverse proxy)](#start-without-ssl-for-apache-reverse-proxy)
@@ -223,6 +224,23 @@ config.toml        → override hardcoded defaults
     ↑
 Default Hardcoded  → fallback values
 ```
+
+## Structure of OTA URL
+
+This is an example URL:
+
+`https://ota.mycompany.com:8070/firmware/projectA/projectA-01.00.02.bin?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...`
+
+The server root directory is `www` by default, relative to the directory where OTA server is started. It can be changed in `config.toml` with the parameter `www_dir` or with the CLI option `--www-dir`.
+
+Next level directory must present below `www` that is a container for the firmware files for all projects. By default it is `firmware`. It corresponds to te first element in URL after the domain and port.
+The directory name in the file system can be changed by `firmware_dir` parameter (`--firmware-dir` option). The first element in the URL path can be changed / renamed by `url_firmware` parameter (`--url-firmware`).
+
+Next element in the URL is the project name. If JWT is used it must be the same with the value of `project` field in JWT.
+
+After the project name real binary image file name follows.
+
+An eventual JWT is at the end.
 
 ## Standalone Mode
 
