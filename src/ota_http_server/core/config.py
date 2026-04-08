@@ -43,6 +43,7 @@ class ParametersConfig(TypedDict, total=False):
     firmware_dir: str
     url_firmware: str
     ota_audit_log: str
+    issuer_jwt: str
 
 class ConfigDict(TypedDict):
     template: TemplateConfig
@@ -80,7 +81,8 @@ class Config:
             'www_dir': "www",
             'firmware_dir': "firmware",
             'url_firmware': "firmware",
-            'ota_audit_log': "ota_audit_log.csv"
+            'ota_audit_log': "ota_audit_log.csv",
+            'issuer_jwt': "ota_http_server"
         }
     }
 
@@ -155,6 +157,9 @@ class Config:
                         "type": "string"
                     },
                     "ota_audit_log": {
+                        "type": "string"
+                    },
+                    "issuer_jwt": {
                         "type": "string"
                     }
                 },
@@ -244,7 +249,8 @@ class Config:
                 "jwt_expiry": os.getenv("OTA_JWT_EXPIRY_MINUTES"),
                 "jwt_secret": os.getenv("OTA_JWT_SECRET"),
                 "admin_secret": os.getenv("OTA_ADMIN_SECRET"),
-                "ota_audit_log": os.getenv("OTA_AUDIT_LOG")
+                "ota_audit_log": os.getenv("OTA_AUDIT_LOG"),
+                "issuer_jwt": os.getenv("OTA_ISSUER_JWT")
             }
         }
         self.deep_update(config=self.config, config_file=env_overrides)
@@ -285,6 +291,8 @@ class Config:
                 self.config['parameters']['jwt_secret'] = config_cli.jwt_secret
             if config_cli.admin_secret is not None:
                 self.config['parameters']['admin_secret'] = config_cli.admin_secret
+            if config_cli.issuer_jwt is not None:
+                self.config['parameters']['issuer_jwt'] = config_cli.issuer_jwt
             # server parameters
             if config_cli.host is not None:
                 self.config['parameters']['host'] = config_cli.host
@@ -407,6 +415,7 @@ def parse_args() -> argparse.Namespace:
     jwt_group.add_argument("--jwt-expiry", dest="jwt_expiry", type=int, help="JWT expiry time in minutes (default 30), overrides OTA_JWT_EXPIRY_MINUTES environment variable")
     jwt_group.add_argument("--jwt-secret", dest="jwt_secret", type=str, help="JWT secret key, overrides OTA_JWT_SECRET environment variable")
     jwt_group.add_argument("--admin-secret", dest="admin_secret", type=str, help="Admin secret key, overrides OTA_ADMIN_SECRET environment variable")
+    jwt_group.add_argument("--issuer-jwt", dest="issuer_jwt", type=str, help="JWT issuer claim value, overrides OTA_ISSUER_JWT environment variable")
 
     server_group = parser.add_argument_group("Server")
     server_group.add_argument("--host", dest="host", help="Listening host")

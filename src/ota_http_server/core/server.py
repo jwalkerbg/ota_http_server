@@ -8,6 +8,8 @@ from datetime import datetime, timedelta, timezone
 from flask import Flask, Response, send_from_directory, request, abort, jsonify
 from packaging import version
 import jwt
+import hmac
+from uuid import UUID
 
 from ota_http_server.logger import get_app_logger
 
@@ -123,6 +125,7 @@ def create_app(www_dir:str,                 # pylint: disable=too-many-positiona
             "sub": device_id,
             "project": project,
             "roles": ["device", "ota_client"],
+            "iss": app.config.get("issuer_jwt", "ota_http_server"),
             "iat": int(now.timestamp()),
             "exp": int((now + timedelta(minutes=expires_minutes)).timestamp()),
             "jti": f"{device_id}-{int(now.timestamp())}",
@@ -194,7 +197,7 @@ def create_app(www_dir:str,                 # pylint: disable=too-many-positiona
             }
         """
         admin_header = request.headers.get("X-Admin-Secret")
-        if not admin_header or admin_header != admin_secret:
+        if not admin_header or not hmac.compare_digest(admin_header, admin_secret):
             abort(403, "Invalid or missing admin secret")
 
         data = request.get_json(silent=True)
@@ -202,8 +205,12 @@ def create_app(www_dir:str,                 # pylint: disable=too-many-positiona
             abort(400, "Missing JSON body")
 
         device_id = data.get("device_id")
+        try:
+            UUID(device_id)
+        except ValueError:
+            abort(400, "Invalid device_id format")
         project = data.get("project")
-        expires_minutes = data.get("expires_minutes", jwt_expiry)
+        expires_minutes = min(data.get("expires_minutes", jwt_expiry), 30)  # Cap expiry to 30 minutes for security
         current_fw = data.get("current_fw", "1.0.0")
 
         if not device_id or not project:
