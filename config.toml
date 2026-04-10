@@ -10,5 +10,5 @@ url_firmware = "firmware"
 issuer_jwt = "okto7-ota"
 
 [logging]
-verbose = true
+verbose = 3
 #version_option = true
