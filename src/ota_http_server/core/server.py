@@ -58,7 +58,7 @@ def create_app(www_dir:str,                 # pylint: disable=too-many-positiona
 
         # 1️⃣ Try Authorization header first
         auth_header = request.headers.get("Authorization")
-        if auth_header and auth_header.startswith("Bearer "):
+        if auth_header and auth_header.lower().startswith("bearer "):
             token = auth_header[len("Bearer "):]
             source = "header"
 
