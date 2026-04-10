@@ -30,9 +30,9 @@ def create_app(www_dir:str,                 # pylint: disable=too-many-positiona
                ota_audit_log:str) -> Flask:
 
     # Print argument names and values
-    print("create_app() called with:")
+    logger.info("create_app() called with:")
     for name, value in locals().items():
-        print(f"  {name} = {value!r}")
+        logger.info(f" %s = %r", name, value)
 
     if use_jwt and (not jwt_secret or not admin_secret):
         raise ValueError("JWT is enabled but jwt_secret or admin_secret is not set")
@@ -91,7 +91,7 @@ def create_app(www_dir:str,                 # pylint: disable=too-many-positiona
         # 6️⃣ Log successful authentication
         device_id = payload.get("sub", "unknown")
         now = datetime.now(timezone.utc).isoformat()
-        print(f"[{now}] [AUTH] OK - Device={device_id}, Project={token_project}, Source={source}")
+        logger.info(f"[%s] [AUTH] OK - Device=%s, Project=%s, Source=%s", now, device_id, token_project, source)
 
     def get_sorted_versions(project:str) -> tuple[str, list[str], list[tuple[str, str]]]:
         """Return sorted list of versions for a given project."""
@@ -143,7 +143,7 @@ def create_app(www_dir:str,                 # pylint: disable=too-many-positiona
             if new_file:
                 writer.writerow(["timestamp", "ip", "action", "details"])
             writer.writerow([timestamp, ip, action, details])
-        print(f"[AUDIT] {timestamp} | {ip} | {action} | {details}")
+        logger.info(f"[AUDIT] %s | %s | %s | %s", timestamp, ip, action, details)
 
     # ---------------------------------------------------------------
     #                          ROUTES
