@@ -85,8 +85,25 @@ def create_app(www_dir:str,                 # pylint: disable=too-many-positiona
 
         # 5️⃣ Verify project match
         token_project = payload.get("project")
-        if project and not hmac.compare_digest(token_project, project):
+        if not project or not hmac.compare_digest(token_project, project):
             abort(403, "Token not valid for this project")
+
+        # 5️⃣.1️⃣ Verify "roles" claim contains "device" and "fw_download"
+        roles = payload.get("roles", [])
+        if not all(role in roles for role in ("device", "fw_download")):
+            abort(403, "Token does not have required roles")
+
+        # 5️⃣.2️⃣ Verify "aud" claim is "ota_api"
+        aud = payload.get("aud")
+        #if aud != "ota_api":
+        if not aud or not hmac.compare_digest(aud, "ota_api"):
+            abort(403, "Token not valid for this API")
+
+        # 5️⃣.3️⃣ Verify issuer claim if present (optional, but good practice)
+        issuer = payload.get("iss")
+        expected_issuer = app.config.get("issuer_jwt", "ota_http_server")
+        if issuer and not hmac.compare_digest(issuer, expected_issuer):
+            abort(403, "Token issuer mismatch")
 
         # 6️⃣ Log successful authentication
         device_id = payload.get("sub", "unknown")
@@ -122,14 +139,15 @@ def create_app(www_dir:str,                 # pylint: disable=too-many-positiona
         """Generate a timezone-aware JWT for OTA clients (devices)."""
         now = datetime.now(timezone.utc)
         payload = {
-            "sub": device_id,
-            "project": project,
-            "roles": ["device", "ota_client"],
-            "iss": app.config.get("issuer_jwt", "ota_http_server"),
-            "iat": int(now.timestamp()),
+            "aud": "ota_api",
             "exp": int((now + timedelta(minutes=expires_minutes)).timestamp()),
+            "fw_version": current_fw,
+            "iat": int(now.timestamp()),
+            "iss": app.config.get("issuer_jwt", "ota_http_server"),
             "jti": f"{device_id}-{int(now.timestamp())}",
-            "fw_version": current_fw
+            "project": project,
+            "roles": ["device", "fw_download"],
+            "sub": device_id
         }
         return jwt.encode(payload, jwt_secret, algorithm=jwt_algorithm), payload
 
@@ -204,19 +222,29 @@ def create_app(www_dir:str,                 # pylint: disable=too-many-positiona
         if not data:
             abort(400, "Missing JSON body")
 
+        # validation of presence of fields "device_id", "project", "current_fw", "download_fw"
+
+        # Device ID is validated as a UUID, but we also check it's provided before that.
+        if not device_id:
+            abort(400, "Missing 'device_id'")
         device_id = data.get("device_id")
         try:
             UUID(device_id)
         except ValueError:
             abort(400, "Invalid device_id format")
-        project = data.get("project")
-        expires_minutes = min(data.get("expires_minutes", jwt_expiry), 30)  # Cap expiry to 30 minutes for security
+
+        # Project name validation can also be added if there are specific requirements (e.g., allowed characters), but for now we just check it's provided.
+        project = data.get("project", None)
+        if not project:
+            abort(400, "Missing 'project'")
         current_fw = data.get("current_fw", "1.0.0")
+        # download_fw is obligatory for the token generation, but we don't need to validate it here since it's just a claim in the token and doesn't affect server logic.
+        download_fw = data.get("download_fw")
+        if not download_fw:
+            abort(400, "Missing 'download_fw'")
 
-        if not device_id or not project:
-            abort(400, "Missing 'device_id' or 'project'")
-
-        token, payload = generate_ota_jwt(device_id, project, current_fw, expires_minutes)
+        expires_minutes = min(data.get("expires_minutes", jwt_expiry), 30)  # Cap expiry to 30 minutes for security
+        token, payload = generate_ota_jwt(device_id, project, download_fw, expires_minutes)
 
         # Audit logging
         log_audit_event(
