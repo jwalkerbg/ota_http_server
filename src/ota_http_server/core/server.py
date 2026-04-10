@@ -85,7 +85,7 @@ def create_app(www_dir:str,                 # pylint: disable=too-many-positiona
 
         # 5️⃣ Verify project match
         token_project = payload.get("project")
-        if project and token_project != project:
+        if project and not hmac.compare_digest(token_project, project):
             abort(403, "Token not valid for this project")
 
         # 6️⃣ Log successful authentication
