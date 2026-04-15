@@ -312,7 +312,9 @@ class Config:
 
 def parse_args() -> argparse.Namespace:
     """Parse command-line arguments, including nested options for mqtt and MS Protocol."""
-    parser = argparse.ArgumentParser(description='Secure OTA server with JWT and audit logging')
+    parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter,
+                                     description='Secure OTA server with JWT and audit logging',
+                                     epilog='Priority: (lowest) defaults -> config file -> environment variables -> CLI options (highest)')
 
     # -------------------
     # General options
@@ -417,7 +419,10 @@ def parse_args() -> argparse.Namespace:
     jwt_group.add_argument("--admin-secret", dest="admin_secret", type=str, help="Admin secret key, overrides OTA_ADMIN_SECRET environment variable")
     jwt_group.add_argument("--issuer-jwt", dest="issuer_jwt", type=str, help="JWT issuer claim value, overrides OTA_ISSUER_JWT environment variable")
 
-    server_group = parser.add_argument_group("Server")
+    server_group = parser.add_argument_group("Server", description="""Server configuration options
+  Firmware URL has format host:port/url_firmware/project/filename-prefix-version.bin.
+  'url_firmware' is usually 'firmware' and corresponds to 'firmware-dir' in the file system under 'www-dir'.
+  'www-dir' is the root directory of the http server.""")
     server_group.add_argument("--host", dest="host", help="Listening host")
     server_group.add_argument("--port", dest="port", type=int, help="Listening port")
     server_group.add_argument("--www-dir", dest="www_dir", help="Root directory for files (default 'www')")
