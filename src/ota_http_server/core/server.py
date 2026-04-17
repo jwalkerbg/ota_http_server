@@ -1,15 +1,22 @@
 # core/server.py
 
 from typing import Any, Dict
+import time
 import csv
 import os
+import sys
 import re
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, time, timedelta, timezone
 from flask import Flask, Response, send_from_directory, request, abort, jsonify
 from packaging import version
 import jwt
 import hmac
 from uuid import UUID
+# Check Python version at runtime
+if sys.version_info >= (3, 11):
+    import tomllib as toml # Use the built-in tomllib for Python 3.11+
+else:
+    import tomli as toml # Use the external tomli for Python 3.7 to 3.10
 
 from ota_http_server.logger import get_app_logger
 
@@ -29,6 +36,10 @@ def create_app(www_dir:str,                 # pylint: disable=too-many-positiona
                admin_secret:str|None,
                ota_audit_log:str) -> Flask:
 
+    ota_db = None  # Placeholder for OTA database, can be implemented as needed
+    ota_db_last_load = 0
+    DB_CACHE_TTL = 30
+
     # Print argument names and values
     logger.info("create_app() called with:")
     for name, value in locals().items():
@@ -46,12 +57,12 @@ def create_app(www_dir:str,                 # pylint: disable=too-many-positiona
     #                       HELPER FUNCTIONS
     # ---------------------------------------------------------------
 
-    def check_token(project:str|None=None) -> None:
+    def check_token(project:str|None=None) -> Dict[str, Any]:
         """Verifies JWT from Authorization header or ?token= query param.
         Allows query param only for safe (GET, HEAD) requests.
         """
         if not use_jwt:
-            return
+            return {}  # JWT authentication is disabled, allow all requests
 
         token = None
         source = None
@@ -110,6 +121,8 @@ def create_app(www_dir:str,                 # pylint: disable=too-many-positiona
         now = datetime.now(timezone.utc).isoformat()
         logger.info(f"[%s] [AUTH] OK - Device=%s, Project=%s, Source=%s", now, device_id, token_project, source)
 
+        return payload
+
     def get_sorted_versions(project:str) -> tuple[str, list[str], list[tuple[str, str]]]:
         """Return sorted list of versions for a given project."""
         project_dir = os.path.join(www_dir, firmware_dir, project)
@@ -163,13 +176,51 @@ def create_app(www_dir:str,                 # pylint: disable=too-many-positiona
             writer.writerow([timestamp, ip, action, details])
         logger.info(f"[AUDIT] %s | %s | %s | %s", timestamp, ip, action, details)
 
+    def load_ota_db() -> Dict[str, Any]:
+        now = time.time()
+        if ota_db is None or (now - ota_db_last_load) > DB_CACHE_TTL :
+            try:
+                ota_db = toml.load("ota_db.toml")
+                ota_db_last_load = now
+            except (FileNotFoundError, toml.TomlDecodeError):
+                logger.error("Failed to load OTA database")
+                return {}
+        return ota_db
+
+    def is_device_in_project(db, project: str, device_id: str) -> bool:
+        devices = db.get("projects", {}).get(project, {}).get("devices", [])
+        return any(d["uuid"] == device_id for d in devices)
+
+    def has_firmware_access(db, project: str, device_id: str) -> bool:
+        devices = db.get("projects", {}).get(project, {}).get("devices", [])
+
+        for d in devices:
+            if d["uuid"] == device_id:
+                return d.get("fw_access", False)
+
+        return False
+
     # ---------------------------------------------------------------
     #                          ROUTES
     # ---------------------------------------------------------------
 
     @app.route(f'/{url_firmware}/<project>/<path:filename>')
     def firmware(project:str, filename:str) -> Response:
-        check_token(project)
+        if use_jwt:
+            # 1. Decode JWT
+            payload = check_token(project)
+            # 2. Extract identity
+            device_id = payload["sub"]
+            project = payload["project"]
+            # 3. Load authorization DB
+            db = load_ota_db()
+            # 4. Check membership
+            if not is_device_in_project(db, project, device_id):
+                abort(403, "Device not registered for project")
+            # 5. Check firmware permission
+            if not has_firmware_access(db, project, device_id):
+                abort(403, "Device not allowed to download firmware")
+
         project_dir = os.path.join(www_dir, firmware_dir, project)
         return send_from_directory(project_dir, filename)
 
