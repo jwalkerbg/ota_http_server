@@ -7,7 +7,7 @@ import os
 import sys
 import re
 from datetime import datetime, time, timedelta, timezone
-from flask import Flask, Response, send_from_directory, request, abort, jsonify
+from flask import Flask, Response, send_from_directory, request, abort, jsonify, current_app
 from packaging import version
 import jwt
 import hmac
@@ -34,11 +34,8 @@ def create_app(www_dir:str,                 # pylint: disable=too-many-positiona
                jwt_expiry:int,
                jwt_secret:str|None,
                admin_secret:str|None,
-               ota_audit_log:str) -> Flask:
-
-    ota_db = None  # Placeholder for OTA database, can be implemented as needed
-    ota_db_last_load = 0
-    DB_CACHE_TTL = 30
+               ota_audit_log:str,
+               ota_db_file:str) -> Flask:
 
     # Print argument names and values
     logger.info("create_app() called with:")
@@ -48,10 +45,33 @@ def create_app(www_dir:str,                 # pylint: disable=too-many-positiona
     if use_jwt and (not jwt_secret or not admin_secret):
         raise ValueError("JWT is enabled but jwt_secret or admin_secret is not set")
 
+    def load_ota_db() -> Dict[str, Any]:
+        app = current_app
+        now = datetime.now()
+
+        logger.info("load_ota_db")
+
+        if app.config["OTA_DB"] is None or (now - app.config["OTA_DB_LAST_LOAD"]) > app.config["OTA_DB_CACHE_TTL"]:
+            try:
+                with open(app.config["OTA_DB_FILE"], 'rb') as f:
+                    app.config["OTA_DB"] = toml.load(f)
+                    app.config["OTA_DB_LAST_LOAD"] = now
+            except (FileNotFoundError, toml.TOMLDecodeError) as e:
+                logger.info("Failed to load OTA database: %s", e)
+                return {}
+        return app.config["OTA_DB"]
+
     #
     # Flask app factory with JWT authentication and secure admin endpoint.
     #
     app = Flask(__name__.split('.', maxsplit=1)[0])
+
+    app.config["OTA_DB_FILE"] = ota_db_file
+    app.config["OTA_DB"] = None
+    app.config["OTA_DB_LAST_LOAD"] = 0
+    app.config["OTA_DB_CACHE_TTL"] = 30  # seconds
+    with app.app_context():
+        load_ota_db()
 
     # ---------------------------------------------------------------
     #                       HELPER FUNCTIONS
@@ -175,17 +195,6 @@ def create_app(www_dir:str,                 # pylint: disable=too-many-positiona
                 writer.writerow(["timestamp", "ip", "action", "details"])
             writer.writerow([timestamp, ip, action, details])
         logger.info(f"[AUDIT] %s | %s | %s | %s", timestamp, ip, action, details)
-
-    def load_ota_db() -> Dict[str, Any]:
-        now = time.time()
-        if ota_db is None or (now - ota_db_last_load) > DB_CACHE_TTL :
-            try:
-                ota_db = toml.load("ota_db.toml")
-                ota_db_last_load = now
-            except (FileNotFoundError, toml.TomlDecodeError):
-                logger.error("Failed to load OTA database")
-                return {}
-        return ota_db
 
     def is_device_in_project(db, project: str, device_id: str) -> bool:
         devices = db.get("projects", {}).get(project, {}).get("devices", [])
