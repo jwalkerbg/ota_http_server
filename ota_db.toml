@@ -1,0 +1,23 @@
+# Projects and devices served by this oTA server
+
+[projects.smart_fan]
+devices = [
+    { uuid: "3b1254c9-0ec6-48be-811c-6d103c79e97b", fw_access: true },
+    { uuid: "4fdc0d1f-2421-4b5b-975b-9b4d0a08d712", fw_access: true },
+    { uuid: "8c7691bf-2943-4b31-a564-5a2acf6b1ab6", fw_access: true },
+    { uuid: "043ac6f0-fdb1-4832-ab96-308c1fb83589", fw_access: true },
+    { uuid: "5f0083da-1dee-4023-9e72-22d03ce0da25", fw_access: true },
+    { uuid: "c749c589-db0f-4b84-b7fb-df45e9c3ace8", fw_access: true },
+    { uuid: "f511c8c7-a245-496c-8295-29e9823726e0", fw_access: true }
+]
+
+[projects.smart_air]
+devices = [
+    { uuid: "3b1254c9-0ec6-48be-811c-6d103c79e97b", fw_access: true },
+    { uuid: "4fdc0d1f-2421-4b5b-975b-9b4d0a08d712", fw_access: true },
+    { uuid: "8c7691bf-2943-4b31-a564-5a2acf6b1ab6", fw_access: true },
+    { uuid: "043ac6f0-fdb1-4832-ab96-308c1fb83589", fw_access: true },
+    { uuid: "5f0083da-1dee-4023-9e72-22d03ce0da25", fw_access: true },
+    { uuid: "c749c589-db0f-4b84-b7fb-df45e9c3ace8", fw_access: true },
+    { uuid: "f511c8c7-a245-496c-8295-29e9823726e0", fw_access: true }
+]
