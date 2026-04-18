@@ -44,6 +44,7 @@ class ParametersConfig(TypedDict, total=False):
     url_firmware: str
     ota_audit_log: str
     issuer_jwt: str
+    ota_db: str
 
 class ConfigDict(TypedDict):
     template: TemplateConfig
@@ -82,7 +83,8 @@ class Config:
             'firmware_dir': "firmware",
             'url_firmware': "firmware",
             'ota_audit_log': "ota_audit_log.csv",
-            'issuer_jwt': "ota_http_server"
+            'issuer_jwt': "ota_http_server",
+            'ota_db': "ota_db.toml"
         }
     }
 
@@ -160,6 +162,9 @@ class Config:
                         "type": "string"
                     },
                     "issuer_jwt": {
+                        "type": "string"
+                    },
+                    "ota_db": {
                         "type": "string"
                     }
                 },
@@ -250,7 +255,8 @@ class Config:
                 "jwt_secret": os.getenv("OTA_JWT_SECRET"),
                 "admin_secret": os.getenv("OTA_ADMIN_SECRET"),
                 "ota_audit_log": os.getenv("OTA_AUDIT_LOG"),
-                "issuer_jwt": os.getenv("OTA_ISSUER_JWT")
+                "issuer_jwt": os.getenv("OTA_ISSUER_JWT"),
+                "ota_db": os.getenv("OTA_DATABASE")
             }
         }
         self.deep_update(config=self.config, config_file=env_overrides)
@@ -293,6 +299,8 @@ class Config:
                 self.config['parameters']['admin_secret'] = config_cli.admin_secret
             if config_cli.issuer_jwt is not None:
                 self.config['parameters']['issuer_jwt'] = config_cli.issuer_jwt
+            if config_cli.ota_db is not None:
+                self.config["parameters"]["ota_db"] = config_cli.ota_db
             # server parameters
             if config_cli.host is not None:
                 self.config['parameters']['host'] = config_cli.host
@@ -329,6 +337,7 @@ Environment variables:
   OTA_ADMIN_SECRET        Admin secret key, can be overridden by --admin-secret CLI option
   OTA_ISSUER_JWT          JWT issuer claim value, can be overridden by --issuer-jwt CLI option
   OTA_AUDIT_LOG           Path to the OTA audit log file (default 'ota_audit_log.csv'), can be overridden by --ota-audit-log CLI option
+  OTA_DB                  Path to the OTA database file (default 'ota_db.toml'), can be overridden by --ota-db CLI option
 
 Examples:
 
@@ -453,6 +462,7 @@ For use in development environment without SSL certificates and JWT authenticati
     jwt_group.add_argument("--jwt-secret", dest="jwt_secret", type=str, help="JWT secret key, overrides OTA_JWT_SECRET environment variable")
     jwt_group.add_argument("--admin-secret", dest="admin_secret", type=str, help="Admin secret key, overrides OTA_ADMIN_SECRET environment variable")
     jwt_group.add_argument("--issuer-jwt", dest="issuer_jwt", type=str, help="JWT issuer claim value, overrides OTA_ISSUER_JWT environment variable")
+    jwt_group.add_argument("--ota-db", dest="ota_db", type=str, help="Path to the OTA database file (default 'ota_db.toml'), overrides OTA_DB environment variable")
 
     server_group = parser.add_argument_group("Server", description="""Server configuration options
   Firmware URL has format host:port/url_firmware/project/filename-prefix-version.bin.

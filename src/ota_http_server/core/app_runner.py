@@ -26,7 +26,8 @@ def run_app(cfg:Config) -> None:
             jwt_expiry=int(cfg.config['parameters']['jwt_expiry']),
             jwt_secret=cfg.config['parameters']['jwt_secret'],
             admin_secret=cfg.config['parameters']['admin_secret'],
-            ota_audit_log=cfg.config['parameters']['ota_audit_log']
+            ota_audit_log=cfg.config['parameters']['ota_audit_log'],
+            ota_db_file=cfg.config['parameters']['ota_db']
         )
 
         print("\n=== OTA Server Configuration ===")
