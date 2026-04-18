@@ -314,7 +314,43 @@ def parse_args() -> argparse.Namespace:
     """Parse command-line arguments, including nested options for mqtt and MS Protocol."""
     parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter,
                                      description='Secure OTA server with JWT and audit logging',
-                                     epilog='Priority: (lowest) defaults -> config file -> environment variables -> CLI options (highest)')
+                                     epilog="""
+Configuration priority: (lowest) defaults -> config file -> environment variables -> CLI options (highest)
+
+Examples:
+
+options:
+  -h, --help     show this help message and exit
+
+Environment variables:
+  OTA_JWT_ALGORITHM       JWT algorithm to use (default 'HS256')
+  OTA_JWT_EXPIRY_MINUTES  JWT expiry time in minutes (default 30)
+  OTA_JWT_SECRET          JWT secret key, can be overridden by --jwt-secret CLI option
+  OTA_ADMIN_SECRET        Admin secret key, can be overridden by --admin-secret CLI option
+  OTA_ISSUER_JWT          JWT issuer claim value, can be overridden by --issuer-jwt CLI option
+  OTA_AUDIT_LOG           Path to the OTA audit log file (default 'ota_audit_log.csv'), can be overridden by --ota-audit-log CLI option
+
+Examples:
+
+Use default configuration values in the program, default config file is 'config.toml' in the current directory and environment variables:
+  ota_http_server
+
+Use a different port than the default 8071:
+  ota_http_server --port 18070
+
+Use a custom configuration file instead of the default 'config.toml':
+  ota_http_server --config myota/config.toml
+
+For use behind a reverse proxy with SSL termination, you can disable certificates in the OTA server and let the reverse proxy handle SSL:
+  ota_http_server --no-certs
+
+For use in development when no JWT authentication is needed, you can disable JWT:
+  ota_http_server --no-jwt
+
+For use in development environment without SSL certificates and JWT authentication, you can disable both:
+  ota_http_server --no-certs --no-jwt
+"""
+)
 
     # -------------------
     # General options
@@ -398,7 +434,6 @@ def parse_args() -> argparse.Namespace:
         dest="use_string_handler",
         help="Disable string handler to store logs in an internal buffer"
     )
-
 
     # application options & parameters
 
