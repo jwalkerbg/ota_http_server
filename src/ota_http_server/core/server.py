@@ -35,7 +35,8 @@ def create_app(www_dir:str,                 # pylint: disable=too-many-positiona
                jwt_secret:str|None,
                admin_secret:str|None,
                ota_audit_log:str,
-               ota_db_file:str) -> Flask:
+               ota_db_file:str,
+               ota_db_cache_ttl:int) -> Flask:
 
     # Print argument names and values
     logger.info("create_app() called with:")
@@ -69,7 +70,7 @@ def create_app(www_dir:str,                 # pylint: disable=too-many-positiona
     app.config["OTA_DB_FILE"] = ota_db_file
     app.config["OTA_DB"] = None
     app.config["OTA_DB_LAST_LOAD"] = 0
-    app.config["OTA_DB_CACHE_TTL"] = 30  # seconds
+    app.config["OTA_DB_CACHE_TTL"] = timedelta(seconds=ota_db_cache_ttl)  # seconds
     with app.app_context():
         load_ota_db()
 

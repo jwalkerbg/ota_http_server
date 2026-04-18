@@ -27,7 +27,8 @@ def run_app(cfg:Config) -> None:
             jwt_secret=cfg.config['parameters']['jwt_secret'],
             admin_secret=cfg.config['parameters']['admin_secret'],
             ota_audit_log=cfg.config['parameters']['ota_audit_log'],
-            ota_db_file=cfg.config['parameters']['ota_db']
+            ota_db_file=cfg.config['parameters']['ota_db'],
+            ota_db_cache_ttl=int(cfg.config['parameters']['ota_db_cache_ttl'])
         )
 
         print("\n=== OTA Server Configuration ===")
