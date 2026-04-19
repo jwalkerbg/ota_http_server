@@ -4,10 +4,10 @@
 [parameters]
 no_certs = true
 port = 8071
-www_dir = "www"
+www_dir = "e:\data\ota_http_server\www"
 firmware_dir = "firmware"
 url_firmware = "firmware"
-issuer_jwt = "okto7-ota"
+jwt_issuer = "okto7-ota"
 
 [logging]
 verbose = 3

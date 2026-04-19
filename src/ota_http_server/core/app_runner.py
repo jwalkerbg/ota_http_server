@@ -25,6 +25,8 @@ def run_app(cfg:Config) -> None:
             jwt_algorithm=cfg.config['parameters']['jwt_alg'],
             jwt_expiry=int(cfg.config['parameters']['jwt_expiry']),
             jwt_secret=cfg.config['parameters']['jwt_secret'],
+            jwt_issuer=cfg.config['parameters']['jwt_issuer'],
+            jwt_audience=cfg.config['parameters']['jwt_audience'],
             admin_secret=cfg.config['parameters']['admin_secret'],
             ota_audit_log=cfg.config['parameters']['ota_audit_log'],
             ota_db_file=cfg.config['parameters']['ota_db'],

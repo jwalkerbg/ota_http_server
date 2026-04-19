@@ -36,6 +36,8 @@ class ParametersConfig(TypedDict, total=False):
     jwt_alg: str
     jwt_expiry: int
     jwt_secret: str | None
+    jwt_issuer: str | None
+    jwt_audience: str | None
     admin_secret: str | None
     host: str
     port: int
@@ -43,7 +45,6 @@ class ParametersConfig(TypedDict, total=False):
     firmware_dir: str
     url_firmware: str
     ota_audit_log: str
-    issuer_jwt: str
     ota_db: str
     ota_db_cache_ttl: int
 
@@ -77,6 +78,8 @@ class Config:
             'jwt_alg': "HS256",
             'jwt_expiry': 300,
             'jwt_secret': None,
+            'jwt_issuer': "ota_http_server",
+            'jwt_audience': "ota_api",
             'admin_secret': None,
             'host': "0.0.0.0",
             'port': 8071,
@@ -84,7 +87,6 @@ class Config:
             'firmware_dir': "firmware",
             'url_firmware': "firmware",
             'ota_audit_log': "ota_audit_log.csv",
-            'issuer_jwt': "ota_http_server",
             'ota_db': "ota_db.toml",
             'ota_db_cache_ttl': 300
         }
@@ -142,6 +144,12 @@ class Config:
                     "jwt_secret": {
                         "type": ["string", "null"]
                     },
+                    "jwt_issuer": {
+                        "type": ["string", "null"]
+                    },
+                    "jwt_audience": {
+                        "type": ["string", "null"]
+                    },
                     "admin_secret": {
                         "type": ["string", "null"]
                     },
@@ -161,9 +169,6 @@ class Config:
                         "type": "string"
                     },
                     "ota_audit_log": {
-                        "type": "string"
-                    },
-                    "issuer_jwt": {
                         "type": "string"
                     },
                     "ota_db": {
@@ -260,7 +265,8 @@ class Config:
                 "jwt_secret": os.getenv("OTA_JWT_SECRET"),
                 "admin_secret": os.getenv("OTA_ADMIN_SECRET"),
                 "ota_audit_log": os.getenv("OTA_AUDIT_LOG"),
-                "issuer_jwt": os.getenv("OTA_ISSUER_JWT"),
+                "jwt_issuer": os.getenv("OTA_JWT_ISSUER"),
+                "jwt_audience": os.getenv("OTA_JWT_AUDIENCE"),
                 "ota_db": os.getenv("OTA_DATABASE"),
                 "ota_db_cache_ttl": os.getenv("OTA_DB_CACHE_TTL")
             }
@@ -301,10 +307,12 @@ class Config:
                 self.config['parameters']['jwt_expiry'] = config_cli.jwt_expiry
             if config_cli.jwt_secret is not None:
                 self.config['parameters']['jwt_secret'] = config_cli.jwt_secret
+            if config_cli.jwt_issuer is not None:
+                self.config['parameters']['jwt_issuer'] = config_cli.jwt_issuer
+            if config_cli.jwt_audience is not None:
+                self.config['parameters']['jwt_audience'] = config_cli.jwt_audience
             if config_cli.admin_secret is not None:
                 self.config['parameters']['admin_secret'] = config_cli.admin_secret
-            if config_cli.issuer_jwt is not None:
-                self.config['parameters']['issuer_jwt'] = config_cli.issuer_jwt
             if config_cli.ota_db is not None:
                 self.config["parameters"]["ota_db"] = config_cli.ota_db
             if config_cli.ota_db_cache_ttl is not None:
@@ -343,7 +351,8 @@ Environment variables:
   OTA_JWT_EXPIRY_SECONDS  JWT expiry time in seconds (default 300)
   OTA_JWT_SECRET          JWT secret key, can be overridden by --jwt-secret CLI option
   OTA_ADMIN_SECRET        Admin secret key, can be overridden by --admin-secret CLI option
-  OTA_ISSUER_JWT          JWT issuer claim value, can be overridden by --issuer-jwt CLI option
+  OTA_JWT_ISSUER          JWT issuer claim value, can be overridden by --jwt-issuer CLI option
+  OTA_JWT_AUDIENCE        JWT audience claim value, can be overridden by --jwt-audience CLI option
   OTA_AUDIT_LOG           Path to the OTA audit log file (default 'ota_audit_log.csv'), can be overridden by --ota-audit-log CLI option
   OTA_DB                  Path to the OTA database file (default 'ota_db.toml'), can be overridden by --ota-db CLI option
   OTA_DB_CACHE_TTL        Cache time-to-live for the OTA database in seconds (default 300), can be overridden by --ota-db-cache-ttl CLI option
@@ -469,10 +478,13 @@ For use in development environment without SSL certificates and JWT authenticati
     jwt_group.add_argument("--jwt-alg", dest="jwt_alg", type=str, help="JWT algorithm to use (default 'HS256'), overrides OTA_JWT_ALGORITHM environment variable")
     jwt_group.add_argument("--jwt-expiry", dest="jwt_expiry", type=int, help="JWT expiry time in seconds (default 300), overrides OTA_JWT_EXPIRY_SECONDS environment variable")
     jwt_group.add_argument("--jwt-secret", dest="jwt_secret", type=str, help="JWT secret key, overrides OTA_JWT_SECRET environment variable")
+    jwt_group.add_argument("--jwt-issuer", dest="jwt_issuer", type=str, help="JWT issuer claim value, overrides OTA_JWT_ISSUER environment variable")
+    jwt_group.add_argument("--jwt-audience", dest="jwt_audience", type=str, help="JWT audience claim value, overrides OTA_JWT_AUDIENCE environment variable")
     jwt_group.add_argument("--admin-secret", dest="admin_secret", type=str, help="Admin secret key, overrides OTA_ADMIN_SECRET environment variable")
-    jwt_group.add_argument("--issuer-jwt", dest="issuer_jwt", type=str, help="JWT issuer claim value, overrides OTA_ISSUER_JWT environment variable")
-    jwt_group.add_argument("--ota-db", dest="ota_db", type=str, help="Path to the OTA database file (default 'ota_db.toml'), overrides OTA_DB environment variable")
-    jwt_group.add_argument("--ota-db-cache-ttl", dest="ota_db_cache_ttl", type=int, help="Cache time-to-live for the OTA database in seconds (default 300), overrides OTA_DB_CACHE_TTL environment variable")
+
+    db_group = parser.add_argument_group("Database")
+    db_group.add_argument("--ota-db", dest="ota_db", type=str, help="Path to the OTA database file (default 'ota_db.toml'), overrides OTA_DB environment variable")
+    db_group.add_argument("--ota-db-cache-ttl", dest="ota_db_cache_ttl", type=int, help="Cache time-to-live for the OTA database in seconds (default 300), overrides OTA_DB_CACHE_TTL environment variable")
 
     server_group = parser.add_argument_group("Server", description="""Server configuration options
   Firmware URL has format host:port/url_firmware/project/filename-prefix-version.bin.

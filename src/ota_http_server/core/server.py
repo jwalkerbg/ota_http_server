@@ -6,8 +6,9 @@ import csv
 import os
 import sys
 import re
+from pathlib import Path
 from datetime import datetime, time, timedelta, timezone
-from flask import Flask, Response, send_from_directory, request, abort, jsonify, current_app
+from flask import Flask, Response, send_file, request, abort, jsonify, current_app
 from packaging import version
 import jwt
 import hmac
@@ -33,6 +34,8 @@ def create_app(www_dir:str,                 # pylint: disable=too-many-positiona
                jwt_algorithm:str,
                jwt_expiry:int,
                jwt_secret:str|None,
+               jwt_issuer:str|None,
+               jwt_audience:str|None,
                admin_secret:str|None,
                ota_audit_log:str,
                ota_db_file:str,
@@ -107,7 +110,7 @@ def create_app(www_dir:str,                 # pylint: disable=too-many-positiona
 
         # 4️⃣ Decode and verify JWT
         try:
-            payload = jwt.decode(token, jwt_secret, algorithms=[jwt_algorithm],audience="ota_api")
+            payload = jwt.decode(jwt=token, key=jwt_secret, algorithms=[jwt_algorithm], audience=jwt_audience, issuer=jwt_issuer)
         except jwt.ExpiredSignatureError:
             abort(401, "Token expired")
         except jwt.InvalidTokenError:
@@ -131,7 +134,7 @@ def create_app(www_dir:str,                 # pylint: disable=too-many-positiona
 
         # 5️⃣.3️⃣ Verify issuer claim if present (optional, but good practice)
         issuer = payload.get("iss")
-        expected_issuer = app.config.get("issuer_jwt", "ota_http_server")
+        expected_issuer = app.config.get("jwt_issuer", "ota_http_server")
         if issuer and not hmac.compare_digest(issuer, expected_issuer):
             abort(403, "Token issuer mismatch")
 
@@ -171,11 +174,11 @@ def create_app(www_dir:str,                 # pylint: disable=too-many-positiona
         """Generate a timezone-aware JWT for OTA clients (devices)."""
         now = datetime.now(timezone.utc)
         payload = {
-            "aud": "ota_api",
+            "aud": jwt_audience if jwt_audience else app.config.get("jwt_audience", "ota_api"),
             "exp": int((now + timedelta(minutes=expires_minutes)).timestamp()),
             "download_vs": download_vs,
             "iat": int(now.timestamp()),
-            "iss": app.config.get("issuer_jwt", "ota_http_server"),
+            "iss": jwt_issuer if jwt_issuer else app.config.get("jwt_issuer", "ota_http_server"),
             "jti": f"{device_id}-{int(now.timestamp())}",
             "project": project,
             "roles": ["device", "fw_download"],
@@ -229,8 +232,11 @@ def create_app(www_dir:str,                 # pylint: disable=too-many-positiona
             if not has_firmware_access(db, project, device_id):
                 abort(403, "Device not allowed to download firmware")
 
-        project_dir = os.path.join(www_dir, firmware_dir, project)
-        return send_from_directory(project_dir, filename)
+        file_path = (Path(www_dir) / Path(firmware_dir) / Path(project) / Path(filename)).resolve()
+        logger.info("Serving firmware from: %s", file_path)
+        if not file_path.is_file():
+            abort(404, "Firmware file not found")
+        return send_file(file_path, conditional=True)
 
     @app.route(f'/{url_firmware}/<project>/latest')
     def latest_firmware(project:str) -> Response:
