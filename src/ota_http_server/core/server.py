@@ -147,28 +147,29 @@ def create_app(www_dir:str,                 # pylint: disable=too-many-positiona
 
     def get_sorted_versions(project:str) -> tuple[str, list[str], list[tuple[str, str]]]:
         """Return sorted list of versions for a given project."""
-        project_dir = os.path.join(www_dir, firmware_dir, project)
-        if not os.path.isdir(project_dir):
+
+        project_path = (Path(www_dir) / firmware_dir / project).resolve()
+        if not project_path.is_dir():
             abort(404, "Project not found")
 
         pattern = re.compile(r"(\d+\.\d+\.\d+)")
         versions = []
         version_files = []
 
-        for filename in os.listdir(project_dir):
-            if filename.endswith(".json"):
-                match = pattern.search(filename)
+        for file_path in project_path.iterdir():
+            if file_path.is_file() and file_path.suffix == ".json":
+                match = pattern.search(file_path.name)
                 if match:
                     ver = match.group(1)
                     versions.append(ver)
-                    version_files.append((filename, ver))
+                    version_files.append((file_path.name, ver))
 
         if not versions:
             abort(404, "No versions found")
 
-        versions.sort(key=lambda s: list(map(int, s.split('.'))))
         version_files.sort(key=lambda x: version.parse(x[1]))
-        return project_dir, versions, version_files
+        sorted_versions = [v for _, v in version_files]
+        return str(project_path), sorted_versions, version_files
 
     def generate_ota_jwt(device_id:str, project:str, download_vs:str="1.0.0", expires_minutes:int=jwt_expiry) -> tuple[str, Dict[str, Any]]:
         """Generate a timezone-aware JWT for OTA clients (devices)."""
@@ -243,7 +244,8 @@ def create_app(www_dir:str,                 # pylint: disable=too-many-positiona
         check_token(project)
         project_dir, _, version_files = get_sorted_versions(project)
         latest_file, _ = version_files[-1]
-        return send_from_directory(project_dir, latest_file, mimetype="application/json")
+        file_path = (Path(project_dir) / latest_file).resolve()
+        return send_file(file_path, conditional=True)
 
     @app.route(f'/{url_firmware}/<project>/versions')
     def list_versions(project:str) -> Response:
