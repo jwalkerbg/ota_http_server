@@ -24,6 +24,7 @@ def run_app(cfg:Config) -> None:
             use_jwt=not cfg.config['parameters']['no_jwt'],
             jwt_algorithm=cfg.config['parameters']['jwt_alg'],
             jwt_expiry=int(cfg.config['parameters']['jwt_expiry']),
+            jwt_max_expiry=int(cfg.config['parameters']['jwt_max_expiry']),
             jwt_secret=cfg.config['parameters']['jwt_secret'],
             jwt_issuer=cfg.config['parameters']['jwt_issuer'],
             jwt_audience=cfg.config['parameters']['jwt_audience'],

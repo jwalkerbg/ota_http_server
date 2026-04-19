@@ -35,6 +35,7 @@ class ParametersConfig(TypedDict, total=False):
     no_jwt: bool
     jwt_alg: str
     jwt_expiry: int
+    jwt_max_expiry: int
     jwt_secret: str | None
     jwt_issuer: str | None
     jwt_audience: str | None
@@ -77,6 +78,7 @@ class Config:
             'no_jwt': False,
             'jwt_alg': "HS256",
             'jwt_expiry': 300,
+            'jwt_max_expiry': 3600,
             'jwt_secret': None,
             'jwt_issuer': "ota_http_server",
             'jwt_audience': "ota_api",
@@ -139,6 +141,9 @@ class Config:
                         "type": "string"
                     },
                     "jwt_expiry": {
+                        "type": "number"
+                    },
+                    "jwt_max_expiry": {
                         "type": "number"
                     },
                     "jwt_secret": {
@@ -262,6 +267,7 @@ class Config:
             "parameters": {
                 "jwt_alg": os.getenv("OTA_JWT_ALGORITHM"),
                 "jwt_expiry": os.getenv("OTA_JWT_EXPIRY_SECONDS"),
+                "jwt_max_expiry": os.getenv("OTA_JWT_MAX_EXPIRY_SECONDS"),
                 "jwt_secret": os.getenv("OTA_JWT_SECRET"),
                 "admin_secret": os.getenv("OTA_ADMIN_SECRET"),
                 "ota_audit_log": os.getenv("OTA_AUDIT_LOG"),
@@ -305,6 +311,8 @@ class Config:
                 self.config['parameters']['jwt_alg'] = config_cli.jwt_alg
             if config_cli.jwt_expiry is not None:
                 self.config['parameters']['jwt_expiry'] = config_cli.jwt_expiry
+            if config_cli.jwt_max_expiry is not None:
+                self.config['parameters']['jwt_max_expiry'] = config_cli.jwt_max_expiry
             if config_cli.jwt_secret is not None:
                 self.config['parameters']['jwt_secret'] = config_cli.jwt_secret
             if config_cli.jwt_issuer is not None:
@@ -349,6 +357,7 @@ options:
 Environment variables:
   OTA_JWT_ALGORITHM       JWT algorithm to use (default 'HS256')
   OTA_JWT_EXPIRY_SECONDS  JWT expiry time in seconds (default 300)
+  OTA_JWT_MAX_EXPIRY_SECONDS JWT max expiry time in seconds (default 3600)
   OTA_JWT_SECRET          JWT secret key, can be overridden by --jwt-secret CLI option
   OTA_ADMIN_SECRET        Admin secret key, can be overridden by --admin-secret CLI option
   OTA_JWT_ISSUER          JWT issuer claim value, can be overridden by --jwt-issuer CLI option
@@ -477,6 +486,7 @@ For use in development environment without SSL certificates and JWT authenticati
     jwt_ex_group.add_argument("--jwt", dest="no_jwt", action="store_const", const=False, help="Enable JWT authentication")
     jwt_group.add_argument("--jwt-alg", dest="jwt_alg", type=str, help="JWT algorithm to use (default 'HS256'), overrides OTA_JWT_ALGORITHM environment variable")
     jwt_group.add_argument("--jwt-expiry", dest="jwt_expiry", type=int, help="JWT expiry time in seconds (default 300), overrides OTA_JWT_EXPIRY_SECONDS environment variable")
+    jwt_group.add_argument("--jwt-max-expiry", dest="jwt_max_expiry", type=int, help="JWT max expiry time in seconds (default 3600), overrides OTA_JWT_MAX_EXPIRY_SECONDS environment variable")
     jwt_group.add_argument("--jwt-secret", dest="jwt_secret", type=str, help="JWT secret key, overrides OTA_JWT_SECRET environment variable")
     jwt_group.add_argument("--jwt-issuer", dest="jwt_issuer", type=str, help="JWT issuer claim value, overrides OTA_JWT_ISSUER environment variable")
     jwt_group.add_argument("--jwt-audience", dest="jwt_audience", type=str, help="JWT audience claim value, overrides OTA_JWT_AUDIENCE environment variable")
