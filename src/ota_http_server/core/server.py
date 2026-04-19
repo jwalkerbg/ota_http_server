@@ -111,7 +111,7 @@ def create_app(www_dir:str,                 # pylint: disable=too-many-positiona
 
         # 4️⃣ Decode and verify JWT
         try:
-            payload = jwt.decode(jwt=token, key=jwt_secret, algorithms=[jwt_algorithm], audience=jwt_audience, issuer=jwt_issuer)
+            payload = jwt.decode(jwt=token, key=jwt_secret, algorithms=[jwt_algorithm], options={"verify_exp": True}, audience=jwt_audience, issuer=jwt_issuer)
         except jwt.ExpiredSignatureError:
             abort(401, "Token expired")
         except jwt.InvalidTokenError:
