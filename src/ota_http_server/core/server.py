@@ -283,12 +283,12 @@ def create_app(www_dir:str,                 # pylint: disable=too-many-positiona
         if not data:
             abort(400, "Missing JSON body")
 
-        # validation of presence of fields "device_id", "project", "current_fw", "download_fw"
+        # validation of presence of fields "device_id", "project", "current_vs", "download_vs"
 
         # Device ID is validated as a UUID, but we also check it's provided before that.
+        device_id = data.get("device_id")
         if not device_id:
             abort(400, "Missing 'device_id'")
-        device_id = data.get("device_id")
         try:
             UUID(device_id)
         except ValueError:
