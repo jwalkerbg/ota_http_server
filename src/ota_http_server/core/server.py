@@ -172,12 +172,12 @@ def create_app(www_dir:str,                 # pylint: disable=too-many-positiona
         sorted_versions = [v for _, v in version_files]
         return str(project_path), sorted_versions, version_files
 
-    def generate_ota_jwt(device_id:str, project:str, download_vs:str="1.0.0", expires_minutes:int=jwt_expiry) -> tuple[str, Dict[str, Any]]:
+    def generate_ota_jwt(device_id:str, project:str, download_vs:str="1.0.0", expires_seconds:int=jwt_expiry) -> tuple[str, Dict[str, Any]]:
         """Generate a timezone-aware JWT for OTA clients (devices)."""
         now = datetime.now(timezone.utc)
         payload = {
             "aud": jwt_audience if jwt_audience else app.config.get("jwt_audience", "ota_api"),
-            "exp": int((now + timedelta(minutes=expires_minutes)).timestamp()),
+            "exp": int((now + timedelta(seconds=expires_seconds)).timestamp()),
             "download_vs": download_vs,
             "iat": int(now.timestamp()),
             "iss": jwt_issuer if jwt_issuer else app.config.get("jwt_issuer", "ota_http_server"),
