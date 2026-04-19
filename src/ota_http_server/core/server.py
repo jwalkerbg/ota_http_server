@@ -169,13 +169,13 @@ def create_app(www_dir:str,                 # pylint: disable=too-many-positiona
         version_files.sort(key=lambda x: version.parse(x[1]))
         return project_dir, versions, version_files
 
-    def generate_ota_jwt(device_id:str, project:str, current_fw:str="1.0.0", expires_minutes:int=jwt_expiry) -> tuple[str, Dict[str, Any]]:
+    def generate_ota_jwt(device_id:str, project:str, current_vs:str="1.0.0", expires_minutes:int=jwt_expiry) -> tuple[str, Dict[str, Any]]:
         """Generate a timezone-aware JWT for OTA clients (devices)."""
         now = datetime.now(timezone.utc)
         payload = {
             "aud": "ota_api",
             "exp": int((now + timedelta(minutes=expires_minutes)).timestamp()),
-            "fw_version": current_fw,
+            "fw_version": current_vs,
             "iat": int(now.timestamp()),
             "iss": app.config.get("issuer_jwt", "ota_http_server"),
             "jti": f"{device_id}-{int(now.timestamp())}",
@@ -272,7 +272,8 @@ def create_app(www_dir:str,                 # pylint: disable=too-many-positiona
               "device_id": "uuid-v4",
               "project": "project_name",
               "expires_minutes": jwt_expiry,
-              "current_fw": "1.0.0"
+              "current_vs": "1.0.0",
+              "download_vs": "2.0.0"
             }
         """
         admin_header = request.headers.get("X-Admin-Secret")
@@ -298,14 +299,14 @@ def create_app(www_dir:str,                 # pylint: disable=too-many-positiona
         project = data.get("project", None)
         if not project:
             abort(400, "Missing 'project'")
-        current_fw = data.get("current_fw", "1.0.0")
-        # download_fw is obligatory for the token generation, but we don't need to validate it here since it's just a claim in the token and doesn't affect server logic.
-        download_fw = data.get("download_fw")
-        if not download_fw:
-            abort(400, "Missing 'download_fw'")
+        current_vs = data.get("current_vs", "1.0.0")
+        # download_vs is obligatory for the token generation, but we don't need to validate it here since it's just a claim in the token and doesn't affect server logic.
+        download_vs = data.get("download_vs")
+        if not download_vs:
+            abort(400, "Missing 'download_vs'")
 
         expires_minutes = min(data.get("expires_minutes", jwt_expiry), 30)  # Cap expiry to 30 minutes for security
-        token, payload = generate_ota_jwt(device_id, project, download_fw, expires_minutes)
+        token, payload = generate_ota_jwt(device_id, project, download_vs, expires_minutes)
 
         # Audit logging
         log_audit_event(
