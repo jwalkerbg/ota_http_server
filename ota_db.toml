@@ -8,7 +8,8 @@ devices = [
     { uuid = "043ac6f0-fdb1-4832-ab96-308c1fb83589", fw_access = true },
     { uuid = "5f0083da-1dee-4023-9e72-22d03ce0da25", fw_access = true },
     { uuid = "c749c589-db0f-4b84-b7fb-df45e9c3ace8", fw_access = true },
-    { uuid = "f511c8c7-a245-496c-8295-29e9823726e0", fw_access = true }
+    { uuid = "f511c8c7-a245-496c-8295-29e9823726e0", fw_access = true },
+	{ uuid = "e6f87d77-4216-4be1-ab83-b5fa6792b747", fw_access = true }
 ]
 
 [projects.smart_air]
@@ -19,5 +20,6 @@ devices = [
     { uuid = "043ac6f0-fdb1-4832-ab96-308c1fb83589", fw_access = true },
     { uuid = "5f0083da-1dee-4023-9e72-22d03ce0da25", fw_access = true },
     { uuid = "c749c589-db0f-4b84-b7fb-df45e9c3ace8", fw_access = true },
-    { uuid = "f511c8c7-a245-496c-8295-29e9823726e0", fw_access = true }
+    { uuid = "f511c8c7-a245-496c-8295-29e9823726e0", fw_access = true },
+	{ uuid = "e6f87d77-4216-4be1-ab83-b5fa6792b747", fw_access = true }
 ]
