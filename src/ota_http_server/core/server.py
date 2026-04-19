@@ -129,8 +129,7 @@ def create_app(www_dir:str,                 # pylint: disable=too-many-positiona
 
         # 5️⃣.2️⃣ Verify "aud" claim is "ota_api"
         aud = payload.get("aud")
-        #if aud != "ota_api":
-        if not aud or not hmac.compare_digest(aud, "ota_api"):
+        if not aud or not hmac.compare_digest(aud, jwt_audience):
             abort(403, "Token not valid for this API")
 
         # 5️⃣.3️⃣ Verify issuer claim if present (optional, but good practice)

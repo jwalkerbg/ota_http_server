@@ -146,6 +146,7 @@ project_root/
 ├── build.py
 ├── pyproject.toml
 ├── config.toml
+├── ota_db.toml
 ├── ota_start.bat
 └── README.md
 ```
@@ -192,10 +193,15 @@ Note: In the configuration file, keys use `underscores` (`_`), while the corresp
 For `dynamic runtime overrides`, the server can read environment variables. These are read on server start only, not on every http(s) request afterwards. These take precedence over values defined in `config.toml`. These variables are as follows:
 
 * "jwt_alg": os.getenv("OTA_JWT_ALGORITHM"),
-* "jwt_expiry": os.getenv("OTA_JWT_EXPIRY_MINUTES"),
+* "jwt_expiry": os.getenv("OTA_JWT_EXPIRY_SECONDS"),
+* "jwt_max_expiry": os.getenv("OTA_JWT_MAX_EXPIRY_SECONDS"),
 * "jwt_secret": os.getenv("OTA_JWT_SECRET"),
 * "admin_secret": os.getenv("OTA_ADMIN_SECRET"),
 * "ota_audit_log": os.getenv("OTA_AUDIT_LOG")
+* "jwt_issuer": os.getenv("OTA_JWT_ISSUER"),
+* "jwt_audience": os.getenv("OTA_JWT_AUDIENCE"),
+* "ota_db": os.getenv("OTA_DATABASE"),
+* "ota_db_cache_ttl": os.getenv("OTA_DB_CACHE_TTL")
 
 Above is a code snippet from `core/config.py` and correspondence between the `environment variables` and the `options` can be seen.
 
@@ -208,7 +214,7 @@ The `CLI options` override all other configuration sources. This is ideal for te
 Example usage:
 
 ```
-ota_http_server --host 0.0.0.0 --port 8071 --no-certs --no-jwt --jwt-expiry 5
+ota_http_server --host 0.0.0.0 --port 8071 --no-certs --no-jwt
 ```
 
 ### Configuration Hierarchy (Visual)
@@ -374,14 +380,16 @@ Header | Description
 {
   "device_id": "e6f87d77-4216-4be1-ab83-b5fa6792b747",
   "project": "smart_fan",
-  "expires_minutes": 30,
-  "current_fw": "1.0.0"
+  "expires_seconds": 300,
+  "current_vs": "1.0.0",
+  "download_vs": "2.0.0"
 }
 ```
 * `device_id` — The unique UUID of the device that will perform OTA.
 * `project` — The firmware project name (must match the folder name under /firmware/).
-* `expires_minutes` (optional) — Token lifetime in minutes (default: value of JWT_DEFAULT_EXPIRY_MINUTES).
-* `current_fw` (optional) — Current firmware version; stored in the token for auditing.
+* `expires_seconds` (optional) — Token lifetime in seconds (default: value of JWT_DEFAULT_EXPIRY_SECONDS).
+* `current_vs` — Current firmware version; stored in the token for auditing.
+* `download_vs` — The version that shall be served later.
 
 **Example curl command (Linux/macOS)**
 ```bash
@@ -390,7 +398,10 @@ curl -X POST https://yourserver:8070/admin/generate_token \
   -H "Content-Type: application/json" \
   -d '{
         "device_id": "e6f87d77-4216-4be1-ab83-b5fa6792b747",
-        "project": "smart_fan"
+        "project": "smart_fan",
+        "expires_seconds": 300,
+        "current_vs": "1.0.0",
+        "download_vs": "2.0.0"
       }'
 ```
 **Example curl command (Windows)**
@@ -404,17 +415,22 @@ curl -X POST https://yourserver:8070/admin/generate_token ^
 The response contains a signed JWT and metadata:
 ```json
 {
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9....",
-  "expires_at": "2025-10-09T15:34:12+00:00",
-  "payload": {
-    "sub": "e6f87d77-4216-4be1-ab83-b5fa6792b747",
-    "project": "smart_fan",
-    "roles": ["device", "ota_client"],
-    "iat": 1739083200,
-    "exp": 1739085000,
-    "jti": "e6f87d77-4216-4be1-ab83-b5fa6792b747-1739083200",
-    "fw_version": "1.0.0"
-  }
+    "expires_at": "2026-04-19T09:13:32+00:00",
+    "payload": {
+        "aud": "ota_api",
+        "exp": 1776590012,
+        "download_vs": "2.0.0",
+        "iat": 1776588212,
+        "iss": "ota_http_server",
+        "jti": "e6f87d77-4216-4be1-ab83-b5fa6792b747-1776588212",
+        "project": "smart_fan",
+        "roles": [
+            "device",
+            "ota_client"
+        ],
+        "sub": "e6f87d77-4216-4be1-ab83-b5fa6792b747"
+    },
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJlNmY4N2Q3Ny00MjE2LTRiZTEtYWI4My1iNWZhNjc5MmI3NDciLCJwcm9qZWN0Ijoic21hcnRfZmFuIiwicm9sZXMiOlsiZGV2aWNlIiwib3RhX2NsaWVudCJdLCJpc3MiOiJvdGFfaHR0cF9zZXJ2ZXIiLCJpYXQiOjE3NzY1ODgyMTIsImV4cCI6MTc3NjU5MDAxMiwianRpIjoiZTZmODdkNzctNDIxNi00YmUxLWFiODMtYjVmYTY3OTJiNzQ3LTE3NzY1ODgyMTIiLCJmd192ZXJzaW9uIjoiMDEuMDAuMDIifQ.pgybmqVDz2uAZ5zb6L90HrYJ1KPqIAq-CH8S597IyhU"
 }
 ```
 
@@ -422,32 +438,37 @@ The response contains a signed JWT and metadata:
 
 Field | Description
 ------|------------
-| `sub` | Device unique identifier (UUIDv4). Identifies which device the token belongs to. |
-| `project` | Project name — firmware group or directory name. Used to verify access. |
-| `roles` | List of logical roles; currently includes "device" and "ota_client". |
+| `aud` | Audience (example: "ota_api") |
 | `iat` | Issued-At timestamp (UNIX time). |
 | `exp` | Expiration time — after this time the token becomes invalid. |
-| `jti` | Unique token ID (JWT ID). Helps detect re-use or revoke individual tokens. |
 | `fw_version` | Current firmware version reported when the token was generated. |
+| `iat` | Issued at time |
+| `iss` | Issuer of JWT |
+| `jti` | Unique token ID (JWT ID). Helps detect re-use or revoke individual tokens. |
+| `project` | Project name — firmware group or directory name. Used to verify access. |
+| `roles` | List of logical roles; currently includes "device" and "ota_client". |
+| `sub` | Device unique identifier (UUIDv4). Identifies which device the token belongs to. |
 
 ### JWT Generation Logic
 
 Internally, the server uses:
 
 ```python
-def generate_ota_jwt(device_id, project, current_fw="1.0.0",
-                     expires_minutes=JWT_DEFAULT_EXPIRY_MINUTES):
-    now = datetime.now(timezone.utc)
-    payload = {
-        "sub": device_id,
-        "project": project,
-        "roles": ["device", "ota_client"],
-        "iat": int(now.timestamp()),
-        "exp": int((now + timedelta(minutes=expires_minutes)).timestamp()),
-        "jti": f"{device_id}-{int(now.timestamp())}",
-        "fw_version": current_fw
-    }
-    return jwt.encode(payload, jwt_secret, algorithm=jwt_algorithm), payload
+    def generate_ota_jwt(device_id:str, project:str, current_fw:str="1.0.0", expires_seconds:int=jwt_expiry) -> tuple[str, Dict[str, Any]]:
+        """Generate a timezone-aware JWT for OTA clients (devices)."""
+        now = datetime.now(timezone.utc)
+        payload = {
+            "aud": "ota_api",
+            "exp": int((now + timedelta(seconds=expires_seconds)).timestamp()),
+            "fw_version": current_fw,
+            "iat": int(now.timestamp()),
+            "iss": app.config.get("jwt_issuer, "ota_http_server"),
+            "jti": f"{device_id}-{int(now.timestamp())}",
+            "project": project,
+            "roles": ["device", "fw_download"],
+            "sub": device_id
+        }
+        return jwt.encode(payload, jwt_secret, algorithm=jwt_algorithm), payload
 ```
 
 ### Token Usage (Devices)
