@@ -171,21 +171,24 @@ def create_app(www_dir:str,                 # pylint: disable=too-many-positiona
         sorted_versions = [v for _, v in version_files]
         return str(project_path), sorted_versions, version_files
 
-    def generate_ota_jwt(device_id:str, project:str, download_vs:str="1.0.0", expires_seconds:int=jwt_expiry) -> tuple[str, Dict[str, Any]]:
-        """Generate a timezone-aware JWT for OTA clients (devices)."""
+    def generate_ota_jwt(device_id: str, project: str, download_vs: str = "1.0.0", expires_seconds: int = jwt_expiry):
         now = datetime.now(timezone.utc)
+        now_ts = int(now.timestamp())
+
         payload = {
-            "aud": jwt_audience if jwt_audience else app.config.get("jwt_audience", "ota_api"),
-            "exp": int((now + timedelta(seconds=expires_seconds)).timestamp()),
+            "aud": jwt_audience or app.config.get("jwt_audience", "ota_api"),
+            "exp": now_ts + expires_seconds,
             "download_vs": download_vs,
-            "iat": int(now.timestamp()),
-            "iss": jwt_issuer if jwt_issuer else app.config.get("jwt_issuer", "ota_http_server"),
-            "jti": f"{device_id}-{int(now.timestamp())}",
+            "iat": now_ts,
+            "iss": jwt_issuer or app.config.get("jwt_issuer", "ota_http_server"),
+            "jti": f"{device_id}-{now_ts}",
             "project": project,
             "roles": ["device", "fw_download"],
             "sub": device_id
         }
-        return jwt.encode(payload, jwt_secret, algorithm=jwt_algorithm), payload
+
+        token = jwt.encode(payload, jwt_secret, algorithm=jwt_algorithm)
+        return token, payload
 
     def log_audit_event(ip:str|None, action:str, details:str) -> None:
         """Append a token generation audit log entry."""
