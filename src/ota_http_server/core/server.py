@@ -50,8 +50,6 @@ def create_app(www_dir:str,                 # pylint: disable=too-many-positiona
         app = current_app
         now = datetime.now()
 
-        logger.info("load_ota_db")
-
         if app.config["OTA_DB"] is None or (now - app.config["OTA_DB_LAST_LOAD"]) > app.config["OTA_DB_CACHE_TTL"]:
             try:
                 with open(app.config["OTA_DB_FILE"], 'rb') as f:
