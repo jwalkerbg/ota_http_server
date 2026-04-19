@@ -271,7 +271,7 @@ def create_app(www_dir:str,                 # pylint: disable=too-many-positiona
             {
               "device_id": "uuid-v4",
               "project": "project_name",
-              "expires_minutes": jwt_expiry,
+              "expires_seconds": jwt_expiry,
               "current_vs": "1.0.0",
               "download_vs": "2.0.0"
             }
@@ -305,8 +305,8 @@ def create_app(www_dir:str,                 # pylint: disable=too-many-positiona
         if not download_vs:
             abort(400, "Missing 'download_vs'")
 
-        expires_minutes = min(data.get("expires_minutes", jwt_expiry), 30)  # Cap expiry to 30 minutes for security
-        token, payload = generate_ota_jwt(device_id, project, download_vs, expires_minutes)
+        expires_seconds = min(data.get("expires_seconds", jwt_expiry), 30*60)  # Cap expiry to 30 minutes for security
+        token, payload = generate_ota_jwt(device_id, project, download_vs, expires_seconds)
 
         # Audit logging
         log_audit_event(

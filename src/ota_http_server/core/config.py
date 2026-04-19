@@ -75,7 +75,7 @@ class Config:
             'no_certs': False,
             'no_jwt': False,
             'jwt_alg': "HS256",
-            'jwt_expiry': 12,
+            'jwt_expiry': 300,
             'jwt_secret': None,
             'admin_secret': None,
             'host': "0.0.0.0",
@@ -256,7 +256,7 @@ class Config:
         env_overrides = {
             "parameters": {
                 "jwt_alg": os.getenv("OTA_JWT_ALGORITHM"),
-                "jwt_expiry": os.getenv("OTA_JWT_EXPIRY_MINUTES"),
+                "jwt_expiry": os.getenv("OTA_JWT_EXPIRY_SECONDS"),
                 "jwt_secret": os.getenv("OTA_JWT_SECRET"),
                 "admin_secret": os.getenv("OTA_ADMIN_SECRET"),
                 "ota_audit_log": os.getenv("OTA_AUDIT_LOG"),
@@ -340,7 +340,7 @@ options:
 
 Environment variables:
   OTA_JWT_ALGORITHM       JWT algorithm to use (default 'HS256')
-  OTA_JWT_EXPIRY_MINUTES  JWT expiry time in minutes (default 30)
+  OTA_JWT_EXPIRY_SECONDS  JWT expiry time in seconds (default 300)
   OTA_JWT_SECRET          JWT secret key, can be overridden by --jwt-secret CLI option
   OTA_ADMIN_SECRET        Admin secret key, can be overridden by --admin-secret CLI option
   OTA_ISSUER_JWT          JWT issuer claim value, can be overridden by --issuer-jwt CLI option
@@ -467,7 +467,7 @@ For use in development environment without SSL certificates and JWT authenticati
     jwt_ex_group.add_argument("--no-jwt", dest="no_jwt", action="store_const", const=True, help="Disable JWT authentication (not recommended)")
     jwt_ex_group.add_argument("--jwt", dest="no_jwt", action="store_const", const=False, help="Enable JWT authentication")
     jwt_group.add_argument("--jwt-alg", dest="jwt_alg", type=str, help="JWT algorithm to use (default 'HS256'), overrides OTA_JWT_ALGORITHM environment variable")
-    jwt_group.add_argument("--jwt-expiry", dest="jwt_expiry", type=int, help="JWT expiry time in minutes (default 30), overrides OTA_JWT_EXPIRY_MINUTES environment variable")
+    jwt_group.add_argument("--jwt-expiry", dest="jwt_expiry", type=int, help="JWT expiry time in seconds (default 300), overrides OTA_JWT_EXPIRY_SECONDS environment variable")
     jwt_group.add_argument("--jwt-secret", dest="jwt_secret", type=str, help="JWT secret key, overrides OTA_JWT_SECRET environment variable")
     jwt_group.add_argument("--admin-secret", dest="admin_secret", type=str, help="Admin secret key, overrides OTA_ADMIN_SECRET environment variable")
     jwt_group.add_argument("--issuer-jwt", dest="issuer_jwt", type=str, help="JWT issuer claim value, overrides OTA_ISSUER_JWT environment variable")
