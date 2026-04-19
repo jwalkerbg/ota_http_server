@@ -8,6 +8,7 @@ www_dir = "e:\data\ota_http_server\www"
 firmware_dir = "firmware"
 url_firmware = "firmware"
 jwt_issuer = "okto7-ota"
+jwt_audience = "ota_api"
 
 [logging]
 verbose = 3
