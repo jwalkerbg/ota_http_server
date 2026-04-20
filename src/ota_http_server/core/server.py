@@ -80,7 +80,7 @@ def create_app(www_dir:str,                 # pylint: disable=too-many-positiona
     #                       HELPER FUNCTIONS
     # ---------------------------------------------------------------
 
-    def check_token(project:str|None=None) -> Dict[str, Any]:
+    def check_token(project:str|None=None, verify_sub:bool=True) -> Dict[str, Any]:
         """Verifies JWT from Authorization header or ?token= query param.
         Allows query param only for safe (GET, HEAD) requests.
         """
@@ -137,6 +137,18 @@ def create_app(www_dir:str,                 # pylint: disable=too-many-positiona
         expected_issuer = app.config.get("jwt_issuer", "ota_http_server")
         if issuer and not hmac.compare_digest(issuer, expected_issuer):
             abort(403, "Token issuer mismatch")
+
+        # 5️⃣.4️⃣ Verify "sub" claim is present (device identity)
+        if verify_sub:
+            if "sub" not in payload:
+                abort(403, "Token missing 'sub' claim for device identity")
+            request_device_id = request.headers.get("X-Device-ID")
+            if not request_device_id:
+                request_device_id = request.args.get("device_id")  # Allow device_id in query param as fallback for GET requests
+            if not request_device_id:
+                abort(400, "Missing X-Device-ID header or device_id query parameter")
+            if not hmac.compare_digest(payload["sub"], request_device_id):
+                abort(403, "Token sub claim does not match X-Device-ID header")
 
         # 6️⃣ Log successful authentication
         device_id = payload.get("sub", "unknown")
@@ -223,7 +235,7 @@ def create_app(www_dir:str,                 # pylint: disable=too-many-positiona
     def firmware(project:str, filename:str) -> Response:
         if use_jwt:
             # 1. Decode JWT
-            payload = check_token(project)
+            payload = check_token(project, verify_sub=True)
             # 2. Extract identity
             device_id = payload["sub"]
             project = payload["project"]
@@ -244,7 +256,7 @@ def create_app(www_dir:str,                 # pylint: disable=too-many-positiona
 
     @app.route(f'/{url_firmware}/<project>/latest')
     def latest_firmware(project:str) -> Response:
-        check_token(project)
+        check_token(project, verify_sub=False)  # Allow latest version check without device identity, but still require valid token for project
         project_dir, _, version_files = get_sorted_versions(project)
         latest_file, _ = version_files[-1]
         file_path = (Path(project_dir) / latest_file).resolve()
@@ -252,7 +264,7 @@ def create_app(www_dir:str,                 # pylint: disable=too-many-positiona
 
     @app.route(f'/{url_firmware}/<project>/versions')
     def list_versions(project:str) -> Response:
-        check_token(project)
+        check_token(project=project, verify_sub=False)  # Allow version listing without device identity, but still require valid token for project
         _, versions, _ = get_sorted_versions(project)
         return jsonify({
             "versions": versions,
