@@ -12,46 +12,58 @@ logger = get_app_logger(__name__)
 
 # CLI application main function with collected options & configuration
 def run_app(cfg:Config) -> None:
-    try:
-        # Add real application code here.
-        logger.info("Running run_app")
+    if cfg.config['command'] == 'runserver':
+        try:
+            # Add real application code here.
+            logger.info("Starting OTA HTTP Server")
+            logger.info("config = %s",str(cfg.config))
+
+            app = create_app(
+                www_dir=cfg.config['parameters']['www_dir'],
+                firmware_dir=cfg.config['parameters']['firmware_dir'],
+                url_firmware=cfg.config['parameters']['url_firmware'],
+                use_jwt=not cfg.config['parameters']['no_jwt'],
+                jwt_algorithm=cfg.config['parameters']['jwt_alg'],
+                jwt_expiry=int(cfg.config['parameters']['jwt_expiry']),
+                jwt_max_expiry=int(cfg.config['parameters']['jwt_max_expiry']),
+                jwt_secret=cfg.config['parameters']['jwt_secret'],
+                jwt_issuer=cfg.config['parameters']['jwt_issuer'],
+                jwt_audience=cfg.config['parameters']['jwt_audience'],
+                admin_secret=cfg.config['parameters']['admin_secret'],
+                ota_audit_log=cfg.config['parameters']['ota_audit_log'],
+                ota_db_file=cfg.config['parameters']['ota_db'],
+                ota_db_cache_ttl=int(cfg.config['parameters']['ota_db_cache_ttl'])
+            )
+
+            print("\n=== OTA Server Configuration ===")
+            print(f"Listening on {cfg.config['parameters']['host']}:{cfg.config['parameters']['port']}")
+            print(f"JWT: {'ENABLED' if not cfg.config['parameters']['no_jwt'] else 'DISABLED'}")
+            print(f"Audit log file: {cfg.config['parameters']['ota_audit_log']}")
+            print("Admin token endpoint: ENABLED (/admin/generate_token)")
+            print("===========================================\n")
+
+            app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1)   # type: ignore[method-assign]
+
+            if cfg.config['parameters']['no_certs']:
+                app.run(host=cfg.config['parameters']['host'], port=cfg.config['parameters']['port'])
+            else:
+                context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+                context.load_cert_chain(cfg.config['parameters']['cert'], cfg.config['parameters']['key'])
+                app.run(host=cfg.config['parameters']['host'], port=cfg.config['parameters']['port'], ssl_context=context)
+        except ValueError as e:
+            logger.error("Error in application run: %s",str(e))
+        except Exception as e:
+            logger.error("Unexpected error in application run: %s",str(e))
+        finally:
+            logger.info("Exiting runserver")
+
+    elif cfg.config['command'] == 'db':
+        logger.info("Starting OTA Database CLI")
+        # Add database CLI code here, e.g. using click or argparse for subcommands
         logger.info("config = %s",str(cfg.config))
+        print("Database CLI is not implemented yet.")
+        logger.info("Exiting db CLI")
 
-        app = create_app(
-            www_dir=cfg.config['parameters']['www_dir'],
-            firmware_dir=cfg.config['parameters']['firmware_dir'],
-            url_firmware=cfg.config['parameters']['url_firmware'],
-            use_jwt=not cfg.config['parameters']['no_jwt'],
-            jwt_algorithm=cfg.config['parameters']['jwt_alg'],
-            jwt_expiry=int(cfg.config['parameters']['jwt_expiry']),
-            jwt_max_expiry=int(cfg.config['parameters']['jwt_max_expiry']),
-            jwt_secret=cfg.config['parameters']['jwt_secret'],
-            jwt_issuer=cfg.config['parameters']['jwt_issuer'],
-            jwt_audience=cfg.config['parameters']['jwt_audience'],
-            admin_secret=cfg.config['parameters']['admin_secret'],
-            ota_audit_log=cfg.config['parameters']['ota_audit_log'],
-            ota_db_file=cfg.config['parameters']['ota_db'],
-            ota_db_cache_ttl=int(cfg.config['parameters']['ota_db_cache_ttl'])
-        )
+    else:
+        logger.warning("Unknown command '%s' specified, no action taken", cfg.config['command'])
 
-        print("\n=== OTA Server Configuration ===")
-        print(f"Listening on {cfg.config['parameters']['host']}:{cfg.config['parameters']['port']}")
-        print(f"JWT: {'ENABLED' if not cfg.config['parameters']['no_jwt'] else 'DISABLED'}")
-        print(f"Audit log file: {cfg.config['parameters']['ota_audit_log']}")
-        print("Admin token endpoint: ENABLED (/admin/generate_token)")
-        print("===========================================\n")
-
-        app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1)   # type: ignore[method-assign]
-
-        if cfg.config['parameters']['no_certs']:
-            app.run(host=cfg.config['parameters']['host'], port=cfg.config['parameters']['port'])
-        else:
-            context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-            context.load_cert_chain(cfg.config['parameters']['cert'], cfg.config['parameters']['key'])
-            app.run(host=cfg.config['parameters']['host'], port=cfg.config['parameters']['port'], ssl_context=context)
-    except ValueError as e:
-        logger.error("Error in application run: %s",str(e))
-    except Exception as e:
-        logger.error("Unexpected error in application run: %s",str(e))
-    finally:
-        logger.info("Exiting run_app")
