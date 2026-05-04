@@ -1,5 +1,6 @@
 # src/cli/app.py
 
+import traceback
 from importlib.metadata import version as pkg_version
 
 from ota_http_server.core.config import get_app_configuration
@@ -27,6 +28,7 @@ def main() -> None:
             # Step 3b: Run the application with the collected configuration
             run_app(cfg)
     except Exception as e:
+        # traceback.print_exc()
         logger.error("The application could not be started because of errors. %s", str(e))
 
 if __name__ == "__main__":
