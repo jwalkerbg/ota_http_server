@@ -13,3 +13,6 @@ jwt_audience = "ota_api"
 [logging]
 verbose = 3
 #version_option = true
+
+[database]
+dbport = 3306
