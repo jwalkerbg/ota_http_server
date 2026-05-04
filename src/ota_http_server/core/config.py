@@ -49,10 +49,20 @@ class ParametersConfig(TypedDict, total=False):
     ota_db: str
     ota_db_cache_ttl: int
 
+class DatabaseConfig(TypedDict, total=False):
+    dbhost: str
+    dbport: int
+    database: str
+    dbuser: str
+    dbpassword: str
+    dbpool_size: int
+    dbecho: bool
+
 class ConfigDict(TypedDict):
     template: TemplateConfig
     logging: LoggingConfig
     parameters: ParametersConfig
+    database: DatabaseConfig
 
 class Config:
     def __init__(self) -> None:
@@ -91,6 +101,15 @@ class Config:
             'ota_audit_log': "ota_audit_log.csv",
             'ota_db': "ota_db.toml",
             'ota_db_cache_ttl': 300
+        },
+        'database': {
+            'dbhost': "localhost",
+            'dbport': 3306,
+            'database': "ota_db",
+            'dbuser': "ota_user",
+            'dbpassword': "ota_password",
+            'dbpool_size': 10,
+            'dbecho': False
         }
     }
 
@@ -184,6 +203,33 @@ class Config:
                     }
                 },
                 "additionalProperties": False
+            },
+            "database": {
+                "type": "object",
+                "properties": {
+                    "dbhost": {
+                        "type": "string"
+                    },
+                    "dbport": {
+                        "type": "number"
+                    },
+                    "database": {
+                        "type": "string"
+                    },
+                    "dbuser": {
+                        "type": "string"
+                    },
+                    "dbpassword": {
+                        "type": "string"
+                    },
+                    "dbpool_size": {
+                        "type": "number"
+                    },
+                    "dbecho": {
+                        "type": "boolean"
+                    }
+                },
+                 "additionalProperties": False
             }
         },
         "additionalProperties": False
@@ -275,7 +321,16 @@ class Config:
                 "jwt_audience": os.getenv("OTA_JWT_AUDIENCE"),
                 "ota_db": os.getenv("OTA_DATABASE"),
                 "ota_db_cache_ttl": os.getenv("OTA_DB_CACHE_TTL")
-            }
+            },
+            "database": {
+                "dbhost": os.getenv("OTA_DB_HOST"),
+                "dbport": os.getenv("OTA_DB_PORT"),
+                "database": os.getenv("OTA_DB"),
+                "dbuser": os.getenv("OTA_DB_USER"),
+                "dbpassword": os.getenv("OTA_DB_PASSWORD"),
+                "dbpool_size": os.getenv("OTA_DB_POOL_SIZE"),
+                "dbecho": os.getenv("OTA_DB_ECHO")
+             }
         }
         self.deep_update(config=self.config, config_file=env_overrides)
 
@@ -284,6 +339,8 @@ class Config:
     def merge_cli_options(self, config_cli: argparse.Namespace | None = None) -> ConfigDict:    # pylint: disable=too-many-branches
         # handle CLI options if started from CLI interface
         if config_cli:
+            if config_cli.command is not None:
+                self.config['command'] = config_cli.command
 
             if config_cli.version_option is not None:
                 self.config['logging']['version_option'] = config_cli.version_option
@@ -298,48 +355,68 @@ class Config:
             if config_cli.use_string_handler is not None:
                 self.config['logging']['use_string_handler'] = config_cli.use_string_handler
 
-            # sample parameters that should be changed in real applications
-            if config_cli.cert is not None:
-                self.config['parameters']['cert'] = config_cli.cert
-            if config_cli.key is not None:
-                self.config['parameters']['key'] = config_cli.key
-            if config_cli.no_certs is not None:
-                self.config['parameters']['no_certs'] = config_cli.no_certs
-            if config_cli.no_jwt is not None:
-                self.config['parameters']['no_jwt'] = config_cli.no_jwt
-            if config_cli.jwt_alg is not None:
-                self.config['parameters']['jwt_alg'] = config_cli.jwt_alg
-            if config_cli.jwt_expiry is not None:
-                self.config['parameters']['jwt_expiry'] = config_cli.jwt_expiry
-            if config_cli.jwt_max_expiry is not None:
-                self.config['parameters']['jwt_max_expiry'] = config_cli.jwt_max_expiry
-            if config_cli.jwt_secret is not None:
-                self.config['parameters']['jwt_secret'] = config_cli.jwt_secret
-            if config_cli.jwt_issuer is not None:
-                self.config['parameters']['jwt_issuer'] = config_cli.jwt_issuer
-            if config_cli.jwt_audience is not None:
-                self.config['parameters']['jwt_audience'] = config_cli.jwt_audience
-            if config_cli.admin_secret is not None:
-                self.config['parameters']['admin_secret'] = config_cli.admin_secret
-            if config_cli.ota_db is not None:
-                self.config["parameters"]["ota_db"] = config_cli.ota_db
-            if config_cli.ota_db_cache_ttl is not None:
-                self.config["parameters"]["ota_db_cache_ttl"] = config_cli.ota_db_cache_ttl
-            # server parameters
-            if config_cli.host is not None:
-                self.config['parameters']['host'] = config_cli.host
-            if config_cli.port is not None:
-                self.config['parameters']['port'] = config_cli.port
-            if config_cli.www_dir is not None:
-                self.config['parameters']['www_dir'] = config_cli.www_dir
-            if config_cli.firmware_dir is not None:
-                self.config['parameters']['firmware_dir'] = config_cli.firmware_dir
-            if config_cli.url_firmware is not None:
-                self.config['parameters']['url_firmware'] = config_cli.url_firmware
-            # logging parameters
-            if config_cli.ota_audit_log is not None:
-                self.config['parameters']['ota_audit_log'] = config_cli.ota_audit_log
+            # handle database options
+            if config_cli.dbhost is not None:
+                self.config['database']['dbhost'] = config_cli.dbhost
+            if config_cli.dbport is not None:
+                self.config['database']['dbport'] = config_cli.dbport
+            if config_cli.database is not None:
+                self.config['database']['database'] = config_cli.database
+            if config_cli.dbuser is not None:
+                self.config['database']['dbuser'] = config_cli.dbuser
+            if config_cli.dbpassword is not None:
+                self.config['database']['dbpassword'] = config_cli.dbpassword
+            if config_cli.dbpool_size is not None:
+                self.config['database']['dbpool_size'] = config_cli.dbpool_size
+            if config_cli.dbecho is not None:
+                self.config['database']['dbecho'] = config_cli.dbecho
 
+            if config_cli.command == 'runserver':
+                if config_cli.cert is not None:
+                    self.config['parameters']['cert'] = config_cli.cert
+                if config_cli.key is not None:
+                    self.config['parameters']['key'] = config_cli.key
+                if config_cli.no_certs is not None:
+                    self.config['parameters']['no_certs'] = config_cli.no_certs
+                if config_cli.no_jwt is not None:
+                    self.config['parameters']['no_jwt'] = config_cli.no_jwt
+                if config_cli.jwt_alg is not None:
+                    self.config['parameters']['jwt_alg'] = config_cli.jwt_alg
+                if config_cli.jwt_expiry is not None:
+                    self.config['parameters']['jwt_expiry'] = config_cli.jwt_expiry
+                if config_cli.jwt_max_expiry is not None:
+                    self.config['parameters']['jwt_max_expiry'] = config_cli.jwt_max_expiry
+                if config_cli.jwt_secret is not None:
+                    self.config['parameters']['jwt_secret'] = config_cli.jwt_secret
+                if config_cli.jwt_issuer is not None:
+                    self.config['parameters']['jwt_issuer'] = config_cli.jwt_issuer
+                if config_cli.jwt_audience is not None:
+                    self.config['parameters']['jwt_audience'] = config_cli.jwt_audience
+                if config_cli.admin_secret is not None:
+                    self.config['parameters']['admin_secret'] = config_cli.admin_secret
+                if config_cli.ota_db is not None:
+                    self.config["parameters"]["ota_db"] = config_cli.ota_db
+                if config_cli.ota_db_cache_ttl is not None:
+                    self.config["parameters"]["ota_db_cache_ttl"] = config_cli.ota_db_cache_ttl
+                # server parameters
+                if config_cli.host is not None:
+                    self.config['parameters']['host'] = config_cli.host
+                if config_cli.port is not None:
+                    self.config['parameters']['port'] = config_cli.port
+                if config_cli.www_dir is not None:
+                    self.config['parameters']['www_dir'] = config_cli.www_dir
+                if config_cli.firmware_dir is not None:
+                    self.config['parameters']['firmware_dir'] = config_cli.firmware_dir
+                if config_cli.url_firmware is not None:
+                    self.config['parameters']['url_firmware'] = config_cli.url_firmware
+                # logging parameters
+                if config_cli.ota_audit_log is not None:
+                    self.config['parameters']['ota_audit_log'] = config_cli.ota_audit_log
+
+            if config_cli.command == 'db':
+                if config_cli.db_command is not None:
+                    self.config['db_command'] = config_cli.db_command
+                # here db commands must be handled for parameters
         return self.config
 
 def parse_args() -> argparse.Namespace:
@@ -365,6 +442,13 @@ Environment variables:
   OTA_AUDIT_LOG           Path to the OTA audit log file (default 'ota_audit_log.csv'), can be overridden by --ota-audit-log CLI option
   OTA_DB                  Path to the OTA database file (default 'ota_db.toml'), can be overridden by --ota-db CLI option
   OTA_DB_CACHE_TTL        Cache time-to-live for the OTA database in seconds (default 300), can be overridden by --ota-db-cache-ttl CLI option
+  OTA_DB_HOST             Database host (default 'localhost'), can be overridden by --dbhost CLI option
+  OTA_DB_PORT             Database port (default 3306), can be overridden by --dbport CLI option
+  OTA_DATABASE            Database name (default 'ota_db'), can be overridden by --ota-db CLI option
+  OTA_DB_USER             Database user (default 'ota_user'), can be overridden by --dbuser CLI option
+  OTA_DB_PASSWORD         Database password, can be overridden by --dbpassword CLI option
+  OTA_DB_POOL_SIZE        Database connection pool size (default 10), can be overridden by --dbpool-size CLI option
+  OTA_DB_ECHO             Enable database echo (default False), can be overridden by --dbecho CLI option
 
 Examples:
 
@@ -471,16 +555,31 @@ For use in development environment without SSL certificates and JWT authenticati
         help="Disable string handler to store logs in an internal buffer"
     )
 
-    # application options & parameters
+    # database options
+    db_group = parser.add_argument_group("Database")
+    db_group.add_argument("--dbhost", dest="dbhost", type=str, help="Database host (default 'localhost'), overrides OTA_DB_HOST environment variable")
+    db_group.add_argument("--dbport", dest="dbport", type=int, help="Database port (default 3306), overrides OTA_DB_PORT environment variable")
+    db_group.add_argument("--database", dest="database", type=str, help="Database name (default 'ota_db'), overrides OTA_DATABASE environment variable")
+    db_group.add_argument("--dbuser", dest="dbuser", type=str, help="Database user (default 'ota_user'), overrides OTA_DB_USER environment variable")
+    db_group.add_argument("--dbpassword", dest="dbpassword", type=str, help="Database password, overrides OTA_DB_PASSWORD environment variable")
+    db_group.add_argument("--dbpool-size", dest="dbpool_size", type=int, help="Database connection pool size (default 10), overrides OTA_DB_POOL_SIZE environment variable")
+    dbecho_group = db_group.add_mutually_exclusive_group()
+    dbecho_group.add_argument("--dbecho", dest="dbecho", action="store_const", const=True, help="Enable database echo (default False), overrides OTA_DB_ECHO environment variable")
+    dbecho_group.add_argument("--no-dbecho", dest="dbecho", action="store_const", const=False, help="Disable database echo (default False), overrides OTA_DB_ECHO environment variable")
 
-    certs_group = parser.add_argument_group("Certificates")
+    # application options & parameters
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    run_parser = subparsers.add_parser("runserver", help="Start OTA HTTP server")
+
+    certs_group = run_parser.add_argument_group("Certificates")
     certs_ex_group = certs_group.add_mutually_exclusive_group()
     certs_ex_group.add_argument("--no-certs", dest="no_certs", action="store_const", const=True, help="Disable SSL certificates (use plain HTTP)")
     certs_ex_group.add_argument("--certs", dest="no_certs", action="store_const", const=False, help="Enable SSL certificates (use plain HTTP)")
     certs_group.add_argument("--cert", dest="cert", help="Path to certificate file")
     certs_group.add_argument("--key", dest="key", help="Path to private key file")
 
-    jwt_group = parser.add_argument_group("JWT")
+    jwt_group = run_parser.add_argument_group("JWT")
     jwt_ex_group = jwt_group.add_mutually_exclusive_group()
     jwt_ex_group.add_argument("--no-jwt", dest="no_jwt", action="store_const", const=True, help="Disable JWT authentication (not recommended)")
     jwt_ex_group.add_argument("--jwt", dest="no_jwt", action="store_const", const=False, help="Enable JWT authentication")
@@ -492,11 +591,11 @@ For use in development environment without SSL certificates and JWT authenticati
     jwt_group.add_argument("--jwt-audience", dest="jwt_audience", type=str, help="JWT audience claim value, overrides OTA_JWT_AUDIENCE environment variable")
     jwt_group.add_argument("--admin-secret", dest="admin_secret", type=str, help="Admin secret key, overrides OTA_ADMIN_SECRET environment variable")
 
-    db_group = parser.add_argument_group("Database")
+    db_group = run_parser.add_argument_group("TOML Database")
     db_group.add_argument("--ota-db", dest="ota_db", type=str, help="Path to the OTA database file (default 'ota_db.toml'), overrides OTA_DB environment variable")
     db_group.add_argument("--ota-db-cache-ttl", dest="ota_db_cache_ttl", type=int, help="Cache time-to-live for the OTA database in seconds (default 300), overrides OTA_DB_CACHE_TTL environment variable")
 
-    server_group = parser.add_argument_group("Server", description="""Server configuration options
+    server_group = run_parser.add_argument_group("Server", description="""Server configuration options
   Firmware URL has format host:port/url_firmware/project/filename-prefix-version.bin.
   'url_firmware' is usually 'firmware' and corresponds to 'firmware-dir' in the file system under 'www-dir'.
   'www-dir' is the root directory of the http server.""")
@@ -506,8 +605,20 @@ For use in development environment without SSL certificates and JWT authenticati
     server_group.add_argument("--firmware-dir", dest="firmware_dir", help="Subdirectory for firmware files (default 'firmware')")
     server_group.add_argument("--url-firmware", dest="url_firmware", help="The URL path segment for firmware (default 'firmware', corresponds with `firmware-dir`)")
 
-    logging_group = parser.add_argument_group("Logging")
+    logging_group = run_parser.add_argument_group("Logging")
     logging_group.add_argument("--ota-audit-log", dest="ota_audit_log", help="Path to the OTA audit log file (default 'ota_audit_log.csv'), overrides OTA_AUDIT_LOG environment variable")
+
+#############
+
+    db_parser = subparsers.add_parser("db", help="Database operations")
+    db_subparsers = db_parser.add_subparsers(dest="db_command", required=True)
+
+    create_user_parser = db_subparsers.add_parser("create-user", help="Create a user")
+    create_user_parser.add_argument("--email", required=True)
+
+    assign_parser = db_subparsers.add_parser("assign-device", help="Assign device to user")
+    assign_parser.add_argument("--user-id", required=True)
+    assign_parser.add_argument("--device-id", required=True)
 
     return parser.parse_args()
 
