@@ -613,8 +613,19 @@ For use in development environment without SSL certificates and JWT authenticati
     db_parser = subparsers.add_parser("db", help="Database operations")
     db_subparsers = db_parser.add_subparsers(dest="db_command", required=True)
 
+    init_db_parser = db_subparsers.add_parser("init-db", help="Initialize the database")
+
     create_user_parser = db_subparsers.add_parser("create-user", help="Create a user")
     create_user_parser.add_argument("--email", required=True)
+
+    create_device_parser = db_subparsers.add_parser("create-device", help="Create a device")
+    create_device_parser.add_argument("--device-name", required=True)
+    create_device_parser.add_argument("--device-uuid", required=True)
+
+    create_project_parser = db_subparsers.add_parser("create-project", help="Create a project")
+    create_project_parser.add_argument("--project-name", required=True)
+    create_project_parser.add_argument("--project-uuid", required=True)
+    create_project_parser.add_argument("--project-path", required=True, help="Path to the project directory containing firmware files")
 
     assign_parser = db_subparsers.add_parser("assign-device", help="Assign device to user")
     assign_parser.add_argument("--user-id", required=True)

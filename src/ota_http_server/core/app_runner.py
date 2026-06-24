@@ -5,6 +5,7 @@ import ssl
 from werkzeug.middleware.proxy_fix import ProxyFix
 from ota_http_server.core.config import Config
 from ota_http_server.core.server import create_app
+from ota_http_server.core.db import db_command_handler
 
 from ota_http_server.logger import get_app_logger
 
@@ -16,7 +17,7 @@ def run_app(cfg:Config) -> None:
         try:
             # Add real application code here.
             logger.info("Starting OTA HTTP Server")
-            logger.info("config = %s",str(cfg.config))
+            logger.verbose("config = %s",str(cfg.config))
 
             app = create_app(
                 www_dir=cfg.config['parameters']['www_dir'],
@@ -60,8 +61,8 @@ def run_app(cfg:Config) -> None:
     elif cfg.config['command'] == 'db':
         logger.info("Starting OTA Database CLI")
         # Add database CLI code here, e.g. using click or argparse for subcommands
-        logger.info("config = %s",str(cfg.config))
-        print("Database CLI is not implemented yet.")
+        logger.verbose("config = %s",str(cfg.config))
+        db_command_handler(cfg)
         logger.info("Exiting db CLI")
 
     else:
