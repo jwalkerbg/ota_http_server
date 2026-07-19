@@ -26,8 +26,8 @@ exclude = [
 # Make sure to configure authentication if your pypi server requires it.
 # See Poetry documentation for more details: https://python-poetry.org/docs/repositories/#using-private-repositories
 [[tool.poetry.source]]
-name = "okto7-pypi"
-url = "http://pypi.okto7.com/simple"
+name = "imc-pypi"
+url = "http://pypi.imc.bg/simple"
 priority = "primary"
 
 # Runtime dependencies
