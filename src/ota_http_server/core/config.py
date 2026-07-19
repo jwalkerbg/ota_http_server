@@ -27,6 +27,7 @@ class LoggingConfig(TypedDict, total=False):
     use_color: bool
     use_string_handler: bool
     version_option: bool
+    exc_full_stack: bool
 
 class ParametersConfig(TypedDict, total=False):
     cert: str
@@ -79,7 +80,8 @@ class Config:
             'log_prefix': True,
             'use_color': True,
             'use_string_handler': False,
-            'version_option': False
+            'version_option': False,
+            'exc_full_stack': False
         },
         'parameters': {
             'cert': "cert.pem",
@@ -136,6 +138,9 @@ class Config:
                         "type": "boolean"
                     },
                     "version_option": {
+                        "type": "boolean"
+                    },
+                    "exc_full_stack": {
                         "type": "boolean"
                     }
                 },
@@ -344,6 +349,8 @@ class Config:
 
             if config_cli.version_option is not None:
                 self.config['logging']['version_option'] = config_cli.version_option
+            if config_cli.exc_full_stack is not None:
+                self.config['logging']['exc_full_stack'] = config_cli.exc_full_stack
 
             # Handle general options
             if config_cli.verbose is not None:
@@ -553,6 +560,21 @@ For use in development environment without SSL certificates and JWT authenticati
         const=False,
         dest="use_string_handler",
         help="Disable string handler to store logs in an internal buffer"
+    )
+    exception_group = logging_group.add_mutually_exclusive_group()
+    exception_group.add_argument(
+        "--exc-full-stack",
+        action="store_const",
+        const=True,
+        dest='exc_full_stack',
+        help="Enable full stack logging for exceptions (useful for development and debugging)"
+    )
+    exception_group.add_argument(
+        "--no-exc-full-stack",
+        action="store_const",
+        const=False,
+        dest='exc_full_stack',
+        help="Disable full stack logging for exceptions (useful for production)"
     )
 
     # database options

@@ -29,7 +29,7 @@ def main() -> None:
             run_app(cfg)
     except Exception as e:
         # traceback.print_exc()
-        logger.error("The application could not be started because of errors. %s", str(e))
+        logger.error("The application could not be started because of errors. %s", str(e), exc_info=cfg.config['logging']['exc_full_stack'])
 
 if __name__ == "__main__":
     main()
