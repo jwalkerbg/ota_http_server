@@ -658,9 +658,9 @@ For use in development environment without SSL certificates and JWT authenticati
     jwt_group.add_argument("--jwt-audience", dest="jwt_audience", type=str, help="JWT audience claim value, overrides OTA_JWT_AUDIENCE environment variable")
     jwt_group.add_argument("--admin-secret", dest="admin_secret", type=str, help="Admin secret key, overrides OTA_ADMIN_SECRET environment variable")
 
-    db_group = run_parser.add_argument_group("TOML Database")
-    db_group.add_argument("--ota-db", dest="ota_db", type=str, help="Path to the OTA database file (default 'ota_db.toml'), overrides OTA_DB environment variable")
-    db_group.add_argument("--ota-db-cache-ttl", dest="ota_db_cache_ttl", type=int, help="Cache time-to-live for the OTA database in seconds (default 300), overrides OTA_DB_CACHE_TTL environment variable")
+    db_toml_group = run_parser.add_argument_group("TOML Database")
+    db_toml_group.add_argument("--ota-db", dest="ota_db", type=str, help="Path to the OTA database file (default 'ota_db.toml'), overrides OTA_DB environment variable")
+    db_toml_group.add_argument("--ota-db-cache-ttl", dest="ota_db_cache_ttl", type=int, help="Cache time-to-live for the OTA database in seconds (default 300), overrides OTA_DB_CACHE_TTL environment variable")
 
     server_group = run_parser.add_argument_group("Server", description="""Server configuration options
   Firmware URL has format host:port/url_firmware/project/filename-prefix-version.bin.
