@@ -620,7 +620,7 @@ For use in development environment without SSL certificates and JWT authenticati
 
     # database options
     db_group = parser.add_argument_group("Database")
-    db_group.add_argument("--dbtype", dest="dbtype", type=str, choices=["mysql", "sqlite"], help="Database type (mysql or sqlite), overrides OTA_DB_TYPE environment variable")
+    db_group.add_argument("--dbtype", dest="dbtype", type=str, choices=["mysql", "sqlite"], required=True, help="Database type (mysql or sqlite), overrides OTA_DB_TYPE environment variable")
     # MySQL options
     db_group.add_argument("--dbhost", dest="dbhost", type=str, help="Database host (default 'localhost'), overrides OTA_DB_HOST environment variable")
     db_group.add_argument("--dbport", dest="dbport", type=int, help="Database port (default 3306), overrides OTA_DB_PORT environment variable")
