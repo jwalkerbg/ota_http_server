@@ -50,7 +50,7 @@ class ParametersConfig(TypedDict, total=False):
     ota_db: str
     ota_db_cache_ttl: int
 
-class DatabaseConfig(TypedDict, total=False):
+class DatabaseMySQLConfig(TypedDict, total=False):
     dbhost: str
     dbport: int
     database: str
@@ -58,6 +58,14 @@ class DatabaseConfig(TypedDict, total=False):
     dbpassword: str
     dbpool_size: int
     dbecho: bool
+
+class databaseSQLiteConfig(TypedDict, total=False):
+    dbfile: str
+
+class DatabaseConfig(TypedDict, total=False):
+    dbtype: str
+    mysql: DatabaseMySQLConfig
+    sqlite: databaseSQLiteConfig
 
 class ConfigDict(TypedDict):
     template: TemplateConfig
@@ -105,13 +113,19 @@ class Config:
             'ota_db_cache_ttl': 300
         },
         'database': {
-            'dbhost': "localhost",
-            'dbport': 3306,
-            'database': "ota_db",
-            'dbuser': "ota_user",
-            'dbpassword': "ota_password",
-            'dbpool_size': 10,
-            'dbecho': False
+            'dbtype': "sqlite",
+            'mysql': {
+                'dbhost': "localhost",
+                'dbport': 3306,
+                'database': "ota_db",
+                'dbuser': "ota_user",
+                'dbpassword': "ota_password",
+                'dbpool_size': 10,
+                'dbecho': False
+            },
+            "sqlite": {
+                "dbfile": "ota_db.sqlite"
+            },
         }
     }
 
@@ -212,29 +226,44 @@ class Config:
             "database": {
                 "type": "object",
                 "properties": {
-                    "dbhost": {
+                    "dbtype": {
                         "type": "string"
                     },
-                    "dbport": {
-                        "type": "number"
+                    "mysql": {
+                        "type": "object",
+                        "properties": {
+                            "dbhost": {
+                                "type": "string"
+                            },
+                            "dbport": {
+                                "type": "number"
+                            },
+                            "dbuser": {
+                                "type": "string"
+                            },
+                            "dbpassword": {
+                                "type": "string"
+                            },
+                            "dbpool_size": {
+                                "type": "number"
+                            },
+                            "dbecho": {
+                                "type": "boolean"
+                            }
+                        },
+                        "additionalProperties": False
                     },
-                    "database": {
-                        "type": "string"
-                    },
-                    "dbuser": {
-                        "type": "string"
-                    },
-                    "dbpassword": {
-                        "type": "string"
-                    },
-                    "dbpool_size": {
-                        "type": "number"
-                    },
-                    "dbecho": {
-                        "type": "boolean"
+                    "sqlite": {
+                        "type": "object",
+                        "properties": {
+                            "dbfile": {
+                                "type": "string"
+                            }
+                        },
+                        "additionalProperties": False
                     }
                 },
-                 "additionalProperties": False
+                "additionalProperties": False
             }
         },
         "additionalProperties": False
@@ -328,14 +357,20 @@ class Config:
                 "ota_db_cache_ttl": os.getenv("OTA_DB_CACHE_TTL")
             },
             "database": {
-                "dbhost": os.getenv("OTA_DB_HOST"),
-                "dbport": os.getenv("OTA_DB_PORT"),
-                "database": os.getenv("OTA_DB"),
-                "dbuser": os.getenv("OTA_DB_USER"),
-                "dbpassword": os.getenv("OTA_DB_PASSWORD"),
-                "dbpool_size": os.getenv("OTA_DB_POOL_SIZE"),
-                "dbecho": os.getenv("OTA_DB_ECHO")
-             }
+                "dbtype": os.getenv("OTA_DB_TYPE"),
+                "mysql": {
+                    "dbhost": os.getenv("OTA_DB_HOST"),
+                    "dbport": os.getenv("OTA_DB_PORT"),
+                    "database": os.getenv("OTA_DB"),
+                    "dbuser": os.getenv("OTA_DB_USER"),
+                    "dbpassword": os.getenv("OTA_DB_PASSWORD"),
+                    "dbpool_size": os.getenv("OTA_DB_POOL_SIZE"),
+                    "dbecho": os.getenv("OTA_DB_ECHO")
+                },
+                "sqlite": {
+                    "dbfile": os.getenv("OTA_DB_FILE")
+                }
+            }
         }
         self.deep_update(config=self.config, config_file=env_overrides)
 
@@ -362,21 +397,27 @@ class Config:
             if config_cli.use_string_handler is not None:
                 self.config['logging']['use_string_handler'] = config_cli.use_string_handler
 
-            # handle database options
+            # Handle database options
+            if config_cli.dbtype is not None:
+                self.config['database']['dbtype'] = config_cli.dbtype
+            # MySQL database options
             if config_cli.dbhost is not None:
-                self.config['database']['dbhost'] = config_cli.dbhost
+                self.config['database']['mysql']['dbhost'] = config_cli.dbhost
             if config_cli.dbport is not None:
-                self.config['database']['dbport'] = config_cli.dbport
+                self.config['database']['mysql']['dbport'] = config_cli.dbport
             if config_cli.database is not None:
-                self.config['database']['database'] = config_cli.database
+                self.config['database']['mysql']['database'] = config_cli.database
             if config_cli.dbuser is not None:
-                self.config['database']['dbuser'] = config_cli.dbuser
+                self.config['database']['mysql']['dbuser'] = config_cli.dbuser
             if config_cli.dbpassword is not None:
-                self.config['database']['dbpassword'] = config_cli.dbpassword
+                self.config['database']['mysql']['dbpassword'] = config_cli.dbpassword
             if config_cli.dbpool_size is not None:
-                self.config['database']['dbpool_size'] = config_cli.dbpool_size
+                self.config['database']['mysql']['dbpool_size'] = config_cli.dbpool_size
             if config_cli.dbecho is not None:
-                self.config['database']['dbecho'] = config_cli.dbecho
+                self.config['database']['mysql']['dbecho'] = config_cli.dbecho
+            # SQLite database options
+            if config_cli.dbfile is not None:
+                self.config['database']['sqlite']['dbfile'] = config_cli.dbfile
 
             if config_cli.command == 'runserver':
                 if config_cli.cert is not None:
@@ -579,6 +620,8 @@ For use in development environment without SSL certificates and JWT authenticati
 
     # database options
     db_group = parser.add_argument_group("Database")
+    db_group.add_argument("--dbtype", dest="dbtype", type=str, choices=["mysql", "sqlite"], help="Database type (mysql or sqlite), overrides OTA_DB_TYPE environment variable")
+    # MySQL options
     db_group.add_argument("--dbhost", dest="dbhost", type=str, help="Database host (default 'localhost'), overrides OTA_DB_HOST environment variable")
     db_group.add_argument("--dbport", dest="dbport", type=int, help="Database port (default 3306), overrides OTA_DB_PORT environment variable")
     db_group.add_argument("--database", dest="database", type=str, help="Database name (default 'ota_db'), overrides OTA_DATABASE environment variable")
@@ -588,6 +631,8 @@ For use in development environment without SSL certificates and JWT authenticati
     dbecho_group = db_group.add_mutually_exclusive_group()
     dbecho_group.add_argument("--dbecho", dest="dbecho", action="store_const", const=True, help="Enable database echo (default False), overrides OTA_DB_ECHO environment variable")
     dbecho_group.add_argument("--no-dbecho", dest="dbecho", action="store_const", const=False, help="Disable database echo (default False), overrides OTA_DB_ECHO environment variable")
+    # SQLite options
+    db_group.add_argument("--dbfile", dest="dbfile", type=str, help="Path to the SQLite database file (default 'ota_db.sqlite'), overrides OTA_DB_FILE environment variable")
 
     # application options & parameters
     subparsers = parser.add_subparsers(dest="command", required=True)
