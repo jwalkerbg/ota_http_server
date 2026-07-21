@@ -19,6 +19,7 @@ if sys.version_info >= (3, 11):
 else:
     import tomli as toml # Use the external tomli for Python 3.7 to 3.10
 
+from .dataclasses import TokenResult
 from .auth_service import AuthService
 from ota_http_server.logger import get_app_logger
 
@@ -51,7 +52,14 @@ def create_app(www_dir:str,                 # pylint: disable=too-many-positiona
     if use_jwt and (not jwt_secret or not admin_secret):
         raise ValueError("JWT is enabled but jwt_secret or admin_secret is not set")
 
-    authservice = AuthService(use_jwt=use_jwt,jwt_secret=jwt_secret,jwt_algorithm=jwt_algorithm,jwt_audience=jwt_audience,jwt_issuer=jwt_issuer)
+    authservice = AuthService(use_jwt=use_jwt,
+                              jwt_secret=jwt_secret,
+                              jwt_algorithm=jwt_algorithm,
+                              jwt_audience=jwt_audience,
+                              jwt_issuer=jwt_issuer,
+                              jwt_expiry=jwt_expiry,
+                              jwt_max_expiry=jwt_max_expiry
+                            )
 
     def load_ota_db() -> Dict[str, Any]:
         app = current_app
@@ -108,25 +116,6 @@ def create_app(www_dir:str,                 # pylint: disable=too-many-positiona
         version_files.sort(key=lambda x: version.parse(x[1]))
         sorted_versions = [v for _, v in version_files]
         return str(project_path), sorted_versions, version_files
-
-    def generate_ota_jwt(device_id: str, project: str, download_vs: str = "1.0.0", expires_seconds: int = jwt_expiry):
-        now = datetime.now(timezone.utc)
-        now_ts = int(now.timestamp())
-
-        payload = {
-            "aud": jwt_audience or app.config.get("jwt_audience", "ota_api"),
-            "exp": now_ts + expires_seconds,
-            "download_vs": download_vs,
-            "iat": now_ts,
-            "iss": jwt_issuer or app.config.get("jwt_issuer", "ota_http_server"),
-            "jti": f"{device_id}-{now_ts}",
-            "project": project,
-            "roles": ["device", "fw_download"],
-            "sub": device_id
-        }
-
-        token = jwt.encode(payload, jwt_secret, algorithm=jwt_algorithm)
-        return token, payload
 
     def log_audit_event(ip:str|None, action:str, details:str) -> None:
         """Append a token generation audit log entry."""
@@ -231,41 +220,19 @@ def create_app(www_dir:str,                 # pylint: disable=too-many-positiona
         if not data:
             abort(400, "Missing JSON body")
 
-        # validation of presence of fields "device_id", "project", "current_vs", "download_vs"
-
-        # Device ID is validated as a UUID, but we also check it's provided before that.
-        device_id = data.get("device_id")
-        if not device_id:
-            abort(400, "Missing 'device_id'")
-        try:
-            UUID(device_id)
-        except ValueError:
-            abort(400, "Invalid device_id format")
-
-        # Project name validation can also be added if there are specific requirements (e.g., allowed characters), but for now we just check it's provided.
-        project = data.get("project", None)
-        if not project:
-            abort(400, "Missing 'project'")
-        current_vs = data.get("current_vs", "1.0.0")
-        # download_vs is obligatory for the token generation, but we don't need to validate it here since it's just a claim in the token and doesn't affect server logic.
-        download_vs = data.get("download_vs")
-        if not download_vs:
-            abort(400, "Missing 'download_vs'")
-
-        expires_seconds = min(data.get("expires_seconds", jwt_expiry), jwt_max_expiry)  # Cap expiry to 30 minutes for security
-        token, payload = generate_ota_jwt(device_id, project, download_vs, expires_seconds)
+        token_result = authservice.create_device_token(data)
 
         # Audit logging
         log_audit_event(
             ip=request.remote_addr,
             action="generate_token",
-            details=f"device={device_id}, project={project}, exp={payload['exp']}"
+            details=f"device={token_result.payload.get('sub','')}, project={token_result.payload.get('project','')}, exp={token_result.payload.get('exp','')}"
         )
 
         return jsonify({
-            "token": token,
-            "expires_at": datetime.fromtimestamp(payload["exp"], tz=timezone.utc).isoformat(),
-            "payload": payload
+            "token": token_result.token,
+            "expires_at": datetime.fromtimestamp(token_result.payload["exp"], tz=timezone.utc).isoformat(),
+            "payload": token_result.payload
         })
 
     return app

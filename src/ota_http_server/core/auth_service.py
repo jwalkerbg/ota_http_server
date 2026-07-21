@@ -4,20 +4,24 @@ from typing import Any, Dict
 from datetime import datetime, time, timedelta, timezone
 from flask import request, abort, current_app as app
 import jwt
+from uuid import UUID
 import hmac
 
+from .dataclasses import TokenResult
 from ota_http_server.logger import get_app_logger
 
 logger = get_app_logger(__name__)
 
 class AuthService:
 
-    def __init__(self, use_jwt: bool, jwt_secret: str, jwt_algorithm: str, jwt_audience: str, jwt_issuer: str):
+    def __init__(self, use_jwt: bool, jwt_secret: str, jwt_algorithm: str, jwt_audience: str, jwt_issuer: str, jwt_expiry:int, jwt_max_expiry:int):
         self.use_jwt = use_jwt
         self.jwt_secret = jwt_secret
         self.jwt_algorithm = jwt_algorithm
         self.jwt_audience = jwt_audience
         self.jwt_issuer = jwt_issuer
+        self.jwt_expiry = jwt_expiry
+        self.jwt_max_expiry = jwt_max_expiry
 
     def verify_token(self, project:str|None=None, verify_sub:bool=True) -> Dict[str, Any]:
         """Verifies JWT from Authorization header or ?token= query param.
@@ -39,15 +43,6 @@ class AuthService:
                 ],
                 "sub": "e6f87d77-4216-4be1-ab83-b5fa6792b747"               # the device identity (UUID v4), must match the X-Device-ID header or ?device_id= query param
             }
-        }
-
-        params:
-        {
-            jwt_secret: str
-            jwt_algorithm: str
-            jwt_audience: str
-            jwt_issuer: str
-        }
         """
         if not self.use_jwt:
             return {}  # JWT authentication is disabled, allow all requests
@@ -121,3 +116,46 @@ class AuthService:
         logger.info(f"[%s] [AUTH] OK - Device=%s, Project=%s, Source=%s", now, device_id, token_project, source)
 
         return payload
+
+    def create_device_token(self, data: Dict[str, Any]) -> TokenResult:
+
+        # validation of presence of fields "device_id", "project", "current_vs", "download_vs"
+
+        # Device ID is validated as a UUID, but we also check it's provided before that.
+        device_id = data.get("device_id")
+        if not device_id:
+            abort(400, "Missing 'device_id'")
+        try:
+            UUID(device_id)
+        except ValueError:
+            abort(400, "Invalid device_id format")
+
+        # Project name validation can also be added if there are specific requirements (e.g., allowed characters), but for now we just check it's provided.
+        project = data.get("project", None)
+        if not project:
+            abort(400, "Missing 'project'")
+        current_vs = data.get("current_vs", "1.0.0")
+        # download_vs is obligatory for the token generation, but we don't need to validate it here since it's just a claim in the token and doesn't affect server logic.
+        download_vs = data.get("download_vs")
+        if not download_vs:
+            abort(400, "Missing 'download_vs'")
+
+        expires_seconds = min(data.get("expires_seconds", self.jwt_expiry), self.jwt_max_expiry)  # Cap expiry to 30 minutes for security
+
+        now = datetime.now(timezone.utc)
+        now_ts = int(now.timestamp())
+
+        payload = {
+            "aud": self.jwt_audience or app.config.get("jwt_audience", "ota_api"),
+            "exp": now_ts + expires_seconds,
+            "download_vs": download_vs,
+            "iat": now_ts,
+            "iss": self.jwt_issuer or app.config.get("jwt_issuer", "ota_http_server"),
+            "jti": f"{device_id}-{now_ts}",
+            "project": project,
+            "roles": ["device", "fw_download"],
+            "sub": device_id
+        }
+
+        token = jwt.encode(payload, self.jwt_secret, algorithm=self.jwt_algorithm)
+        return TokenResult(token, payload)
