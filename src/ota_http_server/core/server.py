@@ -218,7 +218,7 @@ def create_app(www_dir:str,                 # pylint: disable=too-many-positiona
         if not data:
             abort(400, "Missing JSON body")
 
-        token_result = authservice.create_device_token(data)
+        token_result:TokenResult = authservice.create_device_token(data)
 
         # Audit logging
         log_audit_event(
