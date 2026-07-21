@@ -19,7 +19,7 @@ if sys.version_info >= (3, 11):
 else:
     import tomli as toml # Use the external tomli for Python 3.7 to 3.10
 
-from .auth_service import verify_token
+from .auth_service import AuthService
 from ota_http_server.logger import get_app_logger
 
 logger = get_app_logger(__name__)
@@ -50,6 +50,8 @@ def create_app(www_dir:str,                 # pylint: disable=too-many-positiona
 
     if use_jwt and (not jwt_secret or not admin_secret):
         raise ValueError("JWT is enabled but jwt_secret or admin_secret is not set")
+
+    authservice = AuthService(use_jwt=use_jwt,jwt_secret=jwt_secret,jwt_algorithm=jwt_algorithm,jwt_audience=jwt_audience,jwt_issuer=jwt_issuer)
 
     def load_ota_db() -> Dict[str, Any]:
         app = current_app
@@ -159,14 +161,7 @@ def create_app(www_dir:str,                 # pylint: disable=too-many-positiona
     def firmware(project:str, filename:str) -> Response:
         if use_jwt:
             # 1. Decode JWT
-            payload = verify_token(project, use_jwt,
-                                 params={
-                                    "jwt_secret": jwt_secret,
-                                    "jwt_algorithm": jwt_algorithm,
-                                    "jwt_audience": jwt_audience,
-                                    "jwt_issuer": jwt_issuer
-                                 },
-                                 verify_sub=True)
+            payload = authservice.verify_token(project, verify_sub=True)
             # 2. Extract identity
             device_id = payload["sub"]
             project = payload["project"]
@@ -187,14 +182,7 @@ def create_app(www_dir:str,                 # pylint: disable=too-many-positiona
 
     @app.route(f'/{url_firmware}/<project>/latest')
     def latest_firmware(project:str) -> Response:
-        verify_token(project, use_jwt,
-                   params={
-                        "jwt_secret": jwt_secret,
-                        "jwt_algorithm": jwt_algorithm,
-                        "jwt_audience": jwt_audience,
-                        "jwt_issuer": jwt_issuer
-                   },
-                   verify_sub=False)  # Allow latest version check without device identity, but still require valid token for project
+        authservice.verify_token(project, verify_sub=False)  # Allow latest version check without device identity, but still require valid token for project
         project_dir, _, version_files = get_sorted_versions(project)
         latest_file, _ = version_files[-1]
         file_path = (Path(project_dir) / latest_file).resolve()
@@ -202,14 +190,7 @@ def create_app(www_dir:str,                 # pylint: disable=too-many-positiona
 
     @app.route(f'/{url_firmware}/<project>/versions')
     def list_versions(project:str) -> Response:
-        verify_token(project, use_jwt,
-                   params={
-                        "jwt_secret": jwt_secret,
-                        "jwt_algorithm": jwt_algorithm,
-                        "jwt_audience": jwt_audience,
-                        "jwt_issuer": jwt_issuer
-                   },
-                   verify_sub=False)  # Allow version listing without device identity, but still require valid token for project
+        authservice.verify_token(project, verify_sub=False)  # Allow version listing without device identity, but still require valid token for project
         _, versions, _ = get_sorted_versions(project)
         return jsonify({
             "versions": versions,
