@@ -80,9 +80,35 @@ def create_app(www_dir:str,                 # pylint: disable=too-many-positiona
     #                       HELPER FUNCTIONS
     # ---------------------------------------------------------------
 
-    def check_token(project:str|None=None, verify_sub:bool=True) -> Dict[str, Any]:
+    def check_token__(project:str|None=None, use_jwt:bool=False, params:Dict[str, Any]={},verify_sub:bool=True) -> Dict[str, Any]:
         """Verifies JWT from Authorization header or ?token= query param.
         Allows query param only for safe (GET, HEAD) requests.
+        Example token:
+        {
+            "expires_at": "2026-04-10T13:36:53+00:00",
+            "payload": {
+                "aud": "ota_api",                                           # who the request is targeted to (the OTA api)
+                "download_vs": "01.20.01",                                  # the version the device is allowed to download
+                "exp": 1775828213,                                          # expiration timestamp (UTC)
+                "iat": 1775826413,                                          # issued at timestamp (UTC)
+                "iss": "ota_http_server",
+                "jti": "e6f87d77-4216-4be1-ab83-b5fa6792b747-1775826413",   # unique token identifier
+                "project": "smart_air",                                     # the project the device is allowed to access
+                "roles": [                                                  # the roles the device has, must include
+                    "device",                                               # the device role
+                    "fw_download"                                           # the firmware download role
+                ],
+                "sub": "e6f87d77-4216-4be1-ab83-b5fa6792b747"               # the device identity (UUID v4), must match the X-Device-ID header or ?device_id= query param
+            }
+        }
+
+        params:
+        {
+            "jwt_secret": "your_jwt_secret",
+            "jwt_algorithm": "your_jwt_algorithm",
+            "jwt_audience": "your_jwt_audience",
+            "jwt_issuer": "your_jwt_issuer" or None
+        }
         """
         if not use_jwt:
             return {}  # JWT authentication is disabled, allow all requests
@@ -111,7 +137,11 @@ def create_app(www_dir:str,                 # pylint: disable=too-many-positiona
 
         # 4️⃣ Decode and verify JWT
         try:
-            payload = jwt.decode(jwt=token, key=jwt_secret, algorithms=[jwt_algorithm], options={"verify_exp": True}, audience=jwt_audience, issuer=jwt_issuer)
+            jwt_secret_ = params.get("jwt_secret","")
+            jwt_algorithm_ = params.get("jwt_algorithm","")
+            jwt_audience_ = params.get("jwt_audience","")
+            jwt_issuer_ = params.get("jwt_issuer")
+            payload = jwt.decode(jwt=token, key=jwt_secret_, algorithms=[jwt_algorithm_], options={"verify_exp": True}, audience=jwt_audience_, issuer=jwt_issuer_)
         except jwt.ExpiredSignatureError:
             abort(401, "Token expired")
         except jwt.InvalidTokenError:
@@ -120,7 +150,7 @@ def create_app(www_dir:str,                 # pylint: disable=too-many-positiona
         # 5️⃣ Verify project match
         token_project = payload.get("project")
         if not project or not hmac.compare_digest(token_project, project):
-            abort(403, "Token not valid for this project")
+            abort(403, "Token not valid for this project or project not given")
 
         # 5️⃣.1️⃣ Verify "roles" claim contains "device" and "fw_download"
         roles = payload.get("roles", [])
@@ -129,7 +159,7 @@ def create_app(www_dir:str,                 # pylint: disable=too-many-positiona
 
         # 5️⃣.2️⃣ Verify "aud" claim is "ota_api"
         aud = payload.get("aud")
-        if not aud or not hmac.compare_digest(aud, jwt_audience):
+        if not aud or not hmac.compare_digest(aud, jwt_audience_):
             abort(403, "Token not valid for this API")
 
         # 5️⃣.3️⃣ Verify issuer claim if present (optional, but good practice)
@@ -235,7 +265,14 @@ def create_app(www_dir:str,                 # pylint: disable=too-many-positiona
     def firmware(project:str, filename:str) -> Response:
         if use_jwt:
             # 1. Decode JWT
-            payload = check_token(project, verify_sub=True)
+            payload = check_token(project, use_jwt,
+                                 params={
+                                    "jwt_secret": jwt_secret,
+                                    "jwt_algorithm": jwt_algorithm,
+                                    "jwt_audience": jwt_audience,
+                                    "jwt_issuer": jwt_issuer
+                                 },
+                                 verify_sub=True)
             # 2. Extract identity
             device_id = payload["sub"]
             project = payload["project"]
@@ -256,7 +293,14 @@ def create_app(www_dir:str,                 # pylint: disable=too-many-positiona
 
     @app.route(f'/{url_firmware}/<project>/latest')
     def latest_firmware(project:str) -> Response:
-        check_token(project, verify_sub=False)  # Allow latest version check without device identity, but still require valid token for project
+        check_token(project, use_jwt,
+                   params={
+                        "jwt_secret": jwt_secret,
+                        "jwt_algorithm": jwt_algorithm,
+                        "jwt_audience": jwt_audience,
+                        "jwt_issuer": jwt_issuer
+                   },
+                   verify_sub=False)  # Allow latest version check without device identity, but still require valid token for project
         project_dir, _, version_files = get_sorted_versions(project)
         latest_file, _ = version_files[-1]
         file_path = (Path(project_dir) / latest_file).resolve()
@@ -264,7 +308,14 @@ def create_app(www_dir:str,                 # pylint: disable=too-many-positiona
 
     @app.route(f'/{url_firmware}/<project>/versions')
     def list_versions(project:str) -> Response:
-        check_token(project=project, verify_sub=False)  # Allow version listing without device identity, but still require valid token for project
+        check_token(project, use_jwt,
+                   params={
+                        "jwt_secret": jwt_secret,
+                        "jwt_algorithm": jwt_algorithm,
+                        "jwt_audience": jwt_audience,
+                        "jwt_issuer": jwt_issuer
+                   },
+                   verify_sub=False)  # Allow version listing without device identity, but still require valid token for project
         _, versions, _ = get_sorted_versions(project)
         return jsonify({
             "versions": versions,
