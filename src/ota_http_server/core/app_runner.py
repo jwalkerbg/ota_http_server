@@ -5,8 +5,7 @@ import ssl
 from werkzeug.middleware.proxy_fix import ProxyFix
 from ota_http_server.core.config import Config
 from ota_http_server.core.server import create_app
-from ota_http_server.core.db import db_command_handler
-
+from ota_http_server.core.database_service import DatabaseService
 from ota_http_server.logger import get_app_logger
 
 logger = get_app_logger(__name__)
@@ -62,7 +61,8 @@ def run_app(cfg:Config) -> None:
         logger.info("Starting OTA Database CLI")
         # Add database CLI code here, e.g. using click or argparse for subcommands
         logger.verbose("config = %s",str(cfg.config))
-        db_command_handler(cfg)
+        db_service = DatabaseService(cfg)
+        db_service.db_command_handler()
         logger.info("Exiting db CLI")
 
     else:
