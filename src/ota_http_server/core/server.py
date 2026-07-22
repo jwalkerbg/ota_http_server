@@ -1,16 +1,14 @@
 # core/server.py
 
 from typing import Any, Dict
-import time
 import csv
 import os
 import sys
 import re
 from pathlib import Path
-from datetime import datetime, time, timedelta, timezone
+from datetime import datetime, timedelta, timezone
 from flask import Flask, Response, send_file, request, abort, jsonify, current_app
 from packaging import version
-import jwt
 import hmac
 from uuid import UUID
 # Check Python version at runtime
@@ -19,6 +17,8 @@ if sys.version_info >= (3, 11):
 else:
     import tomli as toml # Use the external tomli for Python 3.7 to 3.10
 
+from .dataclasses import TokenResult
+from .auth_service import AuthService
 from ota_http_server.logger import get_app_logger
 
 logger = get_app_logger(__name__)
@@ -50,6 +50,15 @@ def create_app(www_dir:str,                 # pylint: disable=too-many-positiona
     if use_jwt and (not jwt_secret or not admin_secret):
         raise ValueError("JWT is enabled but jwt_secret or admin_secret is not set")
 
+    authservice = AuthService(use_jwt=use_jwt,
+                              jwt_secret=jwt_secret,
+                              jwt_algorithm=jwt_algorithm,
+                              jwt_audience=jwt_audience,
+                              jwt_issuer=jwt_issuer,
+                              jwt_expiry=jwt_expiry,
+                              jwt_max_expiry=jwt_max_expiry
+                            )
+
     def load_ota_db() -> Dict[str, Any]:
         app = current_app
         now = datetime.now()
@@ -80,83 +89,6 @@ def create_app(www_dir:str,                 # pylint: disable=too-many-positiona
     #                       HELPER FUNCTIONS
     # ---------------------------------------------------------------
 
-    def check_token(project:str|None=None, verify_sub:bool=True) -> Dict[str, Any]:
-        """Verifies JWT from Authorization header or ?token= query param.
-        Allows query param only for safe (GET, HEAD) requests.
-        """
-        if not use_jwt:
-            return {}  # JWT authentication is disabled, allow all requests
-
-        token = None
-        source = None
-
-        # 1️⃣ Try Authorization header first
-        auth_header = request.headers.get("Authorization")
-        if auth_header and auth_header.lower().startswith("bearer "):
-            token = auth_header[len("Bearer "):]
-            source = "header"
-
-        # 2️⃣ Fallback to ?token= only if header missing
-        if not token:
-            token = request.args.get("token")
-            if token:
-                source = "query"
-                # Allow query tokens only for safe requests (GET, HEAD)
-                if request.method not in ("GET", "HEAD"):
-                    abort(405, "Query token not allowed for this method")
-
-        # 3️⃣ If no token found at all
-        if not token:
-            abort(401, "Missing token (Authorization header or ?token=)")
-
-        # 4️⃣ Decode and verify JWT
-        try:
-            payload = jwt.decode(jwt=token, key=jwt_secret, algorithms=[jwt_algorithm], options={"verify_exp": True}, audience=jwt_audience, issuer=jwt_issuer)
-        except jwt.ExpiredSignatureError:
-            abort(401, "Token expired")
-        except jwt.InvalidTokenError:
-            abort(401, "Invalid token")
-
-        # 5️⃣ Verify project match
-        token_project = payload.get("project")
-        if not project or not hmac.compare_digest(token_project, project):
-            abort(403, "Token not valid for this project")
-
-        # 5️⃣.1️⃣ Verify "roles" claim contains "device" and "fw_download"
-        roles = payload.get("roles", [])
-        if not all(role in roles for role in ("device", "fw_download")):
-            abort(403, "Token does not have required roles")
-
-        # 5️⃣.2️⃣ Verify "aud" claim is "ota_api"
-        aud = payload.get("aud")
-        if not aud or not hmac.compare_digest(aud, jwt_audience):
-            abort(403, "Token not valid for this API")
-
-        # 5️⃣.3️⃣ Verify issuer claim if present (optional, but good practice)
-        issuer = payload.get("iss")
-        expected_issuer = app.config.get("jwt_issuer", "ota_http_server")
-        if issuer and not hmac.compare_digest(issuer, expected_issuer):
-            abort(403, "Token issuer mismatch")
-
-        # 5️⃣.4️⃣ Verify "sub" claim is present (device identity)
-        if verify_sub:
-            if "sub" not in payload:
-                abort(403, "Token missing 'sub' claim for device identity")
-            request_device_id = request.headers.get("X-Device-ID")
-            if not request_device_id:
-                request_device_id = request.args.get("device_id")  # Allow device_id in query param as fallback for GET requests
-            if not request_device_id:
-                abort(400, "Missing X-Device-ID header or device_id query parameter")
-            if not hmac.compare_digest(payload["sub"], request_device_id):
-                abort(403, "Token sub claim does not match X-Device-ID header")
-
-        # 6️⃣ Log successful authentication
-        device_id = payload.get("sub", "unknown")
-        now = datetime.now(timezone.utc).isoformat()
-        logger.info(f"[%s] [AUTH] OK - Device=%s, Project=%s, Source=%s", now, device_id, token_project, source)
-
-        return payload
-
     def get_sorted_versions(project:str) -> tuple[str, list[str], list[tuple[str, str]]]:
         """Return sorted list of versions for a given project."""
 
@@ -182,25 +114,6 @@ def create_app(www_dir:str,                 # pylint: disable=too-many-positiona
         version_files.sort(key=lambda x: version.parse(x[1]))
         sorted_versions = [v for _, v in version_files]
         return str(project_path), sorted_versions, version_files
-
-    def generate_ota_jwt(device_id: str, project: str, download_vs: str = "1.0.0", expires_seconds: int = jwt_expiry):
-        now = datetime.now(timezone.utc)
-        now_ts = int(now.timestamp())
-
-        payload = {
-            "aud": jwt_audience or app.config.get("jwt_audience", "ota_api"),
-            "exp": now_ts + expires_seconds,
-            "download_vs": download_vs,
-            "iat": now_ts,
-            "iss": jwt_issuer or app.config.get("jwt_issuer", "ota_http_server"),
-            "jti": f"{device_id}-{now_ts}",
-            "project": project,
-            "roles": ["device", "fw_download"],
-            "sub": device_id
-        }
-
-        token = jwt.encode(payload, jwt_secret, algorithm=jwt_algorithm)
-        return token, payload
 
     def log_audit_event(ip:str|None, action:str, details:str) -> None:
         """Append a token generation audit log entry."""
@@ -235,7 +148,7 @@ def create_app(www_dir:str,                 # pylint: disable=too-many-positiona
     def firmware(project:str, filename:str) -> Response:
         if use_jwt:
             # 1. Decode JWT
-            payload = check_token(project, verify_sub=True)
+            payload = authservice.verify_token(project, verify_sub=True)
             # 2. Extract identity
             device_id = payload["sub"]
             project = payload["project"]
@@ -248,7 +161,15 @@ def create_app(www_dir:str,                 # pylint: disable=too-many-positiona
             if not has_firmware_access(db, project, device_id):
                 abort(403, "Device not allowed to download firmware")
 
-        file_path = (Path(www_dir) / Path(firmware_dir) / Path(project) / Path(filename)).resolve()
+        file_path = (
+            Path(www_dir) / Path(firmware_dir) / Path(project) / Path(filename)
+        ).resolve()
+        allowed_dir = (
+            Path(www_dir) / Path(firmware_dir) / Path(project)
+        ).resolve()
+        if not file_path.is_relative_to(allowed_dir):  # Python >= 3.9
+            abort(403, "Access to this path is forbidden")
+
         logger.info("Serving firmware from: %s", file_path)
         if not file_path.is_file():
             abort(404, "Firmware file not found")
@@ -256,7 +177,7 @@ def create_app(www_dir:str,                 # pylint: disable=too-many-positiona
 
     @app.route(f'/{url_firmware}/<project>/latest')
     def latest_firmware(project:str) -> Response:
-        check_token(project, verify_sub=False)  # Allow latest version check without device identity, but still require valid token for project
+        authservice.verify_token(project, verify_sub=False)  # Allow latest version check without device identity, but still require valid token for project
         project_dir, _, version_files = get_sorted_versions(project)
         latest_file, _ = version_files[-1]
         file_path = (Path(project_dir) / latest_file).resolve()
@@ -264,7 +185,7 @@ def create_app(www_dir:str,                 # pylint: disable=too-many-positiona
 
     @app.route(f'/{url_firmware}/<project>/versions')
     def list_versions(project:str) -> Response:
-        check_token(project=project, verify_sub=False)  # Allow version listing without device identity, but still require valid token for project
+        authservice.verify_token(project, verify_sub=False)  # Allow version listing without device identity, but still require valid token for project
         _, versions, _ = get_sorted_versions(project)
         return jsonify({
             "versions": versions,
@@ -305,41 +226,19 @@ def create_app(www_dir:str,                 # pylint: disable=too-many-positiona
         if not data:
             abort(400, "Missing JSON body")
 
-        # validation of presence of fields "device_id", "project", "current_vs", "download_vs"
-
-        # Device ID is validated as a UUID, but we also check it's provided before that.
-        device_id = data.get("device_id")
-        if not device_id:
-            abort(400, "Missing 'device_id'")
-        try:
-            UUID(device_id)
-        except ValueError:
-            abort(400, "Invalid device_id format")
-
-        # Project name validation can also be added if there are specific requirements (e.g., allowed characters), but for now we just check it's provided.
-        project = data.get("project", None)
-        if not project:
-            abort(400, "Missing 'project'")
-        current_vs = data.get("current_vs", "1.0.0")
-        # download_vs is obligatory for the token generation, but we don't need to validate it here since it's just a claim in the token and doesn't affect server logic.
-        download_vs = data.get("download_vs")
-        if not download_vs:
-            abort(400, "Missing 'download_vs'")
-
-        expires_seconds = min(data.get("expires_seconds", jwt_expiry), jwt_max_expiry)  # Cap expiry to 30 minutes for security
-        token, payload = generate_ota_jwt(device_id, project, download_vs, expires_seconds)
+        token_result:TokenResult = authservice.create_device_token(data)
 
         # Audit logging
         log_audit_event(
             ip=request.remote_addr,
             action="generate_token",
-            details=f"device={device_id}, project={project}, exp={payload['exp']}"
+            details=f"device={token_result.payload.get('sub','')}, project={token_result.payload.get('project','')}, exp={token_result.payload.get('exp','')}"
         )
 
         return jsonify({
-            "token": token,
-            "expires_at": datetime.fromtimestamp(payload["exp"], tz=timezone.utc).isoformat(),
-            "payload": payload
+            "token": token_result.token,
+            "expires_at": datetime.fromtimestamp(token_result.payload["exp"], tz=timezone.utc).isoformat(),
+            "payload": token_result.payload
         })
 
     return app

@@ -15,4 +15,11 @@ verbose = 3
 #version_option = true
 
 [database]
+dbtype = "sqlite"
+
+[database.mysql]
 dbport = 3306
+
+[database.sqlite]
+dbfile = "ota_db.sqlite"
+
