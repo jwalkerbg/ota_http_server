@@ -161,7 +161,15 @@ def create_app(www_dir:str,                 # pylint: disable=too-many-positiona
             if not has_firmware_access(db, project, device_id):
                 abort(403, "Device not allowed to download firmware")
 
-        file_path = (Path(www_dir) / Path(firmware_dir) / Path(project) / Path(filename)).resolve()
+        file_path = (
+            Path(www_dir) / Path(firmware_dir) / Path(project) / Path(filename)
+        ).resolve()
+        allowed_dir = (
+            Path(www_dir) / Path(firmware_dir) / Path(project)
+        ).resolve()
+        if not file_path.is_relative_to(allowed_dir):  # Python >= 3.9
+            abort(403, "Access to this path is forbidden")
+
         logger.info("Serving firmware from: %s", file_path)
         if not file_path.is_file():
             abort(404, "Firmware file not found")
