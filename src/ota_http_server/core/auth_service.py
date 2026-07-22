@@ -7,7 +7,7 @@ import jwt
 from uuid import UUID
 import hmac
 
-from .dataclasses import TokenResult
+from .data_models import TokenResult
 from ota_http_server.logger import get_app_logger
 
 logger = get_app_logger(__name__)

@@ -17,7 +17,7 @@ if sys.version_info >= (3, 11):
 else:
     import tomli as toml # Use the external tomli for Python 3.7 to 3.10
 
-from .dataclasses import TokenResult
+from .data_models import TokenResult
 from .auth_service import AuthService
 from ota_http_server.logger import get_app_logger
 
