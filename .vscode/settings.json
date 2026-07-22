@@ -4,5 +4,7 @@
     ],
     "python.testing.unittestEnabled": false,
     "python.testing.pytestEnabled": true,
-    "editor.fontFamily": "'Source Code Pro', Consolas, 'Courier New', monospace"
+    "editor.fontFamily": "'Source Code Pro', Consolas, 'Courier New', monospace",
+    "python-envs.defaultEnvManager": "ms-python.python:poetry",
+    "python-envs.defaultPackageManager": "ms-python.python:poetry"
 }
