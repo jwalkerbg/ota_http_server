@@ -5,7 +5,7 @@ import ssl
 from werkzeug.middleware.proxy_fix import ProxyFix
 from ota_http_server.core.config import Config
 from ota_http_server.core.server import create_app
-from ota_http_server.core.database_service import DatabaseService
+from ota_http_server.database.database_service import DatabaseService
 from ota_http_server.logger import get_app_logger
 
 logger = get_app_logger(__name__)
