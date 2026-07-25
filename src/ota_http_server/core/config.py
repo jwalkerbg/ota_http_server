@@ -59,9 +59,11 @@ class DatabaseMySQLConfig(TypedDict, total=False):
     dbpassword: str
     dbpool_size: int
     dbecho: bool
+    migrations_dir: str
 
 class databaseSQLiteConfig(TypedDict, total=False):
-    dbfile: str
+    db_file: str
+    migrations_dir: str
 
 class DatabaseConfig(TypedDict, total=False):
     dbtype: str
@@ -123,10 +125,12 @@ class Config:
                 'dbuser': "ota_user",
                 'dbpassword': "ota_password",
                 'dbpool_size': 10,
-                'dbecho': False
+                'dbecho': False,
+                "migrations_dir": "database/migrations/mysql"
             },
             "sqlite": {
-                "dbfile": "ota_db.sqlite"
+                "db_file": "ota_db.sqlite",
+                "migrations_dir": "database/migrations/sqlite"
             },
         }
     }
@@ -254,6 +258,9 @@ class Config:
                             },
                             "dbecho": {
                                 "type": "boolean"
+                            },
+                            "migrations_dir": {
+                                "type": "string"
                             }
                         },
                         "additionalProperties": False
@@ -261,7 +268,10 @@ class Config:
                     "sqlite": {
                         "type": "object",
                         "properties": {
-                            "dbfile": {
+                            "db_file": {
+                                "type": "string"
+                            },
+                            "migrations_dir": {
                                 "type": "string"
                             }
                         },
