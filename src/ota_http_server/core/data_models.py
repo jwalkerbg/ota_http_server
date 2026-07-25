@@ -3,6 +3,9 @@
 from typing import Any, Dict, Optional
 from datetime import datetime
 from dataclasses import dataclass
+from pathlib import Path
+
+from ota_http_server.core.config import Config
 
 # return type of .auth_service.create_device_token
 @dataclass
@@ -56,3 +59,12 @@ class Firmware:
     channel: str        # stable, beta, dev (*)this an example)
     created_at: Optional[datetime]
     updated_at: Optional[datetime]  # Audit information
+
+class AppPaths:
+    def __init__(self, cfg: Config):
+        self._cfg = cfg
+        self._app_data_dir = Path(cfg.config["parameters"]["app_directory"])
+
+    @property
+    def database_sqlite(self) -> Path:
+        return self._app_data_dir / self._cfg.config["database"]["sqlite"]["db_file"]
