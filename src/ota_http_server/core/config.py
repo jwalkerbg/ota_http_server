@@ -49,6 +49,7 @@ class ParametersConfig(TypedDict, total=False):
     ota_audit_log: str
     ota_db: str
     ota_db_cache_ttl: int
+    app_directory: str
 
 class DatabaseMySQLConfig(TypedDict, total=False):
     dbhost: str
@@ -110,7 +111,8 @@ class Config:
             'url_firmware': "firmware",
             'ota_audit_log': "ota_audit_log.csv",
             'ota_db': "ota_db.toml",
-            'ota_db_cache_ttl': 300
+            'ota_db_cache_ttl': 300,
+            'app_directory': "C:\\ProgramData\\ota_http_server"
         },
         'database': {
             'dbtype': "sqlite",
@@ -219,6 +221,9 @@ class Config:
                     },
                     "ota_db_cache_ttl": {
                         "type": "number"
+                    },
+                    "app_directory": {
+                        "type": "string"
                     }
                 },
                 "additionalProperties": False
@@ -354,7 +359,8 @@ class Config:
                 "jwt_issuer": os.getenv("OTA_JWT_ISSUER"),
                 "jwt_audience": os.getenv("OTA_JWT_AUDIENCE"),
                 "ota_db": os.getenv("OTA_DATABASE"),
-                "ota_db_cache_ttl": os.getenv("OTA_DB_CACHE_TTL")
+                "ota_db_cache_ttl": os.getenv("OTA_DB_CACHE_TTL"),
+                "app_directory": os.getenv("OTA_APP_DIRECTORY")
             },
             "database": {
                 "dbtype": os.getenv("OTA_DB_TYPE"),
@@ -446,6 +452,8 @@ class Config:
                     self.config["parameters"]["ota_db"] = config_cli.ota_db
                 if config_cli.ota_db_cache_ttl is not None:
                     self.config["parameters"]["ota_db_cache_ttl"] = config_cli.ota_db_cache_ttl
+                if config_cli.app_directory is not None:
+                    self.config["parameters"]["app_directory"] = config_cli.app_directory
                 # server parameters
                 if config_cli.host is not None:
                     self.config['parameters']['host'] = config_cli.host
@@ -497,6 +505,7 @@ Environment variables:
   OTA_DB_PASSWORD         Database password, can be overridden by --dbpassword CLI option
   OTA_DB_POOL_SIZE        Database connection pool size (default 10), can be overridden by --dbpool-size CLI option
   OTA_DB_ECHO             Enable database echo (default False), can be overridden by --dbecho CLI option
+  OTA_APP_DIRECTORY       Path to the application directory (default 'C:\\ProgramData\\ota_http_server'), can be overridden by --app-directory CLI option
 
 Examples:
 
@@ -633,6 +642,9 @@ For use in development environment without SSL certificates and JWT authenticati
     dbecho_group.add_argument("--no-dbecho", dest="dbecho", action="store_const", const=False, help="Disable database echo (default False), overrides OTA_DB_ECHO environment variable")
     # SQLite options
     db_group.add_argument("--dbfile", dest="dbfile", type=str, help="Path to the SQLite database file (default 'ota_db.sqlite'), overrides OTA_DB_FILE environment variable")
+
+    app_dir_group = parser.add_argument_group("Application Directory")
+    app_dir_group.add_argument("--app-directory", dest="app_directory", type=str, help="Path to the application directory (default 'C:\\ProgramData\\ota_http_server'), overrides OTA_APP_DIRECTORY environment variable.\nHere the configuration file, audit log and database files are stored.\nIf the directory does not exist, it will be created automatically.")
 
     # application options & parameters
     subparsers = parser.add_subparsers(dest="command", required=True)
