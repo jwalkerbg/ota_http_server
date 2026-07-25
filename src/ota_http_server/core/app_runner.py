@@ -7,11 +7,19 @@ from ota_http_server.core.config import Config
 from ota_http_server.core.server import create_app
 from ota_http_server.database.database_service import DatabaseService
 from ota_http_server.logger import get_app_logger
+from ota_http_server.core.data_models import AppPaths
 
 logger = get_app_logger(__name__)
 
 # CLI application main function with collected options & configuration
 def run_app(cfg:Config) -> None:
+
+    # ensure app directories exist
+    logger.verbose("Creating AppPaths object")
+    app_paths = AppPaths(cfg)
+    # store app_paths in the configuration so as to access it elsewhere
+    cfg.config['parameters']['app_paths'] = app_paths
+
     if cfg.config['command'] == 'runserver':
         try:
             # Add real application code here.

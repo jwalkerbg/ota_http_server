@@ -6,6 +6,9 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from ota_http_server.core.config import Config
+from ota_http_server.logger import get_app_logger
+
+logger = get_app_logger(__name__)
 
 # return type of .auth_service.create_device_token
 @dataclass
@@ -63,8 +66,50 @@ class Firmware:
 class AppPaths:
     def __init__(self, cfg: Config):
         self._cfg = cfg
-        self._app_data_dir = Path(cfg.config["parameters"]["app_directory"])
+        self.app_data_dir = Path(self._cfg.config["parameters"]["app_directory"]).expanduser().resolve()
+        self.ensure_directories()
 
     @property
     def database_sqlite(self) -> Path:
-        return self._app_data_dir / self._cfg.config["database"]["sqlite"]["db_file"]
+        return self.app_data_dir / self._cfg.config["database"]["sqlite"]["db_file"]
+
+    @property
+    def logs_dir(self) -> Path:
+        return self.app_data_dir / "logs"
+
+    @property
+    def www_dir(self) -> Path:
+        return self.app_data_dir / self._cfg.config["parameters"]["www_dir"]
+
+    @property
+    def firmware_dir(self) -> Path:
+        return self.www_dir / self._cfg.config["parameters"]["firmware_dir"]
+
+    def project_dir(self,project) -> Path:
+        return self.firmware_dir / project
+
+    def ensure_directories(self) -> None:
+        """Create all required application directories."""
+
+        if self.app_data_dir.exists() and not self.app_data_dir.is_dir():
+            raise RuntimeError(f"{self.app_data_dir} exists but is not a directory.")
+        try:
+            self.app_data_dir.mkdir(parents=True, exist_ok=True)
+            logger.verbose(f"Ensured %s",self.app_data_dir)
+        except OSError as e:
+            logger.error("Cannot create application data directory '%s': %s",self.app_data_dir,e)
+            raise
+
+        try:
+            self.www_dir.mkdir(exist_ok=True)
+            logger.verbose(f"Ensured %s",self.www_dir)
+        except:
+            logger.error("Cannot create application data directory '%s': %s",self.www_dir,e)
+            raise
+
+        try:
+            self.logs_dir.mkdir(exist_ok=True)
+            logger.verbose("Ensured %s",self.logs_dir)
+        except:
+            logger.error("Cannot create application data directory '%s': %s",self.logs_dir,e)
+            raise
