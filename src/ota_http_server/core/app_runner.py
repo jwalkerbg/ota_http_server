@@ -18,22 +18,7 @@ def run_app(cfg:Config) -> None:
             logger.info("Starting OTA HTTP Server")
             logger.verbose("config = %s",str(cfg.config))
 
-            app = create_app(
-                www_dir=cfg.config['parameters']['www_dir'],
-                firmware_dir=cfg.config['parameters']['firmware_dir'],
-                url_firmware=cfg.config['parameters']['url_firmware'],
-                use_jwt=not cfg.config['parameters']['no_jwt'],
-                jwt_algorithm=cfg.config['parameters']['jwt_alg'],
-                jwt_expiry=int(cfg.config['parameters']['jwt_expiry']),
-                jwt_max_expiry=int(cfg.config['parameters']['jwt_max_expiry']),
-                jwt_secret=cfg.config['parameters']['jwt_secret'],
-                jwt_issuer=cfg.config['parameters']['jwt_issuer'],
-                jwt_audience=cfg.config['parameters']['jwt_audience'],
-                admin_secret=cfg.config['parameters']['admin_secret'],
-                ota_audit_log=cfg.config['parameters']['ota_audit_log'],
-                ota_db_file=cfg.config['parameters']['ota_db'],
-                ota_db_cache_ttl=int(cfg.config['parameters']['ota_db_cache_ttl'])
-            )
+            app = create_app(cfg)
 
             print("\n=== OTA Server Configuration ===")
             print(f"Listening on {cfg.config['parameters']['host']}:{cfg.config['parameters']['port']}")
