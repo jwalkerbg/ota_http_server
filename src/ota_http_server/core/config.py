@@ -126,11 +126,11 @@ class Config:
                 'dbpassword': "ota_password",
                 'dbpool_size': 10,
                 'dbecho': False,
-                "migrations_dir": "database/migrations/mysql"
+                "migrations_dir": "src/ota_http_server/database/migrations/mysql"
             },
             "sqlite": {
                 "db_file": "ota_db.sqlite",
-                "migrations_dir": "database/migrations/sqlite"
+                "migrations_dir": "src/ota_http_server/database/migrations/sqlite"
             },
         }
     }
