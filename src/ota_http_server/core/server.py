@@ -19,6 +19,7 @@ else:
 
 from .data_models import TokenResult
 from .auth_service import AuthService
+from ota_http_server.database.database_service import DatabaseService
 from ota_http_server.logger import get_app_logger
 from ota_http_server.core.config import Config
 
@@ -61,6 +62,7 @@ def create_app(cfg: Config) -> Flask:
                               jwt_expiry=jwt_expiry,
                               jwt_max_expiry=jwt_max_expiry
                             )
+    dbservice = DatabaseService(cfg)  # Placeholder for future database service integration
 
     def load_ota_db() -> Dict[str, Any]:
         app = current_app
