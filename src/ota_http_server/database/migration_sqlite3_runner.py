@@ -1,5 +1,6 @@
 # database/migration_sqlite3_runner.py
 
+import time
 import sqlite3
 import importlib.util
 from pathlib import Path
@@ -15,9 +16,10 @@ class MigrationError(Exception):
 
 class MigrationRunner:
     def __init__(self, cfg:Config):
-        migrations_dir: str = cfg.config["database"]["sqlite"]["migrations_dir"]
+        self.cfg = cfg
+        migrations_dir: str = self.cfg.config["database"]["sqlite"]["migrations_dir"]
         self.migrations_dir = Path(migrations_dir).expanduser().resolve()
-        self.app_paths:AppPaths = cfg.config['parameters']['app_paths']
+        self.app_paths:AppPaths = self.cfg.config['parameters']['app_paths']
 
     def _connect(self):
         conn = sqlite3.connect(self.app_paths.database_sqlite)
@@ -48,6 +50,14 @@ class MigrationRunner:
         logger.verbose("migrate_up start")
         with self._connect() as conn:
             self._init_schema_table(conn)
+            if not self.cfg.config["parameters"]["init_db_migrate"]:
+                return
+
+            if  self.cfg.config["parameters"]["trace_sql"]:
+                conn.set_trace_callback(
+                    lambda sql: logger.debug("SQL: %s", sql)
+                )
+            overall_start = time.perf_counter()
             current_version = self._get_current_version(conn)
             logger.verbose(f"Current database version = %d",current_version)
             for path in sorted(self.migrations_dir.glob("*.py")):
@@ -58,18 +68,26 @@ class MigrationRunner:
 
                 migration = self._load_migration(path)
 
-                logger.info("Applying migration %s: %s", path.name, migration.description)
+                if not self.cfg.config["parameters"]["migrate_dry_run"]:
+                    start = time.perf_counter()
+                    logger.info("Applying migration %s: %s", path.name, migration.description)
+                    try:
+                        # Start transaction
+                        conn.execute("BEGIN")
+                        migration.up(conn)
+                        conn.execute("INSERT INTO schema_version(version) VALUES (?)",(version,))
+                        conn.commit()
+                        elapsed_ms = (time.perf_counter() - start) * 1000.0
+                        logger.info("Migration %s completed in %.2f ms", version, elapsed_ms)
+                    except Exception as e:
+                        conn.rollback()
+                        elapsed_ms = (time.perf_counter() - start) * 1000.0
+                        raise MigrationError("Migration up {version} failed in %.2f ms", elapsed_ms) from e
+                else:
+                    logger.info("Pending migration %s: %s", path.name, migration.description)
 
-                try:
-                    # Start transaction
-                    conn.execute("BEGIN")
-                    migration.up(conn)
-                    conn.execute("INSERT INTO schema_version(version) VALUES (?)",(version,))
-                    conn.commit()
-                    logger.info("Migration %s completed",version)
-                except Exception as e:
-                    conn.rollback()
-                    raise MigrationError("Migration up {version} failed") from e
+            overall_ms = (time.perf_counter() - overall_start) * 1000.0
+            logger.info("Database is up-to-date. Total migration time: %.2f ms", overall_ms)
 
     def migrate_down(self):
         with self._connect() as conn:
@@ -83,13 +101,16 @@ class MigrationRunner:
 
             migration = self._load_migration(migration_file)
 
-            try:
-                # Start transaction
-                conn.execute("BEGIN")
-                print(f"Rolling back {migration_file.name}")
-                migration.down(conn)
-                conn.execute("DELETE FROM schema_version WHERE version = ?",(current_version,))
-                conn.commit()
-            except Exception as e:
-                conn.rollback()
-                raise MigrationError("Migration down{version} failed") from e
+            if not self.cfg.config["parameters"]["migrate_dry_run"]:
+                try:
+                    # Start transaction
+                    conn.execute("BEGIN")
+                    print(f"Rolling back {migration_file.name}")
+                    migration.down(conn)
+                    conn.execute("DELETE FROM schema_version WHERE version = ?",(current_version,))
+                    conn.commit()
+                except Exception as e:
+                    conn.rollback()
+                    raise MigrationError("Migration down{version} failed") from e
+            else:
+                logger.info("Pending migration to rollback %s: %s", migration_file.name, migration.description)

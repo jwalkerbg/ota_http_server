@@ -25,11 +25,11 @@ class DatabaseService:
         logger.info("Handling database command: %s", self.cfg.config.get('db_command'))
         db_command = self.cfg.config.get('db_command')
 
-        conn = None
-
         if db_command == 'init-db':
             db_file = self.cfg.config['database']['sqlite']['db_file']
             self.init_db()
+        elif db_command == "migrate":
+            self.migrate()
         elif db_command == 'create-user':
             email = self.cfg.config['parameters']['email']
             self.create_user(email)
@@ -45,6 +45,9 @@ class DatabaseService:
 
     def init_db(self) -> None:
         self._database.init_db()
+
+    def migrate(self) -> None:
+        self._database.migrate()
 
     def create_user(self, email:str) -> None:
         self._database.add_user(name=email.split('@')[0], email=email)

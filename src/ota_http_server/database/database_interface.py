@@ -7,6 +7,9 @@ class DatabaseInterface(Protocol):
     def init_db(self) -> None:
         ...
 
+    def migrate(self) -> None:
+        ...
+
     def add_user(self, name: str, email: str) -> int:
         ...
 

@@ -50,6 +50,9 @@ class ParametersConfig(TypedDict, total=False):
     ota_db: str
     ota_db_cache_ttl: int
     app_directory: str
+    init_db_migrate: bool
+    migrate_dry_run: bool
+    trace_sql: bool
 
 class DatabaseMySQLConfig(TypedDict, total=False):
     dbhost: str
@@ -114,7 +117,10 @@ class Config:
             'ota_audit_log': "ota_audit_log.csv",
             'ota_db': "ota_db.toml",
             'ota_db_cache_ttl': 300,
-            'app_directory': "C:\\ProgramData\\ota_http_server"
+            'app_directory': "C:\\ProgramData\\ota_http_server",
+            'init_db_migrate': True,
+            'migrate_dry_run': False,
+            'trace_sql': False
         },
         'database': {
             'dbtype': "sqlite",
@@ -228,6 +234,15 @@ class Config:
                     },
                     "app_directory": {
                         "type": "string"
+                    },
+                    "init_db_migrate": {
+                        "type": "boolean"
+                    },
+                    "migrate_dry_run": {
+                        "type": "boolean"
+                    },
+                    "trace_sql": {
+                        "type": "boolean"
                     }
                 },
                 "additionalProperties": False
@@ -434,6 +449,8 @@ class Config:
             # SQLite database options
             if config_cli.dbfile is not None:
                 self.config['database']['sqlite']['dbfile'] = config_cli.dbfile
+            if config_cli.trace_sql is not None:
+                self.config["parameters"]["trace_sql"] = config_cli.trace_sql
 
             if config_cli.command == 'runserver':
                 if config_cli.cert is not None:
@@ -483,6 +500,13 @@ class Config:
                 if config_cli.db_command is not None:
                     self.config['db_command'] = config_cli.db_command
                 # here db commands must be handled for parameters
+                if config_cli.db_command == "init-db":
+                    if config_cli.init_db_migrate is not None:
+                        self.config['parameters']['init_db_no_migrate'] = config_cli.init_db_migrate
+                if config_cli.db_command == "migrate":
+                    if config_cli.migrate_dry_run is not None:
+                        self.config["parameters"]["migrate_dry_run"] = config_cli.migrate_dry_run
+
         return self.config
 
 def parse_args() -> argparse.Namespace:
@@ -652,6 +676,9 @@ For use in development environment without SSL certificates and JWT authenticati
     dbecho_group.add_argument("--no-dbecho", dest="dbecho", action="store_const", const=False, help="Disable database echo (default False), overrides OTA_DB_ECHO environment variable")
     # SQLite options
     db_group.add_argument("--dbfile", dest="dbfile", type=str, help="Path to the SQLite database file (default 'ota_db.sqlite'), overrides OTA_DB_FILE environment variable")
+    trace_sql_group = parser.add_mutually_exclusive_group()
+    trace_sql_group.add_argument("--trace-sql", dest="trace_sql", action="store_const", const=True, help="Activates SQL tracing")
+    trace_sql_group.add_argument("--no-trace-sql", dest="trace_sql", action="store_const", const=False, help="De-activates SQL tracing")
 
     app_dir_group = parser.add_argument_group("Application Directory")
     app_dir_group.add_argument("--app-directory", dest="app_directory", type=str, help="Path to the application directory (default 'C:\\ProgramData\\ota_http_server'), overrides OTA_APP_DIRECTORY environment variable.\nHere the configuration file, audit log and database files are stored.\nIf the directory does not exist, it will be created automatically.")
@@ -700,9 +727,16 @@ For use in development environment without SSL certificates and JWT authenticati
 #############
 
     db_parser = subparsers.add_parser("db", help="Database operations")
+
     db_subparsers = db_parser.add_subparsers(dest="db_command", required=True)
 
     init_db_parser = db_subparsers.add_parser("init-db", help="Initialize the database")
+    init_db_migrate_group = init_db_parser.add_mutually_exclusive_group()
+    init_db_migrate_group.add_argument("--migrate", dest="init_db_migrate", action="store_const", const=True, help="Create database without executing migrations")
+    init_db_migrate_group.add_argument("--no-migrate", dest="init_db_migrate", action="store_const", const=False, help="Create database without executing migrations")
+
+    migration_parser = db_subparsers.add_parser("migrate", help="Execute all available and not yet executed migrations up")
+    migration_parser.add_argument("--dry-run",dest="migrate_dry_run", action="store_const", const=True, help="Shows what would do without doing it really")
 
     create_user_parser = db_subparsers.add_parser("create-user", help="Create a user")
     create_user_parser.add_argument("--email", required=True)
@@ -734,7 +768,6 @@ def get_app_configuration() -> Config:
 
     # Step 1: Create config object with default configuration
     config_instance = Config()
-
     # Step 2: Parse command-line arguments
     args = parse_args()
     if args.version_option:

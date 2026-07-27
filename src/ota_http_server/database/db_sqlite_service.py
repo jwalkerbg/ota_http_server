@@ -15,13 +15,13 @@ class DatabaseSqliteService:
         self.migration_runner = MigrationRunner(cfg)
 
     def init_db(self):
-        logger.info("init_db executed")
         self.migration_runner.migrate_up()
-        return 0
 
-    def add_user(self, name: str, email: str) -> int:
+    def migrate(self):
+        self.migration_runner.migrate_up()
+
+    def add_user(self, name: str, email: str):
         logger.info('add_user executed')
-        return 0
 
 
 
