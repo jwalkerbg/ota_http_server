@@ -1,9 +1,28 @@
 # db_sqlite_service.py
 
 import sqlite3
-
-import sqlite3
 from pathlib import Path
+
+from ota_http_server.core.config import Config
+from ota_http_server.database.migration_sqlite3_runner import MigrationRunner
+from ota_http_server.logger import get_app_logger
+
+logger = get_app_logger(__name__)
+
+class DatabaseSqliteService:
+    def __init__(self, cfg:Config):
+        self.cfg = cfg
+        self.migration_runner = MigrationRunner(cfg)
+
+    def init_db(self):
+        logger.info("init_db executed")
+        self.migration_runner.migrate_up()
+        return 0
+
+    def add_user(self, name: str, email: str) -> int:
+        logger.info('add_user executed')
+        return 0
+
 
 
 DB_FILE = Path("ota_server.db")
@@ -143,8 +162,3 @@ def init_database(db_file: Path = DB_FILE):
 
 
         conn.commit()
-
-
-if __name__ == "__main__":
-    init_database()
-    print("Database initialized")

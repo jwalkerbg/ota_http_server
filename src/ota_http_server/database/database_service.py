@@ -1,8 +1,10 @@
 # core/db.py
 
 import traceback
+from typing import Protocol
 
 from ota_http_server.core.config import Config
+from ota_http_server.database.database_interface import DatabaseInterface
 from ota_http_server.logger import get_app_logger
 
 logger = get_app_logger(__name__)
@@ -10,7 +12,14 @@ logger = get_app_logger(__name__)
 class DatabaseService:
     def __init__(self, cfg: Config):
         self.cfg = cfg
-        self.conn = None
+        if self.cfg.config['database']['dbtype'] == 'sqlite':
+            from ota_http_server.database.db_sqlite_service import DatabaseSqliteService
+            self._database: DatabaseInterface = DatabaseSqliteService(cfg)
+        elif self.cfg.config['database']['dbtype'] == 'mysql':
+            from ota_http_server.database.db_mysql_service import DatabaseMySQLService
+            self._database: DatabaseInterface = DatabaseMySQLService(cfg)
+        else:
+            raise ValueError(f"Unsupported database type: {self.cfg.config['database']['dbtype']}")
 
     def db_command_handler(self) -> None:
         logger.info("Handling database command: %s", self.cfg.config.get('db_command'))
@@ -19,7 +28,7 @@ class DatabaseService:
         conn = None
 
         if db_command == 'init-db':
-            db_file = self.cfg.config['parameters']['ota_db']
+            db_file = self.cfg.config['database']['sqlite']['db_file']
             self.init_db()
         elif db_command == 'create-user':
             email = self.cfg.config['parameters']['email']
@@ -35,36 +44,8 @@ class DatabaseService:
             self.create_project(project_name, project_uuid, project_path)
 
     def init_db(self) -> None:
-        try:
-            # Here you would add the actual database initialization logic, e.g. creating tables, etc.
-            logger.info("Initializing database")
-            # For example, if using SQLAlchemy, you would create the engine and call Base.metadata.create_all(engine)
-            # This is just a placeholder to indicate where the real implementation would go.
-            logger.info("Database initialized")
-        except Exception as e:
-            logger.error("Error initializing database: %s", str(e))
-            traceback.print_exc()
+        self._database.init_db()
 
     def create_user(self, email:str) -> None:
-        try:
-            # Here you would add the actual logic to create a user in the database
-            logger.info("Creating user with email: %s (this is a placeholder implementation)", email)
-        except Exception as e:
-            logger.error("Error creating user: %s", str(e))
-            traceback.print_exc()
+        self._database.add_user(name=email.split('@')[0], email=email)
 
-    def create_device(self,device_name:str, device_uuid:str) -> None:
-        try:
-            # Here you would add the actual logic to create a device in the database
-            logger.info("Creating device with name: %s and UUID: %s (this is a placeholder implementation)", device_name, device_uuid)
-        except Exception as e:
-            logger.error("Error creating device: %s", str(e))
-            traceback.print_exc()
-
-    def create_project(self, project_name:str, project_uuid:str, project_path:str) -> None:
-        try:
-            # Here you would add the actual logic to create a project in the database
-            logger.info("Creating project with name: %s, UUID: %s, and path: %s (this is a placeholder implementation)", project_name, project_uuid, project_path)
-        except Exception as e:
-            logger.error("Error creating project: %s", str(e))
-            traceback.print_exc()
