@@ -32,18 +32,6 @@ class DatabaseService:
             self.migrate()
         elif db_command == "rollback":
             self.rollback()
-        elif db_command == 'create-user':
-            email = self.cfg.config['parameters']['email']
-            self.create_user(email)
-        elif db_command == 'create-device':
-            device_name = self.cfg.config['parameters']['device_name']
-            device_uuid = self.cfg.config['parameters']['device_uuid']
-            self.create_device(device_name, device_uuid)
-        elif db_command == 'create-project':
-            project_name = self.cfg.config['parameters']['project_name']
-            project_uuid = self.cfg.config['parameters']['project_uuid']
-            project_path = self.cfg.config['parameters']['project_path']
-            self.create_project(project_name, project_uuid, project_path)
 
     def init_db(self) -> None:
         self._database.init_db()
@@ -53,7 +41,3 @@ class DatabaseService:
 
     def rollback(self) -> None:
         self._database.rollback()
-
-    def create_user(self, email:str) -> None:
-        self._database.add_user(name=email.split('@')[0], email=email)
-
