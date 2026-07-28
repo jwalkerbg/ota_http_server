@@ -10,6 +10,9 @@ class DatabaseInterface(Protocol):
     def migrate(self) -> None:
         ...
 
+    def rollback(self) -> None:
+        ...
+
     def add_user(self, name: str, email: str) -> int:
         ...
 

@@ -20,6 +20,9 @@ class DatabaseSqliteService:
     def migrate(self):
         self.migration_runner.migrate_up()
 
+    def rollback(self):
+        self.migration_runner.migrate_down()
+
     def add_user(self, name: str, email: str):
         logger.info('add_user executed')
 

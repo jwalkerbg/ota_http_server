@@ -53,6 +53,7 @@ class ParametersConfig(TypedDict, total=False):
     init_db_migrate: bool
     migrate_dry_run: bool
     trace_sql: bool
+    rollback_all: bool
 
 class DatabaseMySQLConfig(TypedDict, total=False):
     dbhost: str
@@ -120,7 +121,8 @@ class Config:
             'app_directory': "C:\\ProgramData\\ota_http_server",
             'init_db_migrate': True,
             'migrate_dry_run': False,
-            'trace_sql': False
+            'trace_sql': False,
+            'rollback_all': False
         },
         'database': {
             'dbtype': "sqlite",
@@ -242,6 +244,9 @@ class Config:
                         "type": "boolean"
                     },
                     "trace_sql": {
+                        "type": "boolean"
+                    },
+                    "rollback_all": {
                         "type": "boolean"
                     }
                 },
@@ -506,6 +511,9 @@ class Config:
                 if config_cli.db_command == "migrate":
                     if config_cli.migrate_dry_run is not None:
                         self.config["parameters"]["migrate_dry_run"] = config_cli.migrate_dry_run
+                if config_cli.db_command == "rollback":
+                    if config_cli.rollback_all is not None:
+                        self.config["parameters"]["rollback_all"] = config_cli.rollback_all
 
         return self.config
 
@@ -737,6 +745,9 @@ For use in development environment without SSL certificates and JWT authenticati
 
     migration_parser = db_subparsers.add_parser("migrate", help="Execute all available and not yet executed migrations up")
     migration_parser.add_argument("--dry-run",dest="migrate_dry_run", action="store_const", const=True, help="Shows what would do without doing it really")
+
+    rollback_parser = db_subparsers.add_parser("rollback", help="Execute rollback of the last or all migrations")
+    rollback_parser.add_argument("--all", dest="rollback_all", action="store_const", const=True, help="Execute rollback of all migrations")
 
     create_user_parser = db_subparsers.add_parser("create-user", help="Create a user")
     create_user_parser.add_argument("--email", required=True)

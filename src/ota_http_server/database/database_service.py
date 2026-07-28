@@ -30,6 +30,8 @@ class DatabaseService:
             self.init_db()
         elif db_command == "migrate":
             self.migrate()
+        elif db_command == "rollback":
+            self.rollback()
         elif db_command == 'create-user':
             email = self.cfg.config['parameters']['email']
             self.create_user(email)
@@ -48,6 +50,9 @@ class DatabaseService:
 
     def migrate(self) -> None:
         self._database.migrate()
+
+    def rollback(self) -> None:
+        self._database.rollback()
 
     def create_user(self, email:str) -> None:
         self._database.add_user(name=email.split('@')[0], email=email)

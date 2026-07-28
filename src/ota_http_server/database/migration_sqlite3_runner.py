@@ -82,7 +82,7 @@ class MigrationRunner:
                     except Exception as e:
                         conn.rollback()
                         elapsed_ms = (time.perf_counter() - start) * 1000.0
-                        raise MigrationError("Migration up {version} failed in %.2f ms", elapsed_ms) from e
+                        raise MigrationError("Migration up {version:03d} failed in {elapsed_ms.2f} ms") from e
                 else:
                     logger.info("Pending migration %s: %s", path.name, migration.description)
 
@@ -94,14 +94,19 @@ class MigrationRunner:
             self._init_schema_table(conn)
             current_version = self._get_current_version(conn)
             if current_version == 0:
-                print("No migrations to rollback")
+                logger.info("No migrations to rollback")
                 return
 
+            if  self.cfg.config["parameters"]["trace_sql"]:
+                conn.set_trace_callback(
+                    lambda sql: logger.debug("SQL: %s", sql)
+                )
             migration_file = next(self.migrations_dir.glob(f"{current_version:03d}_*.py"))
 
             migration = self._load_migration(migration_file)
 
             if not self.cfg.config["parameters"]["migrate_dry_run"]:
+                start = time.perf_counter()
                 try:
                     # Start transaction
                     conn.execute("BEGIN")
@@ -109,8 +114,11 @@ class MigrationRunner:
                     migration.down(conn)
                     conn.execute("DELETE FROM schema_version WHERE version = ?",(current_version,))
                     conn.commit()
+                    elapsed_ms = (time.perf_counter() - start) * 1000.0
+                    logger.info("Rollback %s completed in %.2f ms", current_version, elapsed_ms)
                 except Exception as e:
                     conn.rollback()
-                    raise MigrationError("Migration down{version} failed") from e
+                    elapsed_ms = (time.perf_counter() - start) * 1000.0
+                    raise MigrationError("Migration down {version:03d} failed in {elapsed_ms:.2f} ms") from e
             else:
                 logger.info("Pending migration to rollback %s: %s", migration_file.name, migration.description)
