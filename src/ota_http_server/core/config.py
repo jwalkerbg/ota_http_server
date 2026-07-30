@@ -701,21 +701,19 @@ For use in development environment without SSL certificates and JWT authenticati
     logging_group = run_parser.add_argument_group("Logging")
     logging_group.add_argument("--ota-audit-log", dest="ota_audit_log", help="Path to the OTA audit log file (default 'ota_audit_log.csv'), overrides OTA_AUDIT_LOG environment variable")
 
-#############
-
-    db_parser = subparsers.add_parser("db", help="Database operations")
-
+    # db
+    db_parser = subparsers.add_parser(name="db", help="Database operations")
     db_subparsers = db_parser.add_subparsers(dest="db_command", required=True)
-
-    init_db_parser = db_subparsers.add_parser("init-db", help="Initialize the database")
+    # db init-db
+    init_db_parser = db_subparsers.add_parser(name="init-db", help="Initialize the database")
     init_db_migrate_group = init_db_parser.add_mutually_exclusive_group()
     init_db_migrate_group.add_argument("--migrate", dest="init_db_migrate", action="store_const", const=True, help="Create database without executing migrations")
     init_db_migrate_group.add_argument("--no-migrate", dest="init_db_migrate", action="store_const", const=False, help="Create database without executing migrations")
-
-    migration_parser = db_subparsers.add_parser("migrate", help="Execute all available and not yet executed migrations up")
+    # db migrate
+    migration_parser = db_subparsers.add_parser(name="migrate", help="Execute all available and not yet executed migrations up")
     migration_parser.add_argument("--dry-run",dest="migrate_dry_run", action="store_const", const=True, help="Shows what would do without doing it really")
-
-    rollback_parser = db_subparsers.add_parser("rollback", help="Execute rollback of the last or all migrations")
+    # db rollback#
+    rollback_parser = db_subparsers.add_parser(name="rollback", help="Execute rollback of the last or all migrations")
     rollback_parser.add_argument("--all", dest="rollback_all", action="store_const", const=True, help="Execute rollback of all migrations")
 
     # user
