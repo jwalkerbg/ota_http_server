@@ -49,9 +49,9 @@ def run_app(cfg:Config) -> None:
                 context.load_cert_chain(cfg.config['parameters']['cert'], cfg.config['parameters']['key'])
                 app.run(host=cfg.config['parameters']['host'], port=cfg.config['parameters']['port'], ssl_context=context)
         except ValueError as e:
-            logger.error("Error in application run: %s",str(e))
+            logger.error("Error in application run: %s",str(e), exc_info=cfg.config['logging']['exc_full_stack'])
         except Exception as e:
-            logger.error("Unexpected error in application run: %s",str(e))
+            logger.error("Unexpected error in application run: %s",str(e), exc_info=cfg.config['logging']['exc_full_stack'])
         finally:
             logger.info("Exiting runserver")
 
@@ -62,14 +62,14 @@ def run_app(cfg:Config) -> None:
         try:
             db_service.db_command_handler()
         except:
-            logger.error("%s", str(e))
+            logger.error("%s", str(e), exc_info=cfg.config['logging']['exc_full_stack'])
         finally:
             logger.info("Exiting db CLI")
     elif cfg.config['command'] == 'user':
         try:
             user_service.command_handler()
         except Exception as e:
-            logger.error("%s", str(e))
+            logger.error("%s", str(e), exc_info=cfg.config['logging']['exc_full_stack'])
         finally:
             logger.info("Exiting user CLI")
     elif cfg.config['command'] == 'project':
