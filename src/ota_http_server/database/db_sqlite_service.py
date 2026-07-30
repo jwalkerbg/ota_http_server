@@ -2,7 +2,7 @@
 
 import sqlite3
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, UTC
 
 from ota_http_server.core.config import Config
 from ota_http_server.database.migration_sqlite3_runner import MigrationRunner
@@ -86,7 +86,7 @@ class DatabaseSqliteService:
             VALUES (?, ?, ?, ?, ?, ?, ?)
         """
 
-        now = datetime.now().isoformat()
+        now = datetime.now(UTC)
 
         try:
             with self._connect() as conn:
@@ -98,14 +98,14 @@ class DatabaseSqliteService:
                         user.email,
                         user.role,
                         1 if user.is_active else 0,
-                        now,
-                        now,
+                        now.isoformat(),
+                        now.isoformat(),
                     )
                 )
 
                 user.id = cursor.lastrowid
-                user.created_at = datetime.fromisoformat(now)
-                user.updated_at = datetime.fromisoformat(now)
+                user.created_at = now
+                user.updated_at = now
 
                 conn.commit()
 
@@ -153,7 +153,7 @@ class DatabaseSqliteService:
                 For unexpected database errors.
         """
 
-        now = datetime.now().isoformat()
+        now = datetime.now(UTC)
 
         try:
             with self._connect() as conn:
@@ -188,7 +188,7 @@ class DatabaseSqliteService:
                         updated_at = ?
                     WHERE id = ?
                     """,
-                    (now, user_id)
+                    (now.isoformat(), user_id)
                 )
                 conn.commit()
 
@@ -202,7 +202,7 @@ class DatabaseSqliteService:
 
     def user_enable_by_username(self, username: str) -> None:
 
-        now = datetime.now().isoformat()
+        now = datetime.now(UTC)
 
         try:
             with self._connect() as conn:
@@ -217,7 +217,7 @@ class DatabaseSqliteService:
                     AND is_active = 0
                     """,
                     (
-                        now,
+                        now.isoformat(),
                         username,
                     )
                 )
@@ -257,7 +257,7 @@ class DatabaseSqliteService:
                 For unexpected database errors.
         """
 
-        now = datetime.now().isoformat()
+        now = datetime.now(UTC)
 
         try:
             with self._connect() as conn:
@@ -292,7 +292,7 @@ class DatabaseSqliteService:
                         updated_at = ?
                     WHERE id = ?
                     """,
-                    (now, user_id)
+                    (now.isoformat(), user_id)
                 )
                 conn.commit()
 
@@ -306,7 +306,7 @@ class DatabaseSqliteService:
 
     def user_disable_by_username(self, username: str) -> None:
 
-        now = datetime.now().isoformat()
+        now = datetime.now(UTC)
 
         try:
             with self._connect() as conn:
@@ -321,7 +321,7 @@ class DatabaseSqliteService:
                     AND is_active = 1
                     """,
                     (
-                        now,
+                        now.isoformat(),
                         username,
                     )
                 )

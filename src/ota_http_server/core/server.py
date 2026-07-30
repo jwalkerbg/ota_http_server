@@ -6,7 +6,7 @@ import os
 import sys
 import re
 from pathlib import Path
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, UTC
 from flask import Flask, Response, send_file, request, abort, jsonify, current_app
 from packaging import version
 import hmac
@@ -66,7 +66,7 @@ def create_app(cfg: Config) -> Flask:
 
     def load_ota_db() -> Dict[str, Any]:
         app = current_app
-        now = datetime.now()
+        now = datetime.now(UTC)
 
         if app.config["OTA_DB"] is None or (now - app.config["OTA_DB_LAST_LOAD"]) > app.config["OTA_DB_CACHE_TTL"]:
             try:
@@ -122,7 +122,7 @@ def create_app(cfg: Config) -> Flask:
 
     def log_audit_event(ip:str|None, action:str, details:str) -> None:
         """Append a token generation audit log entry."""
-        timestamp = datetime.now(timezone.utc).isoformat()
+        timestamp = datetime.now(UTC).isoformat()
         os.makedirs(os.path.dirname(ota_audit_log) or ".", exist_ok=True)
         new_file = not os.path.exists(ota_audit_log)
         with open(ota_audit_log, "a", newline="", encoding="utf-8") as csvfile:
@@ -202,7 +202,7 @@ def create_app(cfg: Config) -> Flask:
     def status() -> Response:
         return jsonify({
             "status": "ok",
-            "time": datetime.now(timezone.utc).isoformat()
+            "time": datetime.now(UTC).isoformat()
         })
 
     # ---------------------------------------------------------------

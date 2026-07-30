@@ -1,7 +1,7 @@
 # core/auth.py
 
 from typing import Any, Dict
-from datetime import datetime, time, timedelta, timezone
+from datetime import datetime, time, timedelta, timezone, UTC
 from flask import request, abort, current_app as app
 import jwt
 from uuid import UUID
@@ -112,7 +112,7 @@ class AuthService:
 
         # 6️⃣ Log successful authentication
         device_id = payload.get("sub", "unknown")
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         logger.info(f"[%s] [AUTH] OK - Device=%s, Project=%s, Source=%s", now, device_id, token_project, source)
 
         return payload
@@ -142,7 +142,7 @@ class AuthService:
 
         expires_seconds = min(data.get("expires_seconds", self.jwt_expiry), self.jwt_max_expiry)  # Cap expiry to 30 minutes for security
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         now_ts = int(now.timestamp())
 
         payload = {
