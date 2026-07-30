@@ -42,3 +42,9 @@ class DatabaseService:
 
     def add_user(self, user: User) -> User:
         return self._database.add_user(user)
+
+    def disable_user_by_id(self, user_id: int) -> None:
+        self._database.user_disable_by_id(user_id)
+
+    def disable_user_by_username(self, username: str) -> None:
+        self._database.user_disable_by_username(username)

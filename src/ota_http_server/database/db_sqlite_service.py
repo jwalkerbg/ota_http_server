@@ -12,6 +12,15 @@ from ota_http_server.logger import get_app_logger
 
 logger = get_app_logger(__name__)
 
+class UserHasProjectsError(Exception):
+    pass
+
+class UserNotFoundError(Exception):
+    pass
+
+class UserAlreadyDisabledError(Exception):
+    pass
+
 class UserAlreadyExistsError(Exception):
     pass
 
@@ -117,4 +126,109 @@ class DatabaseSqliteService:
 
             raise DatabaseError(
                 f"Database error while adding user '{user.username}'"
+            ) from e
+
+
+    def user_disable_by_id(self, user_id: int) -> None:
+        """
+        Disable a user account.
+
+        The user record is kept for audit purposes.
+        Only the active state is changed.
+
+        Args:
+            user_id: Database id of the user.
+
+        Returns:
+            Updated User object.
+
+        Raises:
+            UserNotFoundError:
+                If the user does not exist.
+            UserAlreadyDisabledError:
+                If the user is already disabled.
+            DatabaseError:
+                For unexpected database errors.
+        """
+
+        now = datetime.now().isoformat()
+
+        try:
+            with self._connect() as conn:
+                cursor = conn.execute(
+                    """
+                    SELECT
+                        id,
+                        is_active
+                    FROM users
+                    WHERE id = ?
+                    """,
+                    (user_id,)
+                )
+
+                row = cursor.fetchone()
+
+                if row is None:
+                    raise UserNotFoundError(
+                        f"User id={user_id} does not exist"
+                    )
+
+                if row["is_active"] == 0:
+                    raise UserAlreadyDisabledError(
+                        f"User id={user_id} is already disabled"
+                    )
+
+                conn.execute(
+                    """
+                    UPDATE users
+                    SET
+                        is_active = 0,
+                        updated_at = ?
+                    WHERE id = ?
+                    """,
+                    (now, user_id)
+                )
+                conn.commit()
+
+        except (UserNotFoundError, UserAlreadyDisabledError):
+            raise
+
+        except sqlite3.Error as e:
+            raise DatabaseError(
+                f"Database error disabling user id={user_id}"
+            ) from e
+
+    def user_disable_by_username(self, username: str) -> None:
+
+        now = datetime.now().isoformat()
+
+        try:
+            with self._connect() as conn:
+
+                cursor = conn.execute(
+                    """
+                    UPDATE users
+                    SET
+                        is_active = 0,
+                        updated_at = ?
+                    WHERE username = ?
+                    AND is_active = 1
+                    """,
+                    (
+                        now,
+                        username,
+                    )
+                )
+
+                if cursor.rowcount == 0:
+                    raise UserNotFoundError(
+                        f"User '{username}' does not exist "
+                        "or is already disabled"
+                    )
+
+                conn.commit()
+
+        except sqlite3.Error as e:
+            raise DatabaseError(
+                f"Database error disabling user '{username}'"
             ) from e

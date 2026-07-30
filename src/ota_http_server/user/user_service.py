@@ -19,6 +19,8 @@ class UserService:
 
         if command == "add":
             self.add_user()
+        elif command == "disable":
+            self.disable_user()
         else:
             logger.debug("Invalid user command received: %s",command)
 
@@ -36,3 +38,16 @@ class UserService:
 
         db_service: DatabaseService = self.cfg.config["db_service"]
         db_service.add_user(user)
+
+    def disable_user(self):
+        db_service: DatabaseService = self.cfg.config["db_service"]
+        user_id = self.cfg.config["parameters"]['user_id']
+        username = self.cfg.config['parameters']['disable_user_name']
+        if user_id is not None:
+            db_service.disable_user_by_id(user_id)
+        if username is not None:
+            db_service.disable_user_by_username(username)
+
+        raise ValueError(
+            "User id or username must be provided"
+        )
