@@ -177,7 +177,7 @@ class DatabaseSqliteService:
 
                 if row["is_active"] == 1:
                     raise UserAlreadyEnabledError(
-                        f"User id={user_id} is already Enabled"
+                        f"User id={user_id} is already enabled"
                     )
 
                 conn.execute(
