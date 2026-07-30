@@ -59,11 +59,19 @@ def run_app(cfg:Config) -> None:
         logger.info("Starting OTA Database CLI")
         # Add database CLI code here, e.g. using click or argparse for subcommands
         logger.verbose("config = %s",str(cfg.config))
-        db_service.db_command_handler()
-        logger.info("Exiting db CLI")
-
+        try:
+            db_service.db_command_handler()
+        except:
+            logger.error("%s", str(e))
+        finally:
+            logger.info("Exiting db CLI")
     elif cfg.config['command'] == 'user':
-        user_service.command_handler()
+        try:
+            user_service.command_handler()
+        except Exception as e:
+            logger.error("%s", str(e))
+        finally:
+            logger.info("Exiting user CLI")
     elif cfg.config['command'] == 'project':
         logger.verbose("command project, still not implemented")
     elif cfg.config['command'] == 'device':
