@@ -575,99 +575,27 @@ For use in development environment without SSL certificates and JWT authenticati
     # General options
     # -------------------
     general_group = parser.add_argument_group("General Options")
-    general_group.add_argument(
-        '--config',
-        type=str,
-        dest='config',
-        default='config.toml',
-        help="Name of the configuration file, default is 'config.toml'"
-    )
-    general_group.add_argument(
-        '--no-config',
-        action='store_const',
-        const='',
-        dest='config',
-        help="Do not use a configuration file (only defaults & options)"
-    )
-    general_group.add_argument(
-        '-v',
-        dest='version_option',
-        action='store_true',
-        default=False,
-        help='Show version information of the module'
-    )
+    general_group.add_argument('--config', type=str, dest='config', default='config.toml', help="Name of the configuration file, default is 'config.toml'" )
+    general_group.add_argument('--no-config', action='store_const', const='', dest='config', help="Do not use a configuration file (only defaults & options)")
+    general_group.add_argument('-v', dest='version_option', action='store_true', default=False, help='Show version information of the module')
 
     # -------------------
     # Logging options
     # -------------------
     logging_group = parser.add_argument_group("Logging Options")
-    logging_group.add_argument(
-        '--verbose',
-        type=int,
-        choices=[0, 1, 2, 3, 4, 5, 6],
-        dest='verbose',
-        help="Verbosity level: 0=CRITICAL, 1=ERROR, 2=WARNING, 3=QUIET, 4=INFO, 5=VERBOSE, 6=DEBUG. Default hardcoded is 3 or taken from config file/environment variable."
-    )
+    logging_group.add_argument('--verbose', type=int, choices=[0, 1, 2, 3, 4, 5, 6], dest='verbose', help="Verbosity level: 0=CRITICAL, 1=ERROR, 2=WARNING, 3=QUIET, 4=INFO, 5=VERBOSE, 6=DEBUG. Default hardcoded is 3 or taken from config file/environment variable.")
     prefix_group = logging_group.add_mutually_exclusive_group()
-    prefix_group.add_argument(
-        "--log-prefix",
-        action="store_const",
-        const=True,
-        dest="log_prefix",
-        help="Enable log prefixes (timestamp, module, level)"
-    )
-    prefix_group.add_argument(
-        "--no-log-prefix",
-        action="store_const",
-        const=False,
-        dest="log_prefix",
-        help="Disable log prefixes (print only the message)"
-    )
+    prefix_group.add_argument("--log-prefix", action="store_const", const=True, dest="log_prefix", help="Enable log prefixes (timestamp, module, level)")
+    prefix_group.add_argument("--no-log-prefix", action="store_const", const=False, dest="log_prefix", help="Disable log prefixes (print only the message)")
     color_group = logging_group.add_mutually_exclusive_group()
-    color_group.add_argument(
-        "--use-color",
-        action="store_const",
-        const=True,
-        dest="use_color",
-        help="Enable colored log output"
-    )
-    color_group.add_argument(
-        "--no-use-color",
-        action="store_const",
-        const=False,
-        dest="use_color",
-        help="Disable colored log output"
-    )
+    color_group.add_argument("--use-color", action="store_const", const=True, dest="use_color", help="Enable colored log output")
+    color_group.add_argument("--no-use-color", action="store_const", const=False, dest="use_color", help="Disable colored log output")
     string_handler_group = logging_group.add_mutually_exclusive_group()
-    string_handler_group.add_argument(
-        "--use-string-handler",
-        action="store_const",
-        const=True,
-        dest="use_string_handler",
-        help="Enable string handler to store logs in an internal buffer"
-    )
-    string_handler_group.add_argument(
-        "--no-use-string-handler",
-        action="store_const",
-        const=False,
-        dest="use_string_handler",
-        help="Disable string handler to store logs in an internal buffer"
-    )
+    string_handler_group.add_argument("--use-string-handler", action="store_const", const=True, dest="use_string_handler", help="Enable string handler to store logs in an internal buffer")
+    string_handler_group.add_argument("--no-use-string-handler", action="store_const", const=False, dest="use_string_handler", help="Disable string handler to store logs in an internal buffer")
     exception_group = logging_group.add_mutually_exclusive_group()
-    exception_group.add_argument(
-        "--exc-full-stack",
-        action="store_const",
-        const=True,
-        dest='exc_full_stack',
-        help="Enable full stack logging for exceptions (useful for development and debugging)"
-    )
-    exception_group.add_argument(
-        "--no-exc-full-stack",
-        action="store_const",
-        const=False,
-        dest='exc_full_stack',
-        help="Disable full stack logging for exceptions (useful for production)"
-    )
+    exception_group.add_argument("--exc-full-stack", action="store_const", const=True, dest='exc_full_stack', help="Enable full stack logging for exceptions (useful for development and debugging)")
+    exception_group.add_argument("--no-exc-full-stack", action="store_const", const=False, dest='exc_full_stack', help="Disable full stack logging for exceptions (useful for production)")
 
     # database options
     db_group = parser.add_argument_group("Database")
