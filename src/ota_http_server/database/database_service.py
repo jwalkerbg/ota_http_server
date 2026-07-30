@@ -24,7 +24,6 @@ class DatabaseService:
         db_command = self.cfg.config.get('db_command')
 
         if db_command == 'init-db':
-            db_file = self.cfg.config['database']['sqlite']['db_file']
             self.init_db()
         elif db_command == "migrate":
             self.migrate()
