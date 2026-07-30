@@ -25,10 +25,10 @@ class UserService:
             logger.debug("Invalid user command received: %s", command)
 
     def add_user(self):
-        username = self.cfg.config["parameters"]["add_user_name"]
-        password = self.cfg.config["parameters"]["add_user_password"]
-        email = self.cfg.config["parameters"]["add_user_email"]
-        role = self.cfg.config["parameters"]["add_user_role"]
+        username = self.cfg.config["parameters"]["user_name"]
+        password = self.cfg.config["parameters"]["user_password"]
+        email = self.cfg.config["parameters"]["user_email"]
+        role = self.cfg.config["parameters"]["user_role"]
 
         password_hash = Passwords.hash(password)
 
@@ -40,11 +40,13 @@ class UserService:
     def disable_user(self):
         db_service: DatabaseService = self.cfg.config["db_service"]
         user_id = self.cfg.config["parameters"]['user_id']
-        username = self.cfg.config['parameters']['disable_user_name']
+        username = self.cfg.config['parameters']['user_name']
         if user_id is not None:
             db_service.disable_user_by_id(user_id)
+            return
         if username is not None:
             db_service.disable_user_by_username(username)
+            return
 
         raise ValueError(
             "User id or username must be provided"
