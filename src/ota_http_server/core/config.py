@@ -80,6 +80,12 @@ class ConfigDict(TypedDict):
     parameters: ParametersConfig
     database: DatabaseConfig
 
+USER_ROLES = [
+    "admin",
+    "operator",
+    "viewer",
+]
+
 class Config:
     def __init__(self) -> None:
         self.config: ConfigDict = self.DEFAULT_CONFIG
@@ -122,7 +128,12 @@ class Config:
             'init_db_migrate': True,
             'migrate_dry_run': False,
             'trace_sql': False,
-            'rollback_all': False
+            'rollback_all': False,
+            'add_user_name': None,
+            'add_user_email': None,
+            'add_user_password': None,
+            'add_user_role': None
+
         },
         'database': {
             'dbtype': "sqlite",
@@ -248,6 +259,18 @@ class Config:
                     },
                     "rollback_all": {
                         "type": "boolean"
+                    },
+                    "add_user_name": {
+                        "type": "string"
+                    },
+                    "add_user_email": {
+                        "type": "string"
+                    },
+                    "add_user_password": {
+                        "type": "string"
+                    },
+                    "add_user_role": {
+                        "type": "string"
                     }
                 },
                 "additionalProperties": False
@@ -515,6 +538,20 @@ class Config:
                     if config_cli.rollback_all is not None:
                         self.config["parameters"]["rollback_all"] = config_cli.rollback_all
 
+            if config_cli.command == 'user':
+                if config_cli.user_command is not None:
+                    self.config['user_command'] = config_cli.user_command
+                # add
+                if config_cli.user_command == 'add':
+                    if config_cli.add_user_name is not None:
+                        self.config["parameters"]["add_user_name"] = config_cli.add_user_name
+                    if config_cli.add_user_email is not None:
+                        self.config["parameters"]["add_user_email"] = config_cli.add_user_email
+                    if config_cli.add_user_password is not None:
+                        self.config["parameters"]["add_user_password"] = config_cli.add_user_password
+                    if config_cli.add_user_role is not None:
+                        self.config["parameters"]["add_user_role"] = config_cli.add_user_role
+
         return self.config
 
 def parse_args() -> argparse.Namespace:
@@ -677,21 +714,33 @@ For use in development environment without SSL certificates and JWT authenticati
     rollback_parser = db_subparsers.add_parser("rollback", help="Execute rollback of the last or all migrations")
     rollback_parser.add_argument("--all", dest="rollback_all", action="store_const", const=True, help="Execute rollback of all migrations")
 
-    create_user_parser = db_subparsers.add_parser("create-user", help="Create a user")
-    create_user_parser.add_argument("--email", required=True)
+    # user
+    user_parser = subparsers.add_parser(name="user", help="Users manipulation operations")
+    user_subparsers = user_parser.add_subparsers(dest="user_command", required=True)
+    # user add
+    add_user_parser = user_subparsers.add_parser(name="add", help="Add new user")
+    add_user_parser.add_argument("--name", dest="add_user_name", type=str, required=True, help="Username of the new created user")
+    add_user_parser.add_argument("--email", dest="add_user_email", type=str, required=True, help="Email of the new created user")
+    add_user_parser.add_argument("--password", dest="add_user_password", type=str, required=True, help="Password of the new created user")
+    add_user_parser.add_argument("--role", dest="add_user_role", type=str, required=True, choices=USER_ROLES, help="Password of the new created user")
 
-    create_device_parser = db_subparsers.add_parser("create-device", help="Create a device")
-    create_device_parser.add_argument("--device-name", required=True)
-    create_device_parser.add_argument("--device-uuid", required=True)
+    # project
+    project_parser = subparsers.add_parser(name="project", help="Projects manipulation operations")
+    project_subparsers = project_parser.add_subparsers(dest="project_command", required=True)
+    # project add
+    add_project_parser = project_subparsers.add_parser(name="add", help="Add new project")
 
-    create_project_parser = db_subparsers.add_parser("create-project", help="Create a project")
-    create_project_parser.add_argument("--project-name", required=True)
-    create_project_parser.add_argument("--project-uuid", required=True)
-    create_project_parser.add_argument("--project-path", required=True, help="Path to the project directory containing firmware files")
+    # device
+    device_parser = subparsers.add_parser(name="device", help="Devices manipulation operations")
+    device_subparsers = device_parser.add_subparsers(dest="device_command", required=True)
+    # device add
+    add_device_parser = device_subparsers.add_parser(name="add", help="Add new device")
 
-    assign_parser = db_subparsers.add_parser("assign-device", help="Assign device to user")
-    assign_parser.add_argument("--user-id", required=True)
-    assign_parser.add_argument("--device-id", required=True)
+    # firmware
+    firmware_parser = subparsers.add_parser(name="firmware", help="Firmware manipulation operations", )
+    firmware_subparsers = firmware_parser.add_subparsers(dest="project_command", required=True)
+    # firmware add
+    add_firmware_parser = firmware_subparsers.add_parser(name="add", help="Add new firmware")
 
     return parser.parse_args()
 

@@ -6,6 +6,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 from ota_http_server.core.config import Config
 from ota_http_server.core.server import create_app
 from ota_http_server.database.database_service import DatabaseService
+from ota_http_server.user.user_service import UserService
 from ota_http_server.logger import get_app_logger
 from ota_http_server.core.data_models import AppPaths
 
@@ -19,6 +20,10 @@ def run_app(cfg:Config) -> None:
     app_paths = AppPaths(cfg)
     # store app_paths in the configuration so as to access it elsewhere
     cfg.config['parameters']['app_paths'] = app_paths
+    db_service = DatabaseService(cfg)
+    cfg.config["db_service"] = db_service
+    user_service = UserService(cfg)
+    cfg.config["user_service"] = user_service
 
     if cfg.config['command'] == 'runserver':
         try:
@@ -54,10 +59,17 @@ def run_app(cfg:Config) -> None:
         logger.info("Starting OTA Database CLI")
         # Add database CLI code here, e.g. using click or argparse for subcommands
         logger.verbose("config = %s",str(cfg.config))
-        db_service = DatabaseService(cfg)
         db_service.db_command_handler()
         logger.info("Exiting db CLI")
 
+    elif cfg.config['command'] == 'user':
+        user_service.command_handler()
+    elif cfg.config['command'] == 'project':
+        logger.verbose("command project, still not implemented")
+    elif cfg.config['command'] == 'device':
+        logger.verbose("command device, still not implemented")
+    elif cfg.config['command'] == 'firmware':
+        logger.verbose("command firmware, still not implemented")
     else:
         logger.warning("Unknown command '%s' specified, no action taken", cfg.config['command'])
 

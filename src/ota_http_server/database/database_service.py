@@ -1,10 +1,8 @@
 # core/db.py
 
-import traceback
-from typing import Protocol
-
 from ota_http_server.core.config import Config
 from ota_http_server.database.database_interface import DatabaseInterface
+from ota_http_server.core.data_models import User, Project, Device, Firmware
 from ota_http_server.logger import get_app_logger
 
 logger = get_app_logger(__name__)
@@ -41,3 +39,6 @@ class DatabaseService:
 
     def rollback(self) -> None:
         self._database.rollback()
+
+    def add_user(self, user: User) -> User:
+        return self._database.add_user(user)

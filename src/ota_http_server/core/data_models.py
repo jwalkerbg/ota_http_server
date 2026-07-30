@@ -21,6 +21,7 @@ class User:
     id: Optional[int]   # the database primary key. It is None before the object is inserted into SQLite.
     username: str       # should be unique in the database.
     password_hash: str  # store only a hash (for example bcrypt or Argon2), never the plaintext password.
+    email: str          # email of the user
     role: str           # allows role-based access control later (admin, operator, viewer).
     is_active: bool     # lets you disable a user account without deleting its audit history.
     created_at: Optional[datetime]
