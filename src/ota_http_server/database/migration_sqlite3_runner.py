@@ -24,7 +24,9 @@ class MigrationRunner:
     def _connect(self):
         conn = sqlite3.connect(self.app_paths.database_sqlite)
         conn.execute("PRAGMA foreign_keys = ON;")
-        return conn
+        if  self.cfg.config["parameters"]["trace_sql"]:
+            conn.set_trace_callback(lambda sql: logger.debug("SQL: %s", sql))
+            return conn
 
     def _init_schema_table(self, conn):
         conn.execute("""
@@ -53,10 +55,6 @@ class MigrationRunner:
             if not self.cfg.config["parameters"]["init_db_migrate"]:
                 return
 
-            if  self.cfg.config["parameters"]["trace_sql"]:
-                conn.set_trace_callback(
-                    lambda sql: logger.debug("SQL: %s", sql)
-                )
             overall_start = time.perf_counter()
             current_version = self._get_current_version(conn)
             logger.verbose(f"Current database version = %d",current_version)
