@@ -54,6 +54,10 @@ class ParametersConfig(TypedDict, total=False):
     migrate_dry_run: bool
     trace_sql: bool
     rollback_all: bool
+    add_user_name: str
+    add_user_email: str
+    add_user_password: str
+    add_user_role: str
 
 class DatabaseMySQLConfig(TypedDict, total=False):
     dbhost: str
