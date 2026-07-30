@@ -38,6 +38,7 @@ class DatabaseSqliteService:
         conn.execute("PRAGMA foreign_keys = ON;")
         if self.cfg.config["parameters"]["trace_sql"]:
             conn.set_trace_callback(lambda sql: logger.debug("SQL: %s", sql))
+        conn.row_factory = sqlite3.Row
         return conn
 
     def init_db(self):
