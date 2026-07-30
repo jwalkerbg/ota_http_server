@@ -18,6 +18,9 @@ class UserHasProjectsError(Exception):
 class UserNotFoundError(Exception):
     pass
 
+class UserAlreadyEnabledError(Exception):
+    pass
+
 class UserAlreadyDisabledError(Exception):
     pass
 
@@ -129,6 +132,108 @@ class DatabaseSqliteService:
                 f"Database error while adding user '{user.username}'"
             ) from e
 
+    def user_enable_by_id(self, user_id: int) -> None:
+        """
+        Enable a user account.
+
+        Only the active state is changed.
+
+        Args:
+            user_id: Database id of the user.
+
+        Returns:
+            Updated User object.
+
+        Raises:
+            UserNotFoundError:
+                If the user does not exist.
+            UserAlreadyEnabledError:
+                If the user is already enabled.
+            DatabaseError:
+                For unexpected database errors.
+        """
+
+        now = datetime.now().isoformat()
+
+        try:
+            with self._connect() as conn:
+                cursor = conn.execute(
+                    """
+                    SELECT
+                        id,
+                        is_active
+                    FROM users
+                    WHERE id = ?
+                    """,
+                    (user_id,)
+                )
+
+                row = cursor.fetchone()
+
+                if row is None:
+                    raise UserNotFoundError(
+                        f"User id={user_id} does not exist"
+                    )
+
+                if row["is_active"] == 1:
+                    raise UserAlreadyEnabledError(
+                        f"User id={user_id} is already Enabled"
+                    )
+
+                conn.execute(
+                    """
+                    UPDATE users
+                    SET
+                        is_active = 1,
+                        updated_at = ?
+                    WHERE id = ?
+                    """,
+                    (now, user_id)
+                )
+                conn.commit()
+
+        except (UserNotFoundError, UserAlreadyEnabledError):
+            raise
+
+        except sqlite3.Error as e:
+            raise DatabaseError(
+                f"Database error enabling user id={user_id}"
+            ) from e
+
+    def user_enable_by_username(self, username: str) -> None:
+
+        now = datetime.now().isoformat()
+
+        try:
+            with self._connect() as conn:
+
+                cursor = conn.execute(
+                    """
+                    UPDATE users
+                    SET
+                        is_active = 1,
+                        updated_at = ?
+                    WHERE username = ?
+                    AND is_active = 0
+                    """,
+                    (
+                        now,
+                        username,
+                    )
+                )
+
+                if cursor.rowcount == 0:
+                    raise UserNotFoundError(
+                        f"User '{username}' does not exist "
+                        "or is already enabled"
+                    )
+
+                conn.commit()
+
+        except sqlite3.Error as e:
+            raise DatabaseError(
+                f"Database error enabling user '{username}'"
+            ) from e
 
     def user_disable_by_id(self, user_id: int) -> None:
         """

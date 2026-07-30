@@ -560,6 +560,12 @@ class Config:
                         self.config["parameters"]["user_email"] = config_cli.user_email
                     if config_cli.user_role is not None:
                         self.config["parameters"]["user_role"] = config_cli.user_role
+                # enable
+                if config_cli.user_command == 'enable':
+                    if config_cli.user_id is not None:
+                        self.config["parameters"]["user_id"] = config_cli.user_id
+                    if config_cli.user_name is not None:
+                        self.config["parameters"]["user_name"] = config_cli.user_name
                 # disable
                 if config_cli.user_command == 'disable':
                     logger.debug("config_cli.user_id = %u", config_cli.user_id)
@@ -737,6 +743,10 @@ For use in development environment without SSL certificates and JWT authenticati
     add_user_parser.add_argument("--password", dest="user_password", type=str, required=True, help="Password of the new created user")
     add_user_parser.add_argument("--email", dest="user_email", type=str, required=True, help="Email of the new created user")
     add_user_parser.add_argument("--role", dest="user_role", type=str, required=True, choices=USER_ROLES, help="Password of the new created user")
+    # user enable
+    disable_user_parser = user_subparsers.add_parser(name="enable", help="Enable user")
+    disable_user_parser.add_argument("--user-id", dest="user_id", type=int, required=False, help="ID of the user to be enabled")
+    disable_user_parser.add_argument("--username", dest="user_name", type=str, required=False, help="Username of the user to be enabled. Give --id or --name. --id takes precedence")
     # user disable
     disable_user_parser = user_subparsers.add_parser(name="disable", help="Disable user")
     disable_user_parser.add_argument("--user-id", dest="user_id", type=int, required=False, help="ID of the user to be disabled")

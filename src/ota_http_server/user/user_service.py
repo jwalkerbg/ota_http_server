@@ -19,6 +19,8 @@ class UserService:
 
         if command == "add":
             self.add_user()
+        elif command == "enable":
+            self.enable_user()
         elif command == "disable":
             self.disable_user()
         else:
@@ -36,6 +38,21 @@ class UserService:
 
         db_service: DatabaseService = self.cfg.config["db_service"]
         db_service.add_user(user)
+
+    def enable_user(self):
+        db_service: DatabaseService = self.cfg.config["db_service"]
+        user_id = self.cfg.config["parameters"]['user_id']
+        username = self.cfg.config['parameters']['user_name']
+        if user_id is not None:
+            db_service.enable_user_by_id(user_id)
+            return
+        if username is not None:
+            db_service.enable_user_by_username(username)
+            return
+
+        raise ValueError(
+            "User id or username must be provided"
+        )
 
     def disable_user(self):
         db_service: DatabaseService = self.cfg.config["db_service"]
