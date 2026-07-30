@@ -22,7 +22,7 @@ class UserService:
         elif command == "disable":
             self.disable_user()
         else:
-            logger.debug("Invalid user command received: %s",command)
+            logger.debug("Invalid user command received: %s", command)
 
     def add_user(self):
         username = self.cfg.config["parameters"]["add_user_name"]
@@ -31,8 +31,6 @@ class UserService:
         role = self.cfg.config["parameters"]["add_user_role"]
 
         password_hash = Passwords.hash(password)
-
-        logger.verbose("username = %s, password = %s, email = %s, role = %s, password_hash = %s",username, password, email, role, password_hash)
 
         user = User(id=None, username=username, password_hash=password_hash, email=email, role=role, is_active=True, created_at=None, updated_at=None)
 
