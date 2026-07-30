@@ -568,7 +568,6 @@ class Config:
                         self.config["parameters"]["user_name"] = config_cli.user_name
                 # disable
                 if config_cli.user_command == 'disable':
-                    logger.debug("config_cli.user_id = %u", config_cli.user_id)
                     if config_cli.user_id is not None:
                         self.config["parameters"]["user_id"] = config_cli.user_id
                     if config_cli.user_name is not None:
