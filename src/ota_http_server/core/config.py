@@ -55,7 +55,7 @@ class ParametersConfig(TypedDict, total=False):
     trace_sql: bool
     rollback_all: bool
     user_id: int
-    user_name: str
+    username: str
     user_password: str
     user_email: str
     user_role: str
@@ -135,7 +135,7 @@ class Config:
             'trace_sql': False,
             'rollback_all': False,
             'user_id': None,
-            'user_name': None,
+            'username': None,
             'user_password': None,
             'user_email': None,
             'user_role': None
@@ -269,7 +269,7 @@ class Config:
                     "user_id": {
                         "type": "number"
                     },
-                    "user_name": {
+                    "username": {
                         "type": "string"
                     },
                     "user_password": {
@@ -552,8 +552,8 @@ class Config:
                     self.config['user_command'] = config_cli.user_command
                 # add
                 if config_cli.user_command == 'add':
-                    if config_cli.user_name is not None:
-                        self.config["parameters"]["user_name"] = config_cli.user_name
+                    if config_cli.username is not None:
+                        self.config["parameters"]["username"] = config_cli.username
                     if config_cli.user_password is not None:
                         self.config["parameters"]["user_password"] = config_cli.user_password
                     if config_cli.user_email is not None:
@@ -564,14 +564,14 @@ class Config:
                 if config_cli.user_command == 'enable':
                     if config_cli.user_id is not None:
                         self.config["parameters"]["user_id"] = config_cli.user_id
-                    if config_cli.user_name is not None:
-                        self.config["parameters"]["user_name"] = config_cli.user_name
+                    if config_cli.username is not None:
+                        self.config["parameters"]["username"] = config_cli.username
                 # disable
                 if config_cli.user_command == 'disable':
                     if config_cli.user_id is not None:
                         self.config["parameters"]["user_id"] = config_cli.user_id
-                    if config_cli.user_name is not None:
-                        self.config["parameters"]["user_name"] = config_cli.user_name
+                    if config_cli.username is not None:
+                        self.config["parameters"]["username"] = config_cli.username
 
         return self.config
 
@@ -738,18 +738,18 @@ For use in development environment without SSL certificates and JWT authenticati
     user_subparsers = user_parser.add_subparsers(dest="user_command", required=True)
     # user add
     add_user_parser = user_subparsers.add_parser(name="add", help="Add new user")
-    add_user_parser.add_argument("--name", dest="user_name", type=str, required=True, help="Username of the new created user")
+    add_user_parser.add_argument("--name", dest="username", type=str, required=True, help="Username of the new created user")
     add_user_parser.add_argument("--password", dest="user_password", type=str, required=True, help="Password of the new created user")
     add_user_parser.add_argument("--email", dest="user_email", type=str, required=True, help="Email of the new created user")
     add_user_parser.add_argument("--role", dest="user_role", type=str, required=True, choices=USER_ROLES, help="Password of the new created user")
     # user enable
     disable_user_parser = user_subparsers.add_parser(name="enable", help="Enable user")
     disable_user_parser.add_argument("--user-id", dest="user_id", type=int, required=False, help="ID of the user to be enabled")
-    disable_user_parser.add_argument("--username", dest="user_name", type=str, required=False, help="Username of the user to be enabled. Give --id or --name. --id takes precedence")
+    disable_user_parser.add_argument("--username", dest="username", type=str, required=False, help="Username of the user to be enabled. Give --id or --name. --id takes precedence")
     # user disable
     disable_user_parser = user_subparsers.add_parser(name="disable", help="Disable user")
     disable_user_parser.add_argument("--user-id", dest="user_id", type=int, required=False, help="ID of the user to be disabled")
-    disable_user_parser.add_argument("--username", dest="user_name", type=str, required=False, help="Username of the user to be disabled. Give --id or --name. --id takes precedence")
+    disable_user_parser.add_argument("--username", dest="username", type=str, required=False, help="Username of the user to be disabled. Give --id or --name. --id takes precedence")
 
     # project
     project_parser = subparsers.add_parser(name="project", help="Projects manipulation operations")
