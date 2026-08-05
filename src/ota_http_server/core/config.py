@@ -751,7 +751,7 @@ For use in development environment without SSL certificates and JWT authenticati
     # user enable
     disable_user_parser = user_subparsers.add_parser(name="enable", help="Enable user")
     disable_user_parser.add_argument("--user-id", dest="user_id", type=int, required=False, help="ID of the user to be enabled")
-    disable_user_parser.add_argument("--username", dest="username", type=str, required=False, help="Username of the user to be enabled. Give --id or --name. --id takes precedence")
+    disable_user_parser.add_argument("--username", dest="username", type=str, required=False, help="Username of the user to be enabled. Give --user-id or --username. --user-id takes precedence")
     # user disable
     disable_user_parser = user_subparsers.add_parser(name="disable", help="Disable user")
     disable_user_parser.add_argument("--user-id", dest="user_id", type=int, required=False, help="ID of the user to be disabled")
