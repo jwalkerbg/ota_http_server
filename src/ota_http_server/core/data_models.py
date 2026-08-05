@@ -70,6 +70,33 @@ class Project:
     created_at: Optional[datetime]
     updated_at: Optional[datetime]  # Audit information
 
+    def __str__(self) -> str:
+        status = "active" if self.is_active else "disabled"
+
+        created_at = (
+            self.created_at.strftime("%Y-%m-%d %H:%M:%S")
+            if self.created_at
+            else "-"
+        )
+
+        updated_at = (
+            self.updated_at.strftime("%Y-%m-%d %H:%M:%S")
+            if self.updated_at
+            else "-"
+        )
+
+        return (
+            f"Project("
+            f"ID:{self.id}, "
+            f"name:{self.name}, "
+            f"display_name:{self.display_name}, "
+            f"description:{self.description}, "
+            f"status:{status}, "
+            f"created_at:{created_at}, "
+            f"updated_at:{updated_at}"
+            f")"
+        )
+
 @dataclass
 class Device:
     id: Optional[int]   # the database primary key. It is None before the object is inserted into SQLite.
@@ -83,6 +110,42 @@ class Device:
     created_at: Optional[datetime]
     updated_at: Optional[datetime]  # Audit information
 
+    def __str__(self) -> str:
+        status = "active" if self.is_active else "disabled"
+
+        last_seen = (
+            self.last_seen.strftime("%Y-%m-%d %H:%M:%S")
+            if self.last_seen
+            else "-"
+        )
+
+        created_at = (
+            self.created_at.strftime("%Y-%m-%d %H:%M:%S")
+            if self.created_at
+            else "-"
+        )
+
+        updated_at = (
+            self.updated_at.strftime("%Y-%m-%d %H:%M:%S")
+            if self.updated_at
+            else "-"
+        )
+
+        return (
+            f"Device("
+            f"ID:{self.id}, "
+            f"device_id:{self.device_id}, "
+            f"project_id:{self.project_id}, "
+            f"model:{self.model}, "
+            f"serial_number:{self.serial_number}, "
+            f"current_version:{self.current_version}, "
+            f"last_seen:{last_seen}, "
+            f"is_active:{self.is_active}, "
+            f"created_at:{created_at}, "
+            f"updated_at:{updated_at}"
+            f")"
+        )
+
 @dataclass
 class Firmware:
     id: Optional[int]   # the database primary key. It is None before the object is inserted into SQLite.
@@ -95,6 +158,33 @@ class Firmware:
     channel: str        # stable, beta, dev (*)this an example)
     created_at: Optional[datetime]
     updated_at: Optional[datetime]  # Audit information
+
+    def __str__(self) -> str:
+        created_at = (
+            self.created_at.strftime("%Y-%m-%d %H:%M:%S")
+            if self.created_at
+            else "-"
+        )
+
+        updated_at = (
+            self.updated_at.strftime("%Y-%m-%d %H:%M:%S")
+            if self.updated_at
+            else "-"
+        )
+
+        return(
+            f"Firmware("
+            f"ID:{self.id}, "
+            "version:{self.version}, "
+            f"filename:{self.filename}, "
+            f"file_size:{self.file_size}, "
+            f"checksum:{self.checksum}, "
+            f"release_notes:{self.release_notes}, "
+            f"channel:{self.channel}, "
+            f"created_at:{created_at}, "
+            f"updated_at:{updated_at}"
+            f")"
+        )
 
 class AppPaths:
     def __init__(self, cfg: Config):
