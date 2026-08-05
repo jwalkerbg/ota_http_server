@@ -48,14 +48,14 @@ class User:
             else "-"
         )
         return (
-            f"(User("
-            f"{self.id}, "
-            f"{self.username}, "
-            f"{self.email}, "
-            f"{self.role}, "
-            f"{status}, "
-            f"{created_at}, "
-            f"{updated_at}"
+            f"User("
+            f"ID:{self.id}, "
+            f"username:{self.username}, "
+            f"email:{self.email}, "
+            f"role:{self.role}, "
+            f"status:{status}, "
+            f"created_at:{created_at}, "
+            f"updated_at:{updated_at}"
             f")"
         )
 
