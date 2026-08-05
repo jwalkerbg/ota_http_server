@@ -53,3 +53,9 @@ class DatabaseService:
 
     def disable_user_by_username(self, username: str) -> None:
         self._database.user_disable_by_username(username)
+
+    def user_get_by_id(self, user_id: int) -> User | None:
+        return self._database.user_get_by_id(user_id)
+
+    def user_get_by_username(self, username: str) -> User | None:
+        return self._database.user_get_by_username(username)

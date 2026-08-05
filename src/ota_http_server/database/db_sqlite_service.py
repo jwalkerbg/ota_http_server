@@ -338,3 +338,86 @@ class DatabaseSqliteService:
             raise DatabaseError(
                 f"Database error disabling user '{username}'"
             ) from e
+
+    def _row_to_user(self, row: sqlite3.Row) -> User:
+        return User(
+            id=row["id"],
+            username=row["username"],
+            password_hash=row["password_hash"],
+            email=row["email"],
+            role=row["role"],
+            is_active=bool(row["is_active"]),
+            created_at=datetime.fromisoformat(row["created_at"])
+                if row["created_at"] else None,
+            updated_at=datetime.fromisoformat(row["updated_at"])
+                if row["updated_at"] else None,
+        )
+
+    def user_get_by_id(self, user_id: int) -> User | None:
+
+        try:
+            with self._connect() as conn:
+
+                cursor = conn.execute(
+                    """
+                    SELECT
+                        id,
+                        username,
+                        password_hash,
+                        email,
+                        role,
+                        is_active,
+                        created_at,
+                        updated_at
+                    FROM users
+                    WHERE id = ?
+                    """,
+                    (user_id,)
+                )
+
+                row = cursor.fetchone()
+
+                if row is None:
+                    return None
+
+                return self._row_to_user(row)
+
+        except sqlite3.Error as e:
+            raise DatabaseError(
+                f"Database error retrieving user id={user_id}"
+            ) from e
+
+    def user_get_by_username(self, username: str) -> User | None:
+
+        try:
+            with self._connect() as conn:
+
+                cursor = conn.execute(
+                    """
+                    SELECT
+                        id,
+                        username,
+                        password_hash,
+                        email,
+                        role,
+                        is_active,
+                        created_at,
+                        updated_at
+                    FROM users
+                    WHERE username = ?
+                    """,
+                    (username,)
+                )
+
+                row = cursor.fetchone()
+
+                if row is None:
+                    return None
+
+                return self._row_to_user(row)
+
+        except sqlite3.Error as e:
+            raise DatabaseError(
+                f"Database error retrieving user '{username}'"
+            ) from e
+

@@ -572,6 +572,12 @@ class Config:
                         self.config["parameters"]["user_id"] = config_cli.user_id
                     if config_cli.username is not None:
                         self.config["parameters"]["username"] = config_cli.username
+                # get
+                if config_cli.user_command == 'get':
+                    if config_cli.user_id is not None:
+                        self.config["parameters"]["user_id"] = config_cli.user_id
+                    if config_cli.username is not None:
+                        self.config["parameters"]["username"] = config_cli.username
 
         return self.config
 
@@ -749,7 +755,11 @@ For use in development environment without SSL certificates and JWT authenticati
     # user disable
     disable_user_parser = user_subparsers.add_parser(name="disable", help="Disable user")
     disable_user_parser.add_argument("--user-id", dest="user_id", type=int, required=False, help="ID of the user to be disabled")
-    disable_user_parser.add_argument("--username", dest="username", type=str, required=False, help="Username of the user to be disabled. Give --id or --name. --id takes precedence")
+    disable_user_parser.add_argument("--username", dest="username", type=str, required=False, help="Username of the user to be disabled. Give --user-id or --username. --user-id takes precedence")
+    # user get
+    get_user_parser = user_subparsers.add_parser(name="get", help="Get user information")
+    get_user_parser.add_argument("--user-id", dest="user_id", type=int, required=False, help="ID of the user to be retrieved")
+    get_user_parser.add_argument("--username", dest="username", type=str, required=False, help="Username of the user to be retrieved. Give --user-id or --username. --user-id takes precedence")
 
     # project
     project_parser = subparsers.add_parser(name="project", help="Projects manipulation operations")

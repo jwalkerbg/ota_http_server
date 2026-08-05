@@ -23,6 +23,12 @@ class UserService:
             self.enable_user()
         elif command == "disable":
             self.disable_user()
+        elif command == "get":
+            user = self.get_user()
+            if user is not None:
+                logger.info("User found: %s", user)
+            else:
+                logger.info("User not found.")
         else:
             logger.debug("Invalid user command received: %s", command)
 
@@ -65,6 +71,18 @@ class UserService:
             db_service.disable_user_by_username(username)
             return
 
+        raise ValueError(
+            "User id or username must be provided"
+        )
+
+    def get_user(self) -> User | None:
+        db_service: DatabaseService = self.cfg.config["db_service"]
+        user_id = self.cfg.config["parameters"]['user_id']
+        username = self.cfg.config['parameters']['username']
+        if user_id is not None:
+            return db_service.user_get_by_id(user_id)
+        if username is not None:
+            return db_service.user_get_by_username(username)
         raise ValueError(
             "User id or username must be provided"
         )
