@@ -33,6 +33,29 @@ class User:
     created_at: Optional[datetime]
     updated_at: Optional[datetime]  # useful for auditing and future administration features.
 
+    def __str__(self) -> str:
+        status = "active" if self.is_active else "disabled"
+
+        created_at = (
+            self.created_at.strftime("%Y-%m-%d %H:%M:%S")
+            if self.created_at
+            else "-"
+        )
+
+        updated_at = (
+            self.updated_at.strftime("%Y-%m-%d %H:%M:%S")
+            if self.updated_at
+            else "-"
+        )
+        return (
+            f"{self.id:<5}"
+            f"{self.username:<20}"
+            f"{self.email:<30}"
+            f"{self.role:<12}"
+            f"{status:<10}"
+            f"{created_at:<22}"
+            f"{updated_at:<22}")
+
 @dataclass
 class Project:
     id: Optional[int]   # the database primary key. It is None before the object is inserted into SQLite.

@@ -59,3 +59,6 @@ class DatabaseService:
 
     def user_get_by_username(self, username: str) -> User | None:
         return self._database.user_get_by_username(username)
+
+    def user_get_list(self) -> list[User]:
+        return self._database.user_get_list()

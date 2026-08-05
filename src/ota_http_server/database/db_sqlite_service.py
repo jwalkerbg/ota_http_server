@@ -421,3 +421,41 @@ class DatabaseSqliteService:
                 f"Database error retrieving user '{username}'"
             ) from e
 
+    def user_get_list(self) -> list[User]:
+        """
+        Get all users from database.
+
+        Returns:
+            List of User objects. Empty list if no users exist.
+        """
+
+        try:
+            with self._connect() as conn:
+
+                cursor = conn.execute(
+                    """
+                    SELECT
+                        id,
+                        username,
+                        password_hash,
+                        email,
+                        role,
+                        is_active,
+                        created_at,
+                        updated_at
+                    FROM users
+                    ORDER BY username
+                    """
+                )
+
+                rows = cursor.fetchall()
+
+                return [
+                    self._row_to_user(row)
+                    for row in rows
+                ]
+
+        except sqlite3.Error as e:
+            raise DatabaseError(
+                "Database error retrieving users"
+            ) from e

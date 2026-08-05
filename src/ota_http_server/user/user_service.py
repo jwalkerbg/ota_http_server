@@ -23,7 +23,8 @@ class UserService:
             "add": self.add_user,
             "enable": self.enable_user,
             "disable": self.disable_user,
-            "get": self.get_user
+            "get": self.get_user,
+            "list": self.list_users
         }
 
         handler = handlers.get(command)
@@ -91,6 +92,27 @@ class UserService:
             logger.verbose("User found: %s", user)
         else:
             logger.verbose("User not found")
+
+    def list_users(self) -> None:
+        db_service: DatabaseService = self.cfg.config["db_service"]
+        users = db_service.user_get_list()
+        if users:
+            header = (
+                f"{'ID':<5}"
+                f"{'Username':<20}"
+                f"{'Email':<30}"
+                f"{'Role':<12}"
+                f"{'Status':<10}"
+                f"{'Created At':<22}"
+                f"{'Updated At':<22}"
+            )
+            separator = "-" * len(header)
+            logger.verbose(header)
+            logger.verbose(separator)
+            for user in users:
+                logger.verbose("%s", user)
+        else:
+            logger.verbose("No users found")
 
     # REST API methods for user operations can be added here, e.g., create_user, get_user, update_user, delete_user, etc.
 
