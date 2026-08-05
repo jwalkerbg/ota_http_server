@@ -7,6 +7,7 @@ from ota_http_server.core.config import Config
 from ota_http_server.core.server import create_app
 from ota_http_server.database.database_service import DatabaseService
 from ota_http_server.user.user_service import UserService
+from ota_http_server.project.project_service import ProjectService
 from ota_http_server.logger import get_app_logger
 from ota_http_server.core.data_models import AppPaths
 
@@ -24,6 +25,8 @@ def run_app(cfg:Config) -> None:
     cfg.config["db_service"] = db_service
     user_service = UserService(cfg)
     cfg.config["user_service"] = user_service
+    project_service = ProjectService(cfg)
+    cfg.config["project_service"] = project_service
 
     if cfg.config['command'] == 'runserver':
         try:
@@ -73,7 +76,12 @@ def run_app(cfg:Config) -> None:
         finally:
             logger.info("Exiting user CLI")
     elif cfg.config['command'] == 'project':
-        logger.verbose("command project, still not implemented")
+        try:
+            project_service.command_handler()
+        except Exception as e:
+            logger.error("%s", str(e), exc_info=cfg.config['logging']['exc_full_stack'])
+        finally:
+            logger.info("Exiting project CLI")
     elif cfg.config['command'] == 'device':
         logger.verbose("command device, still not implemented")
     elif cfg.config['command'] == 'firmware':
