@@ -13,26 +13,26 @@ class UserService:
     def __init__(self, cfg: Config):
         self.cfg = cfg
 
-    def command_handler(self):
+    # CLI command handler for user operations
+
+    def command_handler(self) -> None:
         logger.info("Handling database command: %s", self.cfg.config.get('user_command'))
         command = self.cfg.config.get('user_command')
 
-        if command == "add":
-            self.add_user()
-        elif command == "enable":
-            self.enable_user()
-        elif command == "disable":
-            self.disable_user()
-        elif command == "get":
-            user = self.get_user()
-            if user is not None:
-                logger.info("User found: %s", user)
-            else:
-                logger.info("User not found.")
+        handlers= {
+            "add": self.add_user,
+            "enable": self.enable_user,
+            "disable": self.disable_user,
+            "get": self.get_user
+        }
+
+        handler = handlers.get(command)
+        if handler is not None:
+            handler()
         else:
             logger.debug("Invalid user command received: %s", command)
 
-    def add_user(self):
+    def add_user(self) -> None:
         username = self.cfg.config["parameters"]["username"]
         password = self.cfg.config["parameters"]["user_password"]
         email = self.cfg.config["parameters"]["user_email"]
@@ -45,7 +45,7 @@ class UserService:
         db_service: DatabaseService = self.cfg.config["db_service"]
         db_service.add_user(user)
 
-    def enable_user(self):
+    def enable_user(self) -> None:
         db_service: DatabaseService = self.cfg.config["db_service"]
         user_id = self.cfg.config["parameters"]['user_id']
         username = self.cfg.config['parameters']['username']
@@ -60,7 +60,7 @@ class UserService:
             "User id or username must be provided"
         )
 
-    def disable_user(self):
+    def disable_user(self) -> None:
         db_service: DatabaseService = self.cfg.config["db_service"]
         user_id = self.cfg.config["parameters"]['user_id']
         username = self.cfg.config['parameters']['username']
@@ -75,14 +75,20 @@ class UserService:
             "User id or username must be provided"
         )
 
-    def get_user(self) -> User | None:
+    def get_user(self) -> None:
         db_service: DatabaseService = self.cfg.config["db_service"]
         user_id = self.cfg.config["parameters"]['user_id']
         username = self.cfg.config['parameters']['username']
         if user_id is not None:
-            return db_service.user_get_by_id(user_id)
-        if username is not None:
-            return db_service.user_get_by_username(username)
-        raise ValueError(
-            "User id or username must be provided"
-        )
+            user = db_service.user_get_by_id(user_id)
+        elif username is not None:
+            user = db_service.user_get_by_username(username)
+        else:
+            raise ValueError(
+                "User id or username must be provided"
+            )
+        if user is not None:
+            logger.verbose("User found: %s", user)
+        else:
+            logger.verbose("User not found")
+
