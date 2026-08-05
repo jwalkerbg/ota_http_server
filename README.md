@@ -454,9 +454,9 @@ Field | Description
 Internally, the server uses:
 
 ```python
-    def generate_ota_jwt(device_id:str, project:str, current_fw:str="1.0.0", expires_seconds:int=jwt_expiry) -> tuple[str, Dict[str, Any]]:
+    def create_device_token(device_id:str, project:str, current_fw:str="1.0.0", expires_seconds:int=jwt_expiry) -> tuple[str, Dict[str, Any]]:
         """Generate a timezone-aware JWT for OTA clients (devices)."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         payload = {
             "aud": "ota_api",
             "exp": int((now + timedelta(seconds=expires_seconds)).timestamp()),
