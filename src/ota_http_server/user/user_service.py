@@ -1,7 +1,6 @@
 # user_service.py
 
 from ota_http_server.core.config import Config
-from ota_http_server.user.user_interface import UserInterface
 from ota_http_server.core.passwords import Passwords
 from ota_http_server.core.data_models import User
 from ota_http_server.core.formatters import UserFormatter
@@ -17,9 +16,10 @@ class UserService:
     # CLI command handler for user operations
 
     def command_handler(self) -> None:
-        logger.info("Handling database command: %s", self.cfg.config.get('user_command'))
         command = self.cfg.config.get('user_command')
+        logger.info("Handling user command: %s", command)
 
+        # these handlers expect their parameters in self.cfg.config
         handlers= {
             "add": self._add_user,
             "enable": self._enable_user,
