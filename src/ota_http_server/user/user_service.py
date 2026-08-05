@@ -92,3 +92,6 @@ class UserService:
         else:
             logger.verbose("User not found")
 
+    # REST API methods for user operations can be added here, e.g., create_user, get_user, update_user, delete_user, etc.
+
+    # placeholder for future REST API methods
