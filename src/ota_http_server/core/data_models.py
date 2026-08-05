@@ -17,6 +17,12 @@ class TokenResult:
     payload: Dict[str, Any]
 
 @dataclass
+class CommandResult:
+    success: bool
+    message: str
+    data: Any = None
+
+@dataclass
 class User:
     id: Optional[int]   # the database primary key. It is None before the object is inserted into SQLite.
     username: str       # should be unique in the database.
