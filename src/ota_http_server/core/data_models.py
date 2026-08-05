@@ -48,13 +48,16 @@ class User:
             else "-"
         )
         return (
-            f"{self.id:<5}"
-            f"{self.username:<20}"
-            f"{self.email:<30}"
-            f"{self.role:<12}"
-            f"{status:<10}"
-            f"{created_at:<22}"
-            f"{updated_at:<22}")
+            f"(User("
+            f"{self.id}, "
+            f"{self.username}, "
+            f"{self.email}, "
+            f"{self.role}, "
+            f"{status}, "
+            f"{created_at}, "
+            f"{updated_at}"
+            f")"
+        )
 
 @dataclass
 class Project:

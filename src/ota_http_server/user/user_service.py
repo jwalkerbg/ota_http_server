@@ -4,6 +4,7 @@ from ota_http_server.core.config import Config
 from ota_http_server.user.user_interface import UserInterface
 from ota_http_server.core.passwords import Passwords
 from ota_http_server.core.data_models import User
+from ota_http_server.core.formatters import UserFormatter
 from ota_http_server.database.database_service import DatabaseService
 from ota_http_server.logger import get_app_logger
 
@@ -97,20 +98,10 @@ class UserService:
         db_service: DatabaseService = self.cfg.config["db_service"]
         users = db_service.user_get_list()
         if users:
-            header = (
-                f"{'ID':<5}"
-                f"{'Username':<20}"
-                f"{'Email':<30}"
-                f"{'Role':<12}"
-                f"{'Status':<10}"
-                f"{'Created At':<22}"
-                f"{'Updated At':<22}"
-            )
-            separator = "-" * len(header)
-            logger.verbose(header)
-            logger.verbose(separator)
+            logger.verbose(UserFormatter.header())
+            logger.verbose(UserFormatter.separator())
             for user in users:
-                logger.verbose("%s", user)
+                logger.verbose(UserFormatter.format(user))
         else:
             logger.verbose("No users found")
 
