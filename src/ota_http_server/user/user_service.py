@@ -21,11 +21,11 @@ class UserService:
         command = self.cfg.config.get('user_command')
 
         handlers= {
-            "add": self.add_user,
-            "enable": self.enable_user,
-            "disable": self.disable_user,
-            "get": self.get_user,
-            "list": self.list_users
+            "add": self._add_user,
+            "enable": self._enable_user,
+            "disable": self._disable_user,
+            "get": self._get_user,
+            "list": self._list_users
         }
 
         handler = handlers.get(command)
@@ -34,7 +34,7 @@ class UserService:
         else:
             logger.debug("Invalid user command received: %s", command)
 
-    def add_user(self) -> None:
+    def _add_user(self) -> None:
         username = self.cfg.config["parameters"]["username"]
         password = self.cfg.config["parameters"]["user_password"]
         email = self.cfg.config["parameters"]["user_email"]
@@ -47,7 +47,7 @@ class UserService:
         db_service: DatabaseService = self.cfg.config["db_service"]
         db_service.add_user(user)
 
-    def enable_user(self) -> None:
+    def _enable_user(self) -> None:
         db_service: DatabaseService = self.cfg.config["db_service"]
         user_id = self.cfg.config["parameters"]['user_id']
         username = self.cfg.config['parameters']['username']
@@ -62,7 +62,7 @@ class UserService:
             "User id or username must be provided"
         )
 
-    def disable_user(self) -> None:
+    def _disable_user(self) -> None:
         db_service: DatabaseService = self.cfg.config["db_service"]
         user_id = self.cfg.config["parameters"]['user_id']
         username = self.cfg.config['parameters']['username']
@@ -77,7 +77,7 @@ class UserService:
             "User id or username must be provided"
         )
 
-    def get_user(self) -> None:
+    def _get_user(self) -> None:
         db_service: DatabaseService = self.cfg.config["db_service"]
         user_id = self.cfg.config["parameters"]['user_id']
         username = self.cfg.config['parameters']['username']
@@ -94,7 +94,7 @@ class UserService:
         else:
             logger.verbose("User not found")
 
-    def list_users(self) -> None:
+    def _list_users(self) -> None:
         db_service: DatabaseService = self.cfg.config["db_service"]
         users = db_service.user_get_list()
         if users:
