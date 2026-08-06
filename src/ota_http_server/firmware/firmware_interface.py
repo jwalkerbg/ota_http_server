@@ -2,7 +2,7 @@
 
 from typing import Protocol
 
-class FirmwareService(Protocol):
+class FirmwareInterface(Protocol):
 
     def command_handler(self) -> None:
         ...

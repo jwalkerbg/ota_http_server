@@ -2,7 +2,7 @@
 
 from typing import Protocol
 
-class DeviceService(Protocol):
+class DeviceInterface(Protocol):
 
     def command_handler(self) -> None:
         ...

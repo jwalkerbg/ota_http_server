@@ -2,7 +2,7 @@
 
 from typing import Protocol
 
-class ProjectService(Protocol):
+class ProjectInterface(Protocol):
 
     def command_handler(self) -> None:
         ...
