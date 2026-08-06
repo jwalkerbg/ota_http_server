@@ -46,16 +46,21 @@ class UserFormatter:
     STATUS_WIDTH =  10
     DATE_WIDTH =  22
 
+    COLUMNS = [
+        Column('ID', ID_WIDTH, ">"),
+        Column('Username', USERNAME_WIDTH),
+        Column('Email', EMAIL_WIDTH),
+        Column('Role', ROLE_WIDTH),
+        Column('Status', STATUS_WIDTH),
+        Column('Created At', DATE_WIDTH),
+        Column('Updated At', DATE_WIDTH)
+    ]
+
     @classmethod
     def header(cls) -> str:
-        return (
-            f"{'ID':<{cls.ID_WIDTH}}"
-            f"{'Username':<{cls.USERNAME_WIDTH}}"
-            f"{'Email':<{cls.EMAIL_WIDTH}}"
-            f"{'Role':<{cls.ROLE_WIDTH}}"
-            f"{'Status':<{cls.STATUS_WIDTH}}"
-            f"{'Created At':<{cls.DATE_WIDTH}}"
-            f"{'Updated At':<{cls.DATE_WIDTH}}"
+        return "".join(
+            f"{column.title:<{column.width}}"
+            for column in cls.COLUMNS
         )
 
     @classmethod
@@ -78,15 +83,32 @@ class UserFormatter:
             else "-"
         )
 
-        return (
-            f"{user.id:<{cls.ID_WIDTH}}"
-            f"{user.username:<{cls.USERNAME_WIDTH}}"
-            f"{user.email:<{cls.EMAIL_WIDTH}}"
-            f"{user.role:<{cls.ROLE_WIDTH}}"
-            f"{status:<{cls.STATUS_WIDTH}}"
-            f"{created:<{cls.DATE_WIDTH}}"
-            f"{updated:<{cls.DATE_WIDTH}}"
-        )
+        values = [
+            str(user.id),
+            user.username,
+            user.email,
+            user.role,
+            status,
+            created,
+            updated
+        ]
+
+        widths = [column.width for column in cls.COLUMNS]
+
+        return TableFormatter.format_row(values, widths)
+
+    @classmethod
+    def format_list(cls, users: list[User]) -> str:
+
+        lines = [
+            cls.header(),
+            cls.separator(),
+        ]
+
+        for user in users:
+            lines.extend(cls.format(user))
+
+        return "\n".join(lines)
 
 class ProjectFormatter:
 

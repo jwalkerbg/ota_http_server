@@ -98,10 +98,7 @@ class UserService:
         db_service: DatabaseService = self.cfg.config["db_service"]
         users = db_service.user_get_list()
         if users:
-            logger.verbose(UserFormatter.header())
-            logger.verbose(UserFormatter.separator())
-            for user in users:
-                logger.verbose(UserFormatter.format(user))
+            logger.verbose("\n%s",UserFormatter.format_list(users))
         else:
             logger.verbose("No users found")
 
