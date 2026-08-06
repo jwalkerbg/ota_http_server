@@ -1,7 +1,7 @@
 # project_service.py
 
 from ota_http_server.core.config import Config
-from ota_http_server.core.data_models import Project
+from ota_http_server.core.data_models import User, Project
 from ota_http_server.core.formatters import ProjectFormatter
 from ota_http_server.database.database_service import DatabaseService
 from ota_http_server.logger import get_app_logger
