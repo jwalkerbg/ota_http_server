@@ -155,7 +155,7 @@ class Firmware:
     file_size: int      # Bytes
     checksum: str       # SHA-256 hash
     release_notes: str  # Optional notes
-    channel: str        # stable, beta, dev (*)this an example)
+    channel: str        # stable, beta, dev
     created_at: Optional[datetime]
     updated_at: Optional[datetime]  # Audit information
 
