@@ -2,7 +2,7 @@
 
 from typing import Protocol
 
-from ota_http_server.core.data_models import User
+from ota_http_server.core.data_models import User, Project
 
 class DatabaseInterface(Protocol):
 
@@ -37,4 +37,7 @@ class DatabaseInterface(Protocol):
         ...
 
     def user_get_list(self) -> list[User]:
+        ...
+
+    def add_project(self, project: Project) -> Project:
         ...

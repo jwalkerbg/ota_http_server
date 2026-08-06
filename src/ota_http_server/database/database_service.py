@@ -62,3 +62,6 @@ class DatabaseService:
 
     def user_get_list(self) -> list[User]:
         return self._database.user_get_list()
+
+    def add_project(self, project: Project) -> Project:
+        return self._database.add_project(project)

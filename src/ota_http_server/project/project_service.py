@@ -1,7 +1,8 @@
 # project_service.py
 
 from ota_http_server.core.config import Config
-from ota_http_server.core.data_models import User, Project
+from ota_http_server.core.data_models import Project
+from ota_http_server.core.formatters import ProjectFormatter
 from ota_http_server.database.database_service import DatabaseService
 from ota_http_server.logger import get_app_logger
 
@@ -33,7 +34,19 @@ class ProjectService:
             logger.debug("Invalid project command received: %s", command)
 
     def _add_project(self) -> None:
-        pass
+        name = self.cfg.config["parameters"]["project_name"]
+        display_name = self.cfg.config["parameters"]["project_display_name"]
+        if display_name is None:
+            display_name = name
+        description = self.cfg.config["parameters"]["project_description"]
+        if description is None:
+            description = ""
+        created_by = self.cfg.config["parameters"]["created_by"]
+
+        project = Project(id=None, name=name, display_name=display_name, description=description, created_by=created_by, is_active=True, created_at=None, updated_at=None)
+
+        db_service: DatabaseService = self.cfg.config["db_service"]
+        db_service.add_project(project)
 
     def _enable_project(self) -> None:
         pass
@@ -46,4 +59,3 @@ class ProjectService:
 
     def _list_projects(self) -> None:
         pass
-
