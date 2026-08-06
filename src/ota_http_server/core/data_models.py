@@ -22,6 +22,12 @@ class CommandResult:
     message: str
     data: Any = None
 
+@dataclass(frozen=True)
+class Column:
+    title: str
+    width: int
+    align: str = "<"
+
 @dataclass
 class User:
     id: Optional[int]   # the database primary key. It is None before the object is inserted into SQLite.
