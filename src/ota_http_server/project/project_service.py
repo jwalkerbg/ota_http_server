@@ -61,9 +61,6 @@ class ProjectService:
         db_service: DatabaseService = self.cfg.config["db_service"]
         projects = db_service.project_get_list()
         if projects:
-            logger.info(ProjectFormatter.header())
-            logger.info(ProjectFormatter.separator())
-            for project in projects:
-                logger.info(ProjectFormatter.format(project))
+            logger.verbose("\n%s",ProjectFormatter.format_list(projects))
         else:
             logger.info("No projects found.")

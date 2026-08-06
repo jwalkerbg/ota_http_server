@@ -99,17 +99,22 @@ class ProjectFormatter:
     STATUS_WIDTH =  10
     DATE_WIDTH =  22
 
+    COLUMNS = [
+        Column('ID', ID_WIDTH, ">"),
+        Column('Name', NAME_WIDTH),
+        Column('Display name', DISPLAY_NAME_WIDTH),
+        Column('Description', DESCRIPTION_WIDTH),
+        Column('Created by', CREATED_BY_WIDTH),
+        Column('Status', STATUS_WIDTH),
+        Column('Created At', DATE_WIDTH),
+        Column('Updated At', DATE_WIDTH)
+    ]
+
     @classmethod
     def header(cls) -> str:
-        return (
-            f"{'ID':<{cls.ID_WIDTH}}"
-            f"{'Name':<{cls.NAME_WIDTH}}"
-            f"{'Display name':<{cls.DISPLAY_NAME_WIDTH}}"
-            f"{'Description':<{cls.DESCRIPTION_WIDTH}}"
-            f"{'Created by':<{cls.CREATED_BY_WIDTH}}"
-            f"{'Status':<{cls.STATUS_WIDTH}}"
-            f"{'Created At':<{cls.DATE_WIDTH}}"
-            f"{'Updated At':<{cls.DATE_WIDTH}}"
+        return "".join(
+            f"{column.title:<{column.width}}"
+            for column in cls.COLUMNS
         )
 
     @classmethod
@@ -117,7 +122,7 @@ class ProjectFormatter:
         return "-" * len(cls.header())
 
     @classmethod
-    def format(cls, project: Project) -> str:
+    def format(cls, project: Project) -> list[str]:
         status = "active" if project.is_active else "disabled"
 
         created = (
@@ -132,16 +137,33 @@ class ProjectFormatter:
             else "-"
         )
 
-        return (
-            f"{project.id:<{cls.ID_WIDTH}}"
-            f"{project.name:<{cls.NAME_WIDTH}}"
-            f"{project.display_name:<{cls.DISPLAY_NAME_WIDTH}}"
-            f"{project.description:<{cls.DESCRIPTION_WIDTH}}"
-            f"{project.created_by:<{cls.CREATED_BY_WIDTH}}"
-            f"{project.is_active:<{cls.STATUS_WIDTH}}"
-            f"{created:<{cls.DATE_WIDTH}}"
-            f"{updated:<{cls.DATE_WIDTH}}"
-        )
+        values = [
+            str(project.id),
+            project.name,
+            project.display_name,
+            project.description,
+            str(project.created_by),
+            status,
+            created,
+            updated
+        ]
+
+        widths = [column.width for column in cls.COLUMNS]
+
+        return TableFormatter.format_row(values, widths)
+
+    @classmethod
+    def format_list(cls, projects: list[Project]) -> str:
+
+        lines = [
+            cls.header(),
+            cls.separator(),
+        ]
+
+        for project in projects:
+            lines.extend(cls.format(project))
+
+        return "\n".join(lines)
 
 class DeviceFormatter:
     ID_WIDTH =  5
