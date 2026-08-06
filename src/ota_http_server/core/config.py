@@ -595,6 +595,9 @@ class Config:
                         self.config["parameters"]["project_description"] = config_cli.project_description
                     if config_cli.created_by is not None:
                         self.config["parameters"]["created_by"] = config_cli.created_by
+                # list
+                if config_cli.project_command == 'list':
+                    pass
 
             if config_cli.command == "device":
                 if config_cli.device_command is not None:
@@ -797,6 +800,8 @@ For use in development environment without SSL certificates and JWT authenticati
     add_project_parser.add_argument("--display_name", dest="project_display_name", type=str, required=False, help="Display name of the new created project")
     add_project_parser.add_argument("--description", dest="project_description", type=str, required=False, help="Description of the new created project")
     add_project_parser.add_argument("--created-by", dest="created_by", type=int, required=True, help="ID of the user who created the project")
+    # project list
+    list_project_parser = project_subparsers.add_parser(name="list", help="List all projects")
 
     # device
     device_parser = subparsers.add_parser(name="device", help="Devices manipulation operations")

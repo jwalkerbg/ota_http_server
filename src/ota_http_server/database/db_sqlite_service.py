@@ -537,3 +537,42 @@ class DatabaseSqliteService:
             raise DatabaseError(
                 f"Database error creating project '{project.name}'"
             ) from e
+
+    def project_get_list(self) -> list[Project]:
+        """
+        Get all projects from database.
+
+        Returns:
+            List of Project objects. Empty list if no projects exist.
+        """
+
+        try:
+            with self._connect() as conn:
+
+                cursor = conn.execute(
+                    """
+                    SELECT
+                        id,
+                        name,
+                        display_name,
+                        description,
+                        created_by,
+                        is_active,
+                        created_at,
+                        updated_at
+                    FROM projects
+                    ORDER BY name
+                    """
+                )
+
+                rows = cursor.fetchall()
+
+                return [
+                    self._row_to_project(row)
+                    for row in rows
+                ]
+
+        except sqlite3.Error as e:
+            raise DatabaseError(
+                "Database error retrieving projects"
+            ) from e

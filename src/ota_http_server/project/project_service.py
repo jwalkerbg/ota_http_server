@@ -58,4 +58,12 @@ class ProjectService:
         pass
 
     def _list_projects(self) -> None:
-        pass
+        db_service: DatabaseService = self.cfg.config["db_service"]
+        projects = db_service.project_get_list()
+        if projects:
+            logger.info(ProjectFormatter.header())
+            logger.info(ProjectFormatter.separator())
+            for project in projects:
+                logger.info(ProjectFormatter.format(project))
+        else:
+            logger.info("No projects found.")

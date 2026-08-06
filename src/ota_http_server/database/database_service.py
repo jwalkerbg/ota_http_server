@@ -65,3 +65,6 @@ class DatabaseService:
 
     def add_project(self, project: Project) -> Project:
         return self._database.add_project(project)
+
+    def project_get_list(self) -> list[Project]:
+        return self._database.project_get_list()
