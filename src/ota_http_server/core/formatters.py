@@ -1,7 +1,41 @@
 # core/formatters.py
 
 from datetime import datetime
-from ota_http_server.core.data_models import User, Project, Device, Firmware
+from textwrap import wrap
+from ota_http_server.core.data_models import User, Project, Device, Firmware, Column
+
+class TableFormatter:
+
+    @staticmethod
+    def format_row(
+        values: list[str],
+        widths: list[int],
+    ) -> list[str]:
+
+        # Wrap every cell.
+        wrapped = [
+            wrap(value, width=width) or [""]
+            for value, width in zip(values, widths)
+        ]
+
+        # Maximum number of physical lines.
+        height = max(len(cell) for cell in wrapped)
+
+        # Pad all columns to equal height.
+        for cell in wrapped:
+            cell.extend([""] * (height - len(cell)))
+
+        # Produce formatted output lines.
+        result = []
+
+        for row in range(height):
+            line = "".join(
+                f"{wrapped[col][row]:<{widths[col]}}"
+                for col in range(len(widths))
+            )
+            result.append(line)
+
+        return result
 
 class UserFormatter:
 
