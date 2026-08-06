@@ -70,9 +70,9 @@ class ProjectFormatter:
         return (
             f"{'ID':<{cls.ID_WIDTH}}"
             f"{'Name':<{cls.NAME_WIDTH}}"
-            f"{'Status':<{cls.STATUS_WIDTH}}"
-            f"'Display name':<{cls.DISPLAY_NAME_WIDTH}"
-            f"'Created by':<{cls.CREATED_BY_WIDTH}"
+            f"{'Display name':<{cls.DISPLAY_NAME_WIDTH}}"
+            f"{'Description':<{cls.DESCRIPTION_WIDTH}}"
+            f"{'Created by':<{cls.CREATED_BY_WIDTH}}"
             f"{'Status':<{cls.STATUS_WIDTH}}"
             f"{'Created At':<{cls.DATE_WIDTH}}"
             f"{'Updated At':<{cls.DATE_WIDTH}}"
@@ -83,29 +83,28 @@ class ProjectFormatter:
         return "-" * len(cls.header())
 
     @classmethod
-    def format(cls, device: Device) -> str:
-        status = "active" if device.is_active else "disabled"
+    def format(cls, project: Project) -> str:
+        status = "active" if project.is_active else "disabled"
 
         created = (
-            device.created_at.strftime("%Y-%m-%d %H:%M:%S")
-            if device.created_at
+            project.created_at.strftime("%Y-%m-%d %H:%M:%S")
+            if project.created_at
             else "-"
         )
 
         updated = (
-            device.updated_at.strftime("%Y-%m-%d %H:%M:%S")
-            if device.updated_at
+            project.updated_at.strftime("%Y-%m-%d %H:%M:%S")
+            if project.updated_at
             else "-"
         )
 
         return (
-            f"{device.id:<{cls.ID_WIDTH}}"
-            f"{device.device_id:<{cls.DEVICE_UUID_WIDTH}}"
-            f"{device.project_name:<{cls.PROJECT_NAME_WIDTH}}"
-            f"{device.model:<{cls.MODEL_WIDTH}}"
-            f"{device.serial_number:<{cls.SERIALN_WIDTH}}"
-            f"{device.current_version:<{cls.CURRENT_VERSION_WIDTH}}"
-            f"{status:<{cls.STATUS_WIDTH}}"
+            f"{project.id:<{cls.ID_WIDTH}}"
+            f"{project.name:<{cls.NAME_WIDTH}}"
+            f"{project.display_name:<{cls.DISPLAY_NAME_WIDTH}}"
+            f"{project.description:<{cls.DESCRIPTION_WIDTH}}"
+            f"{project.created_by:<{cls.CREATED_BY_WIDTH}}"
+            f"{project.is_active:<{cls.STATUS_WIDTH}}"
             f"{created:<{cls.DATE_WIDTH}}"
             f"{updated:<{cls.DATE_WIDTH}}"
         )
