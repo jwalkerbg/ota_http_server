@@ -197,19 +197,24 @@ class DeviceFormatter:
     STATUS_WIDTH =  10
     DATE_WIDTH =  22
 
+    COLUMNS = [
+        Column('ID', ID_WIDTH, ">"),
+        Column('UUID', DEVICE_UUID_WIDTH),
+        Column('Project', PROJECT_NAME_WIDTH),
+        Column('Model', MODEL_WIDTH),
+        Column('Serial #', SERIALN_WIDTH),
+        Column('Current version', CURRENT_VERSION_WIDTH),
+        Column('Last seen', DATE_WIDTH),
+        Column('Status', STATUS_WIDTH),
+        Column('Created At', DATE_WIDTH),
+        Column('Updated At', DATE_WIDTH)
+    ]
+
     @classmethod
     def header(cls) -> str:
-        return (
-            f"{'ID':<{cls.ID_WIDTH}}"
-            f"{'UUID':<{cls.DEVICE_UUID_WIDTH}}"
-            f"{'Project':<{cls.PROJECT_NAME_WIDTH}}"
-            f"{'Model':<{cls.MODEL_WIDTH}}"
-            f"{'Serial #':<{cls.SERIALN_WIDTH}}"
-            f"{'Current version':<{cls.CURRENT_VERSION_WIDTH}}"
-            f"{'Last seen':<{cls.DATE_WIDTH}}"
-            f"{'Status':<{cls.STATUS_WIDTH}}"
-            f"{'Created At':<{cls.DATE_WIDTH}}"
-            f"{'Updated At':<{cls.DATE_WIDTH}}"
+        return "".join(
+            f"{column.title:<{column.width}}"
+            for column in cls.COLUMNS
         )
 
     @classmethod
@@ -238,18 +243,34 @@ class DeviceFormatter:
             else "-"
         )
 
-        return (
-            f"{device.id:<{cls.ID_WIDTH}}"
-            f"{device.device_id:<{cls.DEVICE_UUID_WIDTH}}"
-            f"{device.project_id:<{cls.PROJECT_NAME_WIDTH}}"
-            f"{device.model:<{cls.MODEL_WIDTH}}"
-            f"{device.serial_number:<{cls.SERIALN_WIDTH}}"
-            f"{device.current_version:<{cls.CURRENT_VERSION_WIDTH}}"
-            f"{device.last_seen:<{cls.DATE_WIDTH}}"
-            f"{status:<{cls.STATUS_WIDTH}}"
-            f"{created:<{cls.DATE_WIDTH}}"
-            f"{updated:<{cls.DATE_WIDTH}}"
-        )
+        values = [
+            str(device.id),
+            device.device_id,
+            str(device.project_id),
+            device.model,
+            device.serial_number,
+            device.current_version,
+            device.last_seen,
+            status,
+            created,
+            updated
+        ]
+
+        widths = [column.width for column in cls.COLUMNS]
+
+        return TableFormatter.format_row(values, widths)
+    @classmethod
+    def format_list(cls, devices: list[Device]) -> str:
+
+        lines = [
+            cls.header(),
+            cls.separator(),
+        ]
+
+        for device in devices:
+            lines.extend(cls.format(device))
+
+        return "\n".join(lines)
 
 class FirmwareFormatter:
     ID_WIDTH =  5
@@ -262,19 +283,24 @@ class FirmwareFormatter:
     CHANNEL_WIDTH = 10
     DATE_WIDTH =  22
 
+    COLUMNS = [
+        Column('ID', ID_WIDTH, ">"),
+        Column('Project', PROJECT_NAME_WIDTH),
+        Column('Version', VERSION_WIDTH),
+        Column('FileName', FILENAME_WIDTH),
+        Column('FileSize', FILESIZE_WIDTH),
+        Column('Checksum', FILECHECKSUM_WIDTH),
+        Column('Release notes', RELEASE_NOTES),
+        Column('Channel', CHANNEL_WIDTH,)
+        Column('Created At', DATE_WIDTH),
+        Column('Updated At', DATE_WIDTH)
+    ]
+
     @classmethod
     def header(cls) -> str:
-        return (
-            f"{'ID':<{cls.ID_WIDTH}}"
-            f"{'Project':<{cls.PROJECT_NAME_WIDTH}}"
-            f"{'Version':<{cls.VERSION_WIDTH}}"
-            f"{'FileName':<{cls.FILENAME_WIDTH}}"
-            f"{'FileSize':<{cls.FILESIZE_WIDTH}}"
-            f"{'Checksum':<{cls.FILECHECKSUM_WIDTH}}"
-            f"{'Release notes':<{cls.RELEASE_NOTES}}"
-            f"{'Channel':<{cls.CHANNEL_WIDTH}}"
-            f"{'Created At':<{cls.DATE_WIDTH}}"
-            f"{'Updated At':<{cls.DATE_WIDTH}}"
+        return "".join(
+            f"{column.title:<{column.width}}"
+            for column in cls.COLUMNS
         )
 
     @classmethod
@@ -298,14 +324,31 @@ class FirmwareFormatter:
         )
 
         return (
-            f"{firmware.id:<{cls.ID_WIDTH}}"
-            f"{firmware.project_id:<{cls.PROJECT_NAME_WIDTH}}"
-            f"{firmware.version:<{cls.VERSION_WIDTH}}"
-            f"{firmware.filename:<{cls.FILENAME_WIDTH}}"
-            f"{firmware.file_size:<{cls.FILESIZE_WIDTH}}"
-            f"{firmware.checksum:<{cls.FILECHECKSUM_WIDTH}}"
-            f"{firmware.release_notes:<{cls.RELEASE_NOTES}}"
-            f"{firmware.channel:<{cls.CHANNEL_WIDTH}}"
-            f"{created:<{cls.DATE_WIDTH}}"
-            f"{updated:<{cls.DATE_WIDTH}}"
+            str(firmware.id),
+            str(firmware.project_id),
+            firmware.version,
+            firmware.filename,
+            firmware.file_size,
+            firmware.checksum,
+            firmware.release_notes,
+            firmware.channel,
+            created,
+            updated
         )
+
+        widths = [column.width for column in cls.COLUMNS]
+
+        return TableFormatter.format_row(values, widths)
+
+    @classmethod
+    def format_list(cls, firmwares: list[Firmware]) -> str:
+
+        lines = [
+            cls.header(),
+            cls.separator(),
+        ]
+
+        for firmware in firmwares:
+            lines.extend(cls.format(firmware))
+
+        return "\n".join(lines)
