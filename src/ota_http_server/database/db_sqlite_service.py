@@ -526,7 +526,7 @@ class DatabaseSqliteService:
                     ) from e
                 case "SQLITE_CONSTRAINT_FOREIGNKEY":
                     raise UserNotFoundError(
-                        f"Database Integrity violation: User id={project.created_by} does not exist"
+                        f"Database Integrity violation: User with id={project.created_by} does not exist"
                     ) from e
 
                 case _:
