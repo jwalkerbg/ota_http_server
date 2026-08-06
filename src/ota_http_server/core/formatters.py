@@ -291,7 +291,7 @@ class FirmwareFormatter:
         Column('FileSize', FILESIZE_WIDTH),
         Column('Checksum', FILECHECKSUM_WIDTH),
         Column('Release notes', RELEASE_NOTES),
-        Column('Channel', CHANNEL_WIDTH,)
+        Column('Channel', CHANNEL_WIDTH),
         Column('Created At', DATE_WIDTH),
         Column('Updated At', DATE_WIDTH)
     ]
