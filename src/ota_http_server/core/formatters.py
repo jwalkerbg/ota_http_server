@@ -10,7 +10,7 @@ class UserFormatter:
     EMAIL_WIDTH =  30
     ROLE_WIDTH =  12
     STATUS_WIDTH =  10
-    DATE_WIDTH =  22
+    DATE_WIDTH =  32
 
     @classmethod
     def header(cls) -> str:
@@ -63,7 +63,7 @@ class ProjectFormatter:
     DESCRIPTION_WIDTH = 48
     CREATED_BY_WIDTH = 20
     STATUS_WIDTH =  10
-    DATE_WIDTH =  22
+    DATE_WIDTH =  32
 
     @classmethod
     def header(cls) -> str:
@@ -118,7 +118,7 @@ class DeviceFormatter:
     SERIALN_WIDTH = 32
     CURRENT_VERSION_WIDTH = 32
     STATUS_WIDTH =  10
-    DATE_WIDTH =  22
+    DATE_WIDTH =  32
 
     @classmethod
     def header(cls) -> str:
@@ -183,7 +183,7 @@ class FirmwareFormatter:
     FILECHECKSUM_WIDTH = 10
     RELEASE_NOTES = 48
     CHANNEL_WIDTH = 10
-    DATE_WIDTH =  22
+    DATE_WIDTH =  32
 
     @classmethod
     def header(cls) -> str:
