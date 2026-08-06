@@ -1,10 +1,7 @@
 # core/formatters.py
 
 from datetime import datetime
-from ota_http_server.user.user_service import User
-from ota_http_server.project.project_service import Project
-from ota_http_server.device.device_service import Device
-from ota_http_server.firmware.firmware_service import Firmware
+from ota_http_server.core.data_models import User, Project, Device, Firmware
 
 class UserFormatter:
 
