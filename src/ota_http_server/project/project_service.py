@@ -30,7 +30,7 @@ class ProjectService:
         if handler is not None:
             handler()
         else:
-            logger.debug("Invalid user command received: %s", command)
+            logger.debug("Invalid project command received: %s", command)
 
     def _add_project(self) -> None:
         pass
