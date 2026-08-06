@@ -582,6 +582,18 @@ class Config:
                 if config_cli.user_command == 'list':
                     pass
 
+            if config_cli.command == 'project':
+                if config_cli.project_command is not None:
+                    self.config["project_command"] = config_cli.project_command
+
+            if config_cli.command == "device":
+                if config_cli.device_command is not None:
+                    self.config["device_command"] = config_cli.device_command
+
+            if config_cli.command == "firmware":
+                if config_cli.firmware_command is not None:
+                    self.config["firmware_command"] = config_cli.firmware_command
+
         return self.config
 
 def parse_args() -> argparse.Namespace:
@@ -780,7 +792,7 @@ For use in development environment without SSL certificates and JWT authenticati
 
     # firmware
     firmware_parser = subparsers.add_parser(name="firmware", help="Firmware manipulation operations", )
-    firmware_subparsers = firmware_parser.add_subparsers(dest="project_command", required=True)
+    firmware_subparsers = firmware_parser.add_subparsers(dest="firmware_command", required=True)
     # firmware add
     add_firmware_parser = firmware_subparsers.add_parser(name="add", help="Add new firmware")
 
