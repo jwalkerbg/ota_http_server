@@ -98,15 +98,15 @@ class UserFormatter:
         return TableFormatter.format_row(values, widths)
 
     @classmethod
-    def format_list(cls, users: list[User]) -> str:
+    def format_list(cls, items: list[User]) -> str:
 
         lines = [
             cls.header(),
             cls.separator(),
         ]
 
-        for user in users:
-            lines.extend(cls.format(user))
+        for item in items:
+            lines.extend(cls.format(item))
 
         return "\n".join(lines)
 
@@ -175,15 +175,15 @@ class ProjectFormatter:
         return TableFormatter.format_row(values, widths)
 
     @classmethod
-    def format_list(cls, projects: list[Project]) -> str:
+    def format_list(cls, items: list[Project]) -> str:
 
         lines = [
             cls.header(),
             cls.separator(),
         ]
 
-        for project in projects:
-            lines.extend(cls.format(project))
+        for item in items:
+            lines.extend(cls.format(item))
 
         return "\n".join(lines)
 
@@ -260,15 +260,15 @@ class DeviceFormatter:
 
         return TableFormatter.format_row(values, widths)
     @classmethod
-    def format_list(cls, devices: list[Device]) -> str:
+    def format_list(cls, items: list[Device]) -> str:
 
         lines = [
             cls.header(),
             cls.separator(),
         ]
 
-        for device in devices:
-            lines.extend(cls.format(device))
+        for item in items:
+            lines.extend(cls.format(item))
 
         return "\n".join(lines)
 
@@ -341,14 +341,14 @@ class FirmwareFormatter:
         return TableFormatter.format_row(values, widths)
 
     @classmethod
-    def format_list(cls, firmwares: list[Firmware]) -> str:
+    def format_list(cls, items: list[Firmware]) -> str:
 
         lines = [
             cls.header(),
             cls.separator(),
         ]
 
-        for firmware in firmwares:
-            lines.extend(cls.format(firmware))
+        for item in items:
+            lines.extend(cls.format(item))
 
         return "\n".join(lines)
