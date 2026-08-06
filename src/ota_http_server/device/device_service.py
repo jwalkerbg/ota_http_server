@@ -30,7 +30,7 @@ class DeviceService:
         if handler is not None:
             handler()
         else:
-            logger.debug("Invalid user command received: %s", command)
+            logger.debug("Invalid device command received: %s", command)
 
     def _add_device(self) -> None:
         pass
