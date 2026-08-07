@@ -6,10 +6,13 @@ from ota_http_server.core.data_models import User, Project, Device, Firmware, Co
 
 class TableFormatter:
 
+    SEPARATOR = " | "
+
     @staticmethod
     def format_row(
         values: list[str],
         widths: list[int],
+        alignments: list[str]
     ) -> list[str]:
 
         # Wrap every cell.
@@ -29,8 +32,8 @@ class TableFormatter:
         result = []
 
         for row in range(height):
-            line = "".join(
-                f"{wrapped[col][row]:<{widths[col]}}"
+            line = TableFormatter.SEPARATOR.join(
+                f"{wrapped[col][row]:{alignments[col]}{widths[col]}}"
                 for col in range(len(widths))
             )
             result.append(line)
@@ -58,14 +61,17 @@ class UserFormatter:
 
     @classmethod
     def header(cls) -> str:
-        return "".join(
-            f"{column.title:<{column.width}}"
+        return TableFormatter.SEPARATOR.join(
+            f"{column.title:{column.align}{column.width}}"
             for column in cls.COLUMNS
         )
 
     @classmethod
     def separator(cls) -> str:
-        return "-" * len(cls.header())
+        return TableFormatter.SEPARATOR.join(
+            "-" * column.width
+            for column in cls.COLUMNS
+        )
 
     @classmethod
     def format(cls, user: User) -> str:
@@ -95,7 +101,9 @@ class UserFormatter:
 
         widths = [column.width for column in cls.COLUMNS]
 
-        return TableFormatter.format_row(values, widths)
+        alignments = [column.align for column in cls.COLUMNS]
+
+        return TableFormatter.format_row(values, widths, alignments)
 
     @classmethod
     def format_list(cls, items: list[User]) -> str:
@@ -122,7 +130,7 @@ class ProjectFormatter:
     DATE_WIDTH =  22
 
     COLUMNS = [
-        Column('ID', ID_WIDTH, ">"),
+        Column('ID', ID_WIDTH, "^"),
         Column('Name', NAME_WIDTH),
         Column('Display name', DISPLAY_NAME_WIDTH),
         Column('Description', DESCRIPTION_WIDTH),
@@ -134,14 +142,17 @@ class ProjectFormatter:
 
     @classmethod
     def header(cls) -> str:
-        return "".join(
-            f"{column.title:<{column.width}}"
+        return TableFormatter.SEPARATOR.join(
+            f"{column.title:{column.align}{column.width}}"
             for column in cls.COLUMNS
         )
 
     @classmethod
     def separator(cls) -> str:
-        return "-" * len(cls.header())
+        return TableFormatter.SEPARATOR.join(
+            "-" * column.width
+            for column in cls.COLUMNS
+        )
 
     @classmethod
     def format(cls, project: Project) -> list[str]:
@@ -172,7 +183,9 @@ class ProjectFormatter:
 
         widths = [column.width for column in cls.COLUMNS]
 
-        return TableFormatter.format_row(values, widths)
+        alignments = [column.align for column in cls.COLUMNS]
+
+        return TableFormatter.format_row(values, widths, alignments)
 
     @classmethod
     def format_list(cls, items: list[Project]) -> str:
@@ -198,28 +211,31 @@ class DeviceFormatter:
     DATE_WIDTH =  22
 
     COLUMNS = [
-        Column('ID', ID_WIDTH, ">"),
-        Column('UUID', DEVICE_UUID_WIDTH),
-        Column('Project', PROJECT_NAME_WIDTH),
-        Column('Model', MODEL_WIDTH),
-        Column('Serial #', SERIALN_WIDTH),
-        Column('Current version', CURRENT_VERSION_WIDTH),
-        Column('Last seen', DATE_WIDTH),
-        Column('Status', STATUS_WIDTH),
-        Column('Created At', DATE_WIDTH),
-        Column('Updated At', DATE_WIDTH)
+        Column('ID', ID_WIDTH, "^"),
+        Column('UUID', DEVICE_UUID_WIDTH, "^"),
+        Column('Project', PROJECT_NAME_WIDTH, "^"),
+        Column('Model', MODEL_WIDTH, "^"),
+        Column('Serial #', SERIALN_WIDTH, "^"),
+        Column('Current version', CURRENT_VERSION_WIDTH, "^"),
+        Column('Last seen', DATE_WIDTH, "^"),
+        Column('Status', STATUS_WIDTH, "^"),
+        Column('Created At', DATE_WIDTH, "^"),
+        Column('Updated At', DATE_WIDTH, "^")
     ]
 
     @classmethod
     def header(cls) -> str:
-        return "".join(
-            f"{column.title:<{column.width}}"
+        return TableFormatter.SEPARATOR.join(
+            f"{column.title:{column.align}{column.width}}"
             for column in cls.COLUMNS
         )
 
     @classmethod
     def separator(cls) -> str:
-        return "-" * len(cls.header())
+        return TableFormatter.SEPARATOR.join(
+            "-" * column.width
+            for column in cls.COLUMNS
+        )
 
     @classmethod
     def format(cls, device: Device) -> str:
@@ -258,7 +274,10 @@ class DeviceFormatter:
 
         widths = [column.width for column in cls.COLUMNS]
 
-        return TableFormatter.format_row(values, widths)
+        alignments = [column.align for column in cls.COLUMNS]
+
+        return TableFormatter.format_row(values, widths, alignments)
+
     @classmethod
     def format_list(cls, items: list[Device]) -> str:
 
@@ -298,14 +317,17 @@ class FirmwareFormatter:
 
     @classmethod
     def header(cls) -> str:
-        return "".join(
-            f"{column.title:<{column.width}}"
+        return TableFormatter.SEPARATOR.join(
+            f"{column.title:{column.align}{column.width}}"
             for column in cls.COLUMNS
         )
 
     @classmethod
     def separator(cls) -> str:
-        return "-" * len(cls.header())
+        return TableFormatter.SEPARATOR.join(
+            "-" * column.width
+            for column in cls.COLUMNS
+        )
 
     @classmethod
     def format(cls, firmware: Firmware) -> str:
@@ -338,7 +360,9 @@ class FirmwareFormatter:
 
         widths = [column.width for column in cls.COLUMNS]
 
-        return TableFormatter.format_row(values, widths)
+        alignments = [column.align for column in cls.COLUMNS]
+
+        return TableFormatter.format_row(values, widths, alignments)
 
     @classmethod
     def format_list(cls, items: list[Firmware]) -> str:
