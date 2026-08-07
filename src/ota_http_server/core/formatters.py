@@ -68,12 +68,12 @@ class UserFormatter:
 
     COLUMNS = [
         Column('ID', ID_WIDTH, ">"),
-        Column('Username', USERNAME_WIDTH),
-        Column('Email', EMAIL_WIDTH),
-        Column('Role', ROLE_WIDTH),
-        Column('Status', STATUS_WIDTH),
-        Column('Created At', DATE_WIDTH),
-        Column('Updated At', DATE_WIDTH)
+        Column('Username', USERNAME_WIDTH, "^"),
+        Column('Email', EMAIL_WIDTH, "^"),
+        Column('Role', ROLE_WIDTH, "^"),
+        Column('Status', STATUS_WIDTH, "^"),
+        Column('Created At', DATE_WIDTH, "^"),
+        Column('Updated At', DATE_WIDTH, "^")
     ]
 
     @classmethod
@@ -130,13 +130,13 @@ class ProjectFormatter:
 
     COLUMNS = [
         Column('ID', ID_WIDTH, "^"),
-        Column('Name', NAME_WIDTH),
-        Column('Display name', DISPLAY_NAME_WIDTH),
-        Column('Description', DESCRIPTION_WIDTH),
-        Column('Created by', CREATED_BY_WIDTH),
-        Column('Status', STATUS_WIDTH),
-        Column('Created At', DATE_WIDTH),
-        Column('Updated At', DATE_WIDTH)
+        Column('Name', NAME_WIDTH, "^"),
+        Column('Display name', DISPLAY_NAME_WIDTH, "^"),
+        Column('Description', DESCRIPTION_WIDTH, "^"),
+        Column('Created by', CREATED_BY_WIDTH, "^"),
+        Column('Status', STATUS_WIDTH, "^"),
+        Column('Created At', DATE_WIDTH, "^"),
+        Column('Updated At', DATE_WIDTH, "^")
     ]
 
     @classmethod
@@ -267,15 +267,15 @@ class FirmwareFormatter:
 
     COLUMNS = [
         Column('ID', ID_WIDTH, ">"),
-        Column('Project', PROJECT_NAME_WIDTH),
-        Column('Version', VERSION_WIDTH),
-        Column('FileName', FILENAME_WIDTH),
-        Column('FileSize', FILESIZE_WIDTH),
-        Column('Checksum', FILECHECKSUM_WIDTH),
-        Column('Release notes', RELEASE_NOTES),
-        Column('Channel', CHANNEL_WIDTH),
-        Column('Created At', DATE_WIDTH),
-        Column('Updated At', DATE_WIDTH)
+        Column('Project', PROJECT_NAME_WIDTH, "^"),
+        Column('Version', VERSION_WIDTH, "^"),
+        Column('FileName', FILENAME_WIDTH, "^"),
+        Column('FileSize', FILESIZE_WIDTH, "^"),
+        Column('Checksum', FILECHECKSUM_WIDTH, "^"),
+        Column('Release notes', RELEASE_NOTES, "^"),
+        Column('Channel', CHANNEL_WIDTH, "^"),
+        Column('Created At', DATE_WIDTH, "^"),
+        Column('Updated At', DATE_WIDTH, "^")
     ]
 
     @classmethod
