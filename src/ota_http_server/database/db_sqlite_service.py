@@ -135,212 +135,82 @@ class DatabaseSqliteService:
                 f"Database error while adding user '{user.username}'"
             ) from e
 
-    def user_enable_by_id(self, user_id: int) -> None:
-        """
-        Enable a user account.
+    def _user_enable_disable(self, column: str, parameter: int | str, op: bool):
 
-        Only the active state is changed.
+        if column not in ("id", "username"):
+            raise ValueError(f"Invalid column '{column}'")
 
-        Args:
-            user_id: Database id of the user.
-
-        Returns:
-            Updated User object.
-
-        Raises:
-            UserNotFoundError:
-                If the user does not exist.
-            UserAlreadyEnabledError:
-                If the user is already enabled.
-            DatabaseError:
-                For unexpected database errors.
-        """
+        if op:
+            operation = "1"
+            state = "0"
+        else:
+            operation = "0"
+            state = "1"
 
         now = datetime.now(UTC)
 
         try:
             with self._connect() as conn:
                 cursor = conn.execute(
-                    """
-                    SELECT
-                        id,
-                        is_active
-                    FROM users
-                    WHERE id = ?
+                    f"""
+                    UPDATE users
+                    SET
+                        is_active = {operation},
+                        updated_at = ?
+                    WHERE {column} = ?
+                    AND is_active = {state}
                     """,
-                    (user_id,)
+                    (
+                        now.isoformat(),
+                        parameter,
+                    )
+                )
+
+                if cursor.rowcount == 1:
+                    conn.commit()
+                    return
+
+                cursor = conn.execute(
+                    f"""
+                    SELECT is_active
+                    FROM users
+                    WHERE {column} = ?
+                    """,
+                    (parameter,)
                 )
 
                 row = cursor.fetchone()
 
                 if row is None:
-                    raise UserNotFoundError(
-                        f"User id={user_id} does not exist"
-                    )
+                    raise UserNotFoundError(...)
 
-                if row["is_active"] == 1:
-                    raise UserAlreadyEnabledError(
-                        f"User id={user_id} is already enabled"
-                    )
-
-                conn.execute(
-                    """
-                    UPDATE users
-                    SET
-                        is_active = 1,
-                        updated_at = ?
-                    WHERE id = ?
-                    """,
-                    (now.isoformat(), user_id)
-                )
-                conn.commit()
-
-        except (UserNotFoundError, UserAlreadyEnabledError):
-            raise
+            if op:
+                raise UserAlreadyEnabledError(...)
+            else:
+                raise UserAlreadyDisabledError(...)
 
         except sqlite3.Error as e:
-            raise DatabaseError(
-                f"Database error enabling user id={user_id}"
-            ) from e
+            if op:
+                raise DatabaseError(
+                    f"Database error enabling user {column}={parameter}"
+                ) from e
+            else:
+                raise DatabaseError(
+                    f"Database error disabling user {column}={parameter}"
+                ) from e
+
+
+    def user_enable_by_id(self, user_id: int) -> None:
+        return self._user_enable_disable("id", user_id, True)
 
     def user_enable_by_username(self, username: str) -> None:
-
-        now = datetime.now(UTC)
-
-        try:
-            with self._connect() as conn:
-
-                cursor = conn.execute(
-                    """
-                    UPDATE users
-                    SET
-                        is_active = 1,
-                        updated_at = ?
-                    WHERE username = ?
-                    AND is_active = 0
-                    """,
-                    (
-                        now.isoformat(),
-                        username,
-                    )
-                )
-
-                if cursor.rowcount == 0:
-                    raise UserNotFoundError(
-                        f"User '{username}' does not exist "
-                        "or is already enabled"
-                    )
-
-                conn.commit()
-
-        except sqlite3.Error as e:
-            raise DatabaseError(
-                f"Database error enabling user '{username}'"
-            ) from e
+        return self._user_enable_disable("username", username, True)
 
     def user_disable_by_id(self, user_id: int) -> None:
-        """
-        Disable a user account.
-
-        The user record is kept for audit purposes.
-        Only the active state is changed.
-
-        Args:
-            user_id: Database id of the user.
-
-        Returns:
-            Updated User object.
-
-        Raises:
-            UserNotFoundError:
-                If the user does not exist.
-            UserAlreadyDisabledError:
-                If the user is already disabled.
-            DatabaseError:
-                For unexpected database errors.
-        """
-
-        now = datetime.now(UTC)
-
-        try:
-            with self._connect() as conn:
-                cursor = conn.execute(
-                    """
-                    SELECT
-                        id,
-                        is_active
-                    FROM users
-                    WHERE id = ?
-                    """,
-                    (user_id,)
-                )
-
-                row = cursor.fetchone()
-
-                if row is None:
-                    raise UserNotFoundError(
-                        f"User id={user_id} does not exist"
-                    )
-
-                if row["is_active"] == 0:
-                    raise UserAlreadyDisabledError(
-                        f"User id={user_id} is already disabled"
-                    )
-
-                conn.execute(
-                    """
-                    UPDATE users
-                    SET
-                        is_active = 0,
-                        updated_at = ?
-                    WHERE id = ?
-                    """,
-                    (now.isoformat(), user_id)
-                )
-                conn.commit()
-
-        except (UserNotFoundError, UserAlreadyDisabledError):
-            raise
-
-        except sqlite3.Error as e:
-            raise DatabaseError(
-                f"Database error disabling user id={user_id}"
-            ) from e
+        return self._user_enable_disable("id", user_id, False)
 
     def user_disable_by_username(self, username: str) -> None:
-
-        now = datetime.now(UTC)
-
-        try:
-            with self._connect() as conn:
-
-                cursor = conn.execute(
-                    """
-                    UPDATE users
-                    SET
-                        is_active = 0,
-                        updated_at = ?
-                    WHERE username = ?
-                    AND is_active = 1
-                    """,
-                    (
-                        now.isoformat(),
-                        username,
-                    )
-                )
-
-                if cursor.rowcount == 0:
-                    raise UserNotFoundError(
-                        f"User '{username}' does not exist "
-                        "or is already disabled"
-                    )
-
-                conn.commit()
-
-        except sqlite3.Error as e:
-            raise DatabaseError(
-                f"Database error disabling user '{username}'"
-            ) from e
+        return self._user_enable_disable("username", username, False)
 
     def _row_to_user(self, row: sqlite3.Row) -> User:
         return User(
@@ -356,13 +226,16 @@ class DatabaseSqliteService:
                 if row["updated_at"] else None,
         )
 
-    def user_get_by_id(self, user_id: int) -> User | None:
+    def _user_get(self, column: str, parameter: int | str) -> User | None:
+
+        if column not in ("id", "username"):
+            raise ValueError(f"Invalid column '{column}'")
 
         try:
             with self._connect() as conn:
 
                 cursor = conn.execute(
-                    """
+                    f"""
                     SELECT
                         id,
                         username,
@@ -373,9 +246,9 @@ class DatabaseSqliteService:
                         created_at,
                         updated_at
                     FROM users
-                    WHERE id = ?
+                    WHERE {column} = ?
                     """,
-                    (user_id,)
+                    (parameter,)
                 )
 
                 row = cursor.fetchone()
@@ -387,42 +260,14 @@ class DatabaseSqliteService:
 
         except sqlite3.Error as e:
             raise DatabaseError(
-                f"Database error retrieving user id={user_id}"
+                f"Database error retrieving user {column}={parameter}"
             ) from e
+
+    def user_get_by_id(self, user_id: int) -> User | None:
+        return self._user_get("id", user_id)
 
     def user_get_by_username(self, username: str) -> User | None:
-
-        try:
-            with self._connect() as conn:
-
-                cursor = conn.execute(
-                    """
-                    SELECT
-                        id,
-                        username,
-                        password_hash,
-                        email,
-                        role,
-                        is_active,
-                        created_at,
-                        updated_at
-                    FROM users
-                    WHERE username = ?
-                    """,
-                    (username,)
-                )
-
-                row = cursor.fetchone()
-
-                if row is None:
-                    return None
-
-                return self._row_to_user(row)
-
-        except sqlite3.Error as e:
-            raise DatabaseError(
-                f"Database error retrieving user '{username}'"
-            ) from e
+        return self._user_get("username", username)
 
     def user_get_list(self) -> list[User]:
         """
