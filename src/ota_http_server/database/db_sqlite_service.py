@@ -234,6 +234,7 @@ class DatabaseSqliteService:
         return self._user_enable_disable("username", username, False)
 
     def _row_to_user(self, row: sqlite3.Row) -> User:
+
         return User(
             id=row["id"],
             username=row["username"],
@@ -330,6 +331,7 @@ class DatabaseSqliteService:
             ) from e
 
     def _row_to_project(self, row: sqlite3.Row) -> Project:
+
             return Project(
                 id=row["id"],
                 name=row["name"],
@@ -392,7 +394,7 @@ class DatabaseSqliteService:
                     ) from e
                 case "SQLITE_CONSTRAINT_FOREIGNKEY":
                     raise UserNotFoundError(
-                        f"Database Integrity violation: User with id={project.created_by} does not exist"
+                        f"Database Integrity violation: Project with id={project.created_by} does not exist"
                     ) from e
 
                 case _:
@@ -524,12 +526,6 @@ class DatabaseSqliteService:
         return self._project_get("name", name)
 
     def project_get_list(self) -> list[Project]:
-        """
-        Get all projects from database.
-
-        Returns:
-            List of Project objects. Empty list if no projects exist.
-        """
 
         try:
             with self._connect() as conn:
