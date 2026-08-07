@@ -6,18 +6,19 @@ from ota_http_server.core.data_models import User, Project, Device, Firmware, Co
 
 class TableFormatter:
 
-    SEPARATOR = " | "
+    SEPARATOR1 = " | "
+    SEPARATOR2 = "-+-"
 
     @staticmethod
     def header(columns: list[Column]) -> str:
-        return TableFormatter.SEPARATOR.join(
+        return TableFormatter.SEPARATOR1.join(
             f"{column.title:{column.align}{column.width}}"
             for column in columns
         )
 
     @staticmethod
     def separator(columns: list[Column]) -> str:
-        return TableFormatter.SEPARATOR.join(
+        return TableFormatter.SEPARATOR2.join(
             "-" * column.width
             for column in columns
         )
@@ -48,7 +49,7 @@ class TableFormatter:
         result = []
 
         for row in range(height):
-            line = TableFormatter.SEPARATOR.join(
+            line = TableFormatter.SEPARATOR1.join(
                 f"{wrapped[col][row]:{alignments[col]}{widths[col]}}"
                 for col in range(len(widths))
             )
