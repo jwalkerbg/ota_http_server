@@ -59,6 +59,8 @@ class ParametersConfig(TypedDict, total=False):
     user_password: str
     user_email: str
     user_role: str
+    project_id: int
+    project_name: str
 
 class DatabaseMySQLConfig(TypedDict, total=False):
     dbhost: str
@@ -138,8 +140,9 @@ class Config:
             'username': None,
             'user_password': None,
             'user_email': None,
-            'user_role': None
-
+            'user_role': None,
+            'project_id': None,
+            'project_name': None
         },
         'database': {
             'dbtype': "sqlite",
@@ -279,6 +282,12 @@ class Config:
                         "type": "string"
                     },
                     "user_role": {
+                        "type": "string"
+                    },
+                    "project_id": {
+                        "type": "number"
+                    },
+                    "project_name": {
                         "type": "string"
                     }
                 },
@@ -595,6 +604,24 @@ class Config:
                         self.config["parameters"]["project_description"] = config_cli.project_description
                     if config_cli.created_by is not None:
                         self.config["parameters"]["created_by"] = config_cli.created_by
+                # enable
+                if config_cli.project_command == "enable":
+                    if config_cli.project_id is not None:
+                        self.config["parameters"]["project_id"] = config_cli.project_id
+                    if config_cli.project_name is not None:
+                        self.config["parameters"]["project_name"] = config_cli.project_name
+                # disable
+                if config_cli.project_command == "disable":
+                    if config_cli.project_id is not None:
+                        self.config["parameters"]["project_id"] = config_cli.project_id
+                    if config_cli.project_name is not None:
+                        self.config["parameters"]["project_name"] = config_cli.project_name
+                # get
+                if config_cli.project_command == "get":
+                    if config_cli.project_id is not None:
+                        self.config["parameters"]["project_id"] = config_cli.project_id
+                    if config_cli.project_name is not None:
+                        self.config["parameters"]["project_name"] = config_cli.project_name
                 # list
                 if config_cli.project_command == 'list':
                     pass
@@ -777,17 +804,17 @@ For use in development environment without SSL certificates and JWT authenticati
     add_user_parser.add_argument("--email", dest="user_email", type=str, required=True, help="Email of the new created user")
     add_user_parser.add_argument("--role", dest="user_role", type=str, required=True, choices=USER_ROLES, help="Password of the new created user")
     # user enable
-    disable_user_parser = user_subparsers.add_parser(name="enable", help="Enable user")
-    disable_user_parser.add_argument("--user-id", dest="user_id", type=int, required=False, help="ID of the user to be enabled")
-    disable_user_parser.add_argument("--username", dest="username", type=str, required=False, help="Username of the user to be enabled. Give --user-id or --username. --user-id takes precedence")
+    enable_user_parser = user_subparsers.add_parser(name="enable", help="Enable user")
+    enable_user_parser.add_argument("--user-id", dest="user_id", type=int, required=False, help="ID of the user to be enabled")
+    enable_user_parser.add_argument("--username", dest="username", type=str, required=False, help="Username of the user to be enabled. Give --user-id or --username. --user-id takes precedence.")
     # user disable
     disable_user_parser = user_subparsers.add_parser(name="disable", help="Disable user")
     disable_user_parser.add_argument("--user-id", dest="user_id", type=int, required=False, help="ID of the user to be disabled")
-    disable_user_parser.add_argument("--username", dest="username", type=str, required=False, help="Username of the user to be disabled. Give --user-id or --username. --user-id takes precedence")
+    disable_user_parser.add_argument("--username", dest="username", type=str, required=False, help="Username of the user to be disabled. Give --user-id or --username. --user-id takes precedence.")
     # user get
     get_user_parser = user_subparsers.add_parser(name="get", help="Get user information")
     get_user_parser.add_argument("--user-id", dest="user_id", type=int, required=False, help="ID of the user to be retrieved")
-    get_user_parser.add_argument("--username", dest="username", type=str, required=False, help="Username of the user to be retrieved. Give --user-id or --username. --user-id takes precedence")
+    get_user_parser.add_argument("--username", dest="username", type=str, required=False, help="Username of the user to be retrieved. Give --user-id or --username. --user-id takes precedence.")
     # list
     list_user_parser = user_subparsers.add_parser(name="list", help="List all users")
 
@@ -800,6 +827,18 @@ For use in development environment without SSL certificates and JWT authenticati
     add_project_parser.add_argument("--display_name", dest="project_display_name", type=str, required=False, help="Display name of the new created project")
     add_project_parser.add_argument("--description", dest="project_description", type=str, required=False, help="Description of the new created project")
     add_project_parser.add_argument("--created-by", dest="created_by", type=int, required=True, help="ID of the user who created the project")
+    # project enable
+    enable_project_parser = project_subparsers.add_parser(name="enable", help="Enable project")
+    enable_project_parser.add_argument("--id", dest="project_id", type=int, required=False, help="ID of the project to be enabled")
+    enable_project_parser.add_argument("--name", dest="project_name", type=str, required=False, help="Name of the project to be enabled. Give --id or --name. --id takes precedence.")
+    # project disable
+    disable_project_parser = project_subparsers.add_parser(name="disable", help="Enable project")
+    disable_project_parser.add_argument("--id", dest="project_id", type=int, required=False, help="ID of the project to be disabled")
+    disable_project_parser.add_argument("--name", dest="project_name", type=str, required=False, help="Name of the project to be disabled. Give --id or --name. --id takes precedence.")
+    # project get
+    get_project_parser = project_subparsers.add_parser(name="get", help="Get project information")
+    get_project_parser.add_argument("--id", dest="project_id", type=int, required=False, help="ID of the project to be retrieved")
+    get_project_parser.add_argument("--name", dest="project_name", type=str, required=False, help="Name of the project to be retrieved. Give --id or --name. --id takes precedence.")
     # project list
     list_project_parser = project_subparsers.add_parser(name="list", help="List all projects")
 

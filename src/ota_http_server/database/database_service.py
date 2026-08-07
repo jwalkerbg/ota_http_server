@@ -66,5 +66,23 @@ class DatabaseService:
     def add_project(self, project: Project) -> Project:
         return self._database.add_project(project)
 
+    def enable_project_by_id(self, id: int) -> None:
+        return self._database.enable_project_by_id(id)
+
+    def enable_project_by_name(self, name: str) -> None:
+        return self._database.enable_project_by_name()
+
+    def disable_project_by_id(self, id: int) -> None:
+        return self._database.disable_project_by_id(id)
+
+    def disable_project_by_name(self, name: str) -> None:
+        return self._database.disable_project_by_name(name)
+
+    def get_project_by_id(self, id: int) -> Project | None:
+        return self._database.get_project_by_id(id)
+
+    def get_project_by_name(self, name: str) -> Project | None:
+        return self._database.get_project_by_name(name)
+
     def project_get_list(self) -> list[Project]:
         return self._database.project_get_list()

@@ -30,6 +30,15 @@ class UserAlreadyExistsError(Exception):
 class ProjectAlreadyExistsError(Exception):
     pass
 
+class ProjectNotFoundError(Exception):
+    pass
+
+class ProjectAlreadyEnabledError(Exception):
+    pass
+
+class ProjectAlreadyDisabledError(Exception):
+    pass
+
 class DatabaseError(Exception):
     pass
 
@@ -382,6 +391,125 @@ class DatabaseSqliteService:
             raise DatabaseError(
                 f"Database error creating project '{project.name}'"
             ) from e
+
+    def _project_enable_disable(self, column: str, parameter: int | str, op: bool):
+
+        if column not in ("id", "name"):
+            raise ValueError(f"Invalid column '{column}'")
+
+        if op:
+            operation = "1"
+            state = "0"
+        else:
+            operation = "0"
+            state = "1"
+
+        now = datetime.now(UTC)
+
+        try:
+            with self._connect() as conn:
+                cursor = conn.execute(
+                    f"""
+                    UPDATE projects
+                    SET
+                        is_active = {operation},
+                        updated_at = ?
+                    WHERE {column} = ?
+                    AND is_active = {state}
+                    """,
+                    (
+                        now.isoformat(),
+                        parameter,
+                    )
+                )
+
+                if cursor.rowcount == 1:
+                    conn.commit()
+                    return
+
+                cursor = conn.execute(
+                    f"""
+                    SELECT is_active
+                    FROM projects
+                    WHERE {column} = ?
+                    """,
+                    (parameter,)
+                )
+
+                row = cursor.fetchone()
+
+                if row is None:
+                    raise ProjectNotFoundError(...)
+
+            if op:
+                raise ProjectAlreadyEnabledError(...)
+            else:
+                raise ProjectAlreadyDisabledError(...)
+
+        except sqlite3.Error as e:
+            if op:
+                raise DatabaseError(
+                    f"Database error enabling project {column}={parameter}"
+                ) from e
+            else:
+                raise DatabaseError(
+                    f"Database error disabling project {column}={parameter}"
+                ) from e
+
+    def enable_project_by_id(self, id: int) -> None:
+        return self._project_enable_disable("id", id, True)
+
+    def enable_project_by_name(self, name: str) -> None:
+        return self._project_enable_disable("name", name, True)
+
+    def disable_project_by_id(self, id: int) -> None:
+        return self._project_enable_disable("id", id, False)
+
+    def disable_project_by_name(self, name: str) -> Project |None:
+        return self._project_enable_disable("name", name, False)
+
+    def _project_get(self, column: str, parameter: int | str) -> Project | None:
+
+        if column not in ("id", "name"):
+            raise ValueError(f"Invalid column '{column}'")
+
+        try:
+            with self._connect() as conn:
+
+                cursor = conn.execute(
+                    f"""
+                    SELECT
+                        id,
+                        name,
+                        display_name,
+                        description,
+                        created_by,
+                        is_active,
+                        created_at,
+                        updated_at
+                    FROM projects
+                    WHERE {column} = ?
+                    """,
+                    (parameter,)
+                )
+
+                row = cursor.fetchone()
+
+                if row is None:
+                    return None
+
+                return self._row_to_project(row)
+
+        except sqlite3.Error as e:
+            raise DatabaseError(
+                f"Database error retrieving project {column}={parameter}"
+            ) from e
+
+    def get_project_by_id(self, id: int) -> Project | None:
+        return self._project_get("id", id)
+
+    def get_project_by_name(self, name: str) -> Project | None:
+        return self._project_get("name", name)
 
     def project_get_list(self) -> list[Project]:
         """

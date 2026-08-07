@@ -49,13 +49,57 @@ class ProjectService:
         db_service.add_project(project)
 
     def _enable_project(self) -> None:
-        pass
+        db_service: DatabaseService = self.cfg.config["db_service"]
+        project_id = self.cfg.config["parameters"]['project_id']
+        project_name = self.cfg.config['parameters']['project_name']
+        if project_id is not None:
+            db_service.enable_project_by_id(project_id)
+            return
+        if project_name is not None:
+            db_service.enable_project_by_name(project_name)
+            return
+
+        raise ValueError(
+            "Project id or name must be provided"
+        )
 
     def _disable_project(self) -> None:
-        pass
+        db_service: DatabaseService = self.cfg.config["db_service"]
+        project_id = self.cfg.config["parameters"]['project_id']
+        project_name = self.cfg.config['parameters']['project_name']
+        if project_id is not None:
+            db_service.disable_project_by_id(project_id)
+            return
+        if project_name is not None:
+            db_service.disable_project_by_name(project_name)
+            return
+
+        raise ValueError(
+            "Project id or name must be provided"
+        )
 
     def _get_project(self) -> None:
-        pass
+        db_service: DatabaseService = self.cfg.config["db_service"]
+        project_id = self.cfg.config["parameters"]['project_id']
+        project_name = self.cfg.config['parameters']['project_name']
+        if project_id is not None:
+            project = db_service.get_project_by_id(project_id)
+            if project:
+                logger.verbose("Project found: %s", project)
+            else:
+                logger.info("Project with ID %d not found.", project_id)
+            return
+        if project_name is not None:
+            project = db_service.get_project_by_name(project_name)
+            if project:
+                logger.verbose("Project found: %s", project)
+            else:
+                logger.info("Project with name '%s' not found.", project_name)
+            return
+
+        raise ValueError(
+            "Project id or name must be provided"
+        )
 
     def _list_projects(self) -> None:
         db_service: DatabaseService = self.cfg.config["db_service"]
