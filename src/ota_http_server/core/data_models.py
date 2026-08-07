@@ -106,7 +106,7 @@ class Project:
 @dataclass
 class Device:
     id: Optional[int]   # the database primary key. It is None before the object is inserted into SQLite.
-    device_id: str      # Unique hardware identifier (UUIDv4)
+    uuid: str           # Unique hardware identifier (UUIDv4)
     project_id: int     # FK → Projects: Which project this device belongs to
     model: str          # Hardware model, e.g. ESP32S3
     serial_number: str  # Optional manufacturing serial
@@ -140,7 +140,7 @@ class Device:
         return (
             f"Device("
             f"ID:{self.id}, "
-            f"device_id:{self.device_id}, "
+            f"uuid:{self.uuid}, "
             f"project_id:{self.project_id}, "
             f"model:{self.model}, "
             f"serial_number:{self.serial_number}, "

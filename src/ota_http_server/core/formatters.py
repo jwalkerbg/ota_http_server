@@ -245,7 +245,7 @@ class DeviceFormatter:
 
         values = [
             str(device.id),
-            device.device_id,
+            device.uuid,
             str(device.project_id),
             device.model,
             device.serial_number,
