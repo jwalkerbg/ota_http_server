@@ -9,6 +9,20 @@ class TableFormatter:
     SEPARATOR = " | "
 
     @staticmethod
+    def header(columns: list[Column]) -> str:
+        return TableFormatter.SEPARATOR.join(
+            f"{column.title:{column.align}{column.width}}"
+            for column in columns
+        )
+
+    @staticmethod
+    def separator(columns: list[Column]) -> str:
+        return TableFormatter.SEPARATOR.join(
+            "-" * column.width
+            for column in columns
+        )
+
+    @staticmethod
     def format_row(
         values: list[str],
         widths: list[int],
@@ -60,20 +74,6 @@ class UserFormatter:
     ]
 
     @classmethod
-    def header(cls) -> str:
-        return TableFormatter.SEPARATOR.join(
-            f"{column.title:{column.align}{column.width}}"
-            for column in cls.COLUMNS
-        )
-
-    @classmethod
-    def separator(cls) -> str:
-        return TableFormatter.SEPARATOR.join(
-            "-" * column.width
-            for column in cls.COLUMNS
-        )
-
-    @classmethod
     def format(cls, user: User) -> str:
         status = "active" if user.is_active else "disabled"
 
@@ -109,8 +109,8 @@ class UserFormatter:
     def format_list(cls, items: list[User]) -> str:
 
         lines = [
-            cls.header(),
-            cls.separator(),
+            TableFormatter.header(cls.COLUMNS),
+            TableFormatter.separator(cls.COLUMNS),
         ]
 
         for item in items:
@@ -139,20 +139,6 @@ class ProjectFormatter:
         Column('Created At', DATE_WIDTH),
         Column('Updated At', DATE_WIDTH)
     ]
-
-    @classmethod
-    def header(cls) -> str:
-        return TableFormatter.SEPARATOR.join(
-            f"{column.title:{column.align}{column.width}}"
-            for column in cls.COLUMNS
-        )
-
-    @classmethod
-    def separator(cls) -> str:
-        return TableFormatter.SEPARATOR.join(
-            "-" * column.width
-            for column in cls.COLUMNS
-        )
 
     @classmethod
     def format(cls, project: Project) -> list[str]:
@@ -191,8 +177,8 @@ class ProjectFormatter:
     def format_list(cls, items: list[Project]) -> str:
 
         lines = [
-            cls.header(),
-            cls.separator(),
+            TableFormatter.header(cls.COLUMNS),
+            TableFormatter.separator(cls.COLUMNS),
         ]
 
         for item in items:
@@ -222,20 +208,6 @@ class DeviceFormatter:
         Column('Created At', DATE_WIDTH, "^"),
         Column('Updated At', DATE_WIDTH, "^")
     ]
-
-    @classmethod
-    def header(cls) -> str:
-        return TableFormatter.SEPARATOR.join(
-            f"{column.title:{column.align}{column.width}}"
-            for column in cls.COLUMNS
-        )
-
-    @classmethod
-    def separator(cls) -> str:
-        return TableFormatter.SEPARATOR.join(
-            "-" * column.width
-            for column in cls.COLUMNS
-        )
 
     @classmethod
     def format(cls, device: Device) -> str:
@@ -282,8 +254,8 @@ class DeviceFormatter:
     def format_list(cls, items: list[Device]) -> str:
 
         lines = [
-            cls.header(),
-            cls.separator(),
+            TableFormatter.header(cls.COLUMNS),
+            TableFormatter.separator(cls.COLUMNS),
         ]
 
         for item in items:
@@ -314,20 +286,6 @@ class FirmwareFormatter:
         Column('Created At', DATE_WIDTH),
         Column('Updated At', DATE_WIDTH)
     ]
-
-    @classmethod
-    def header(cls) -> str:
-        return TableFormatter.SEPARATOR.join(
-            f"{column.title:{column.align}{column.width}}"
-            for column in cls.COLUMNS
-        )
-
-    @classmethod
-    def separator(cls) -> str:
-        return TableFormatter.SEPARATOR.join(
-            "-" * column.width
-            for column in cls.COLUMNS
-        )
 
     @classmethod
     def format(cls, firmware: Firmware) -> str:
@@ -368,8 +326,8 @@ class FirmwareFormatter:
     def format_list(cls, items: list[Firmware]) -> str:
 
         lines = [
-            cls.header(),
-            cls.separator(),
+            TableFormatter.header(cls.COLUMNS),
+            TableFormatter.separator(cls.COLUMNS),
         ]
 
         for item in items:
