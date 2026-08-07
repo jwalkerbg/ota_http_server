@@ -2,7 +2,7 @@
 
 from typing import Protocol
 
-from ota_http_server.core.data_models import User, Project
+from ota_http_server.core.data_models import User, Project, Device
 
 class DatabaseInterface(Protocol):
 
@@ -61,4 +61,28 @@ class DatabaseInterface(Protocol):
         ...
 
     def project_get_list(self) -> list[Project]:
+        ...
+
+    def add_device(self, device: Device) -> Device:
+        ...
+
+    def enable_device_by_id(self, id: int) -> None:
+        ...
+
+    def enable_device_by_name(self, name: str) -> None:
+        ...
+
+    def disable_device_by_id(self, id: int) -> None:
+        ...
+
+    def disable_device_by_name(self, name: str) -> None:
+        ...
+
+    def get_device_by_id(self, id: int) -> Device | None:
+        ...
+
+    def get_device_by_name(self, name: str) -> Device | None:
+        ...
+
+    def device_get_list(self) -> list[Device]:
         ...

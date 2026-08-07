@@ -39,6 +39,18 @@ class ProjectAlreadyEnabledError(Exception):
 class ProjectAlreadyDisabledError(Exception):
     pass
 
+class DeviceAlreadyExistsError(Exception):
+    pass
+
+class DeviceNotFoundError(Exception):
+    pass
+
+class DeviceAlreadyEnabledError(Exception):
+    pass
+
+class DeviceAlreadyDisabledError(Exception):
+    pass
+
 class DatabaseError(Exception):
     pass
 
@@ -549,3 +561,247 @@ class DatabaseSqliteService:
             raise DatabaseError(
                 "Database error retrieving projects"
             ) from e
+
+    def _row_to_device(self, row: sqlite3.Row) -> Device:
+
+            return Device(
+                id=row["id"],
+                uuid=row["uuid"],
+                project_id=row["project_id"],
+                model=row["model"],
+                serial_number=row["serial_number"]
+                    if row["serial_number"] else "",
+                current_version=row["current_version"]
+                    if row["current_version"] else "",
+                last_seen=datetime.fromisoformat(row["last_seen"])
+                    if row["last_seen"] else None,
+                is_active=bool(row["is_active"]),
+                created_at=datetime.fromisoformat(row["created_at"])
+                    if row["created_at"] else None,
+                updated_at=datetime.fromisoformat(row["updated_at"])
+                    if row["updated_at"] else None,
+            )
+
+    def add_device(self, device: Device) -> Device:
+
+        now = datetime.now(UTC)
+
+        try:
+            with self._connect() as conn:
+
+                cursor = conn.execute(
+                    """
+                    INSERT INTO devices
+                    (
+                        id,
+                        uuid,
+                        project_id,
+                        model,
+                        serial_number,
+                        current_version,
+                        last_seen,
+                        is_active,
+                        created_at,
+                        updated_at
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        device.id,
+                        device.uuid,
+                        device.project_id,
+                        device.model,
+                        device.serial_number,
+                        device.current_version,
+                        None,
+                        int(device.is_active),
+                        now.isoformat(),
+                        None
+                    )
+                )
+
+                conn.commit()
+
+                device.id = cursor.lastrowid
+                device.created_at = now
+                device.updated_at = None
+
+                return device
+
+        except sqlite3.IntegrityError as e:
+            match e.sqlite_errorname:
+
+                case "SQLITE_CONSTRAINT_UNIQUE":
+                    raise DeviceAlreadyExistsError(
+                        f"Device '{device.name}' already exists"
+                    ) from e
+                case "SQLITE_CONSTRAINT_FOREIGNKEY":
+                    raise UserNotFoundError(
+                        f"Database Integrity violation: Project with id={device.project_id} does not exist"
+                    ) from e
+
+                case _:
+                    raise DatabaseError(
+                        f"Database integrity error creating device '{device.uuid}': {str(e)}"
+                    ) from e
+        except sqlite3.Error as e:
+            raise DatabaseError(
+                f"Database error creating device '{device.uuid}'"
+            ) from e
+
+    def _device_enable_disable(self, column: str, parameter: int | str, op: bool):
+
+        if column not in ("id", "uuid"):
+            raise ValueError(f"Invalid column '{column}'")
+
+        if op:
+            operation = "1"
+            state = "0"
+        else:
+            operation = "0"
+            state = "1"
+
+        now = datetime.now(UTC)
+
+        try:
+            with self._connect() as conn:
+                cursor = conn.execute(
+                    f"""
+                    UPDATE devices
+                    SET
+                        is_active = {operation},
+                        updated_at = ?
+                    WHERE {column} = ?
+                    AND is_active = {state}
+                    """,
+                    (
+                        now.isoformat(),
+                        parameter,
+                    )
+                )
+
+                if cursor.rowcount == 1:
+                    conn.commit()
+                    return
+
+                cursor = conn.execute(
+                    f"""
+                    SELECT is_active
+                    FROM devices
+                    WHERE {column} = ?
+                    """,
+                    (parameter,)
+                )
+
+                row = cursor.fetchone()
+
+                if row is None:
+                    raise DeviceNotFoundError(...)
+
+            if op:
+                raise DeviceAlreadyEnabledError(...)
+            else:
+                raise DeviceAlreadyDisabledError(...)
+
+        except sqlite3.Error as e:
+            if op:
+                raise DatabaseError(
+                    f"Database error enabling device {column}={parameter}"
+                ) from e
+            else:
+                raise DatabaseError(
+                    f"Database error disabling device {column}={parameter}"
+                ) from e
+
+    def enable_device_by_id(self, id: int) -> None:
+        return self._device_enable_disable("id", id, True)
+
+    def enable_device_by_name(self, name: str) -> None:
+        return self._device_enable_disable("uuid", name, True)
+
+    def disable_device_by_id(self, id: int) -> None:
+        return self._device_enable_disable("id", id, False)
+
+    def disable_device_by_name(self, name: str) -> None:
+        return self._device_enable_disable("uuid", name, False)
+
+    def _device_get(self, column: str, parameter: int | str) -> Device | None:
+
+        if column not in ("id", "uuid"):
+            raise ValueError(f"Invalid column '{column}'")
+
+        try:
+            with self._connect() as conn:
+
+                cursor = conn.execute(
+                    f"""
+                    SELECT
+                        id,
+                        uuid,
+                        project_id,
+                        model,
+                        serial_number,
+                        current_version,
+                        last_seen,
+                        is_active,
+                        created_at,
+                        updated_at
+                    FROM devices
+                    WHERE {column} = ?
+                    """,
+                    (parameter,)
+                )
+
+                row = cursor.fetchone()
+
+                if row is None:
+                    return None
+
+                return self._row_to_device(row)
+
+        except sqlite3.Error as e:
+            raise DatabaseError(
+                f"Database error retrieving device {column}={parameter}"
+            ) from e
+
+    def get_device_by_id(self, id: int) -> Device | None:
+        return self._device_get("id", id)
+
+    def get_device_by_name(self, name: str) -> Device | None:
+        return self._device_get("uuid", name)
+
+    def device_get_list(self) -> list[Device]:
+
+        try:
+            with self._connect() as conn:
+
+                cursor = conn.execute(
+                    """
+                    SELECT
+                        id,
+                        uuid,
+                        project_id,
+                        model,
+                        serial_number,
+                        current_version,
+                        last_seen,
+                        is_active,
+                        created_at,
+                        updated_at
+                    FROM devices
+                    ORDER BY id
+                    """
+                )
+
+                rows = cursor.fetchall()
+
+                return [
+                    self._row_to_device(row)
+                    for row in rows
+                ]
+
+        except sqlite3.Error as e:
+            raise DatabaseError(
+                "Database error retrieving devices"
+            ) from e
+

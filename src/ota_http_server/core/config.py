@@ -61,6 +61,12 @@ class ParametersConfig(TypedDict, total=False):
     user_role: str
     project_id: int
     project_name: str
+    device_id: int
+    device_uuid: str
+    device_pid: str
+    device_model: str
+    device_serial_number: str
+    device_current_version: str
 
 class DatabaseMySQLConfig(TypedDict, total=False):
     dbhost: str
@@ -142,7 +148,13 @@ class Config:
             'user_email': None,
             'user_role': None,
             'project_id': None,
-            'project_name': None
+            'project_name': None,
+            'device_id': None,
+            'device_uuid': None,
+            'device_pid': None,
+            'device_model': None,
+            'device_serial_number': None,
+            'device_current_version': None
         },
         'database': {
             'dbtype': "sqlite",
@@ -288,6 +300,24 @@ class Config:
                         "type": "number"
                     },
                     "project_name": {
+                        "type": "string"
+                    },
+                    "device_id": {
+                        "type": "number"
+                    },
+                    "device_uuid": {
+                        "type": "string"
+                    },
+                    "device_pid": {
+                        "type": "number"
+                    },
+                    "device_model": {
+                        "type": "string"
+                    },
+                    "device_serial_number": {
+                        "type": "string"
+                    },
+                    "device_current_version": {
                         "type": "string"
                     }
                 },
@@ -629,6 +659,39 @@ class Config:
             if config_cli.command == "device":
                 if config_cli.device_command is not None:
                     self.config["device_command"] = config_cli.device_command
+                # add
+                if config_cli.device_command == "add":
+                    if config_cli.device_uuid is not None:
+                        self.config["parameters"]["device_uuid"] = config_cli.device_uuid
+                    if config_cli.device_pid is not None:
+                        self.config["parameters"]["device_pid"] = config_cli.device_pid
+                    if config_cli.device_model is not None:
+                        self.config["parameters"]["device_model"] = config_cli.device_model
+                    if config_cli.device_serial_number is not None:
+                        self.config["parameters"]["device_serial_number"] = config_cli.device_serial_number
+                    if config_cli.device_current_version is not None:
+                        self.config["parameters"]["device_current_version"] = config_cli.device_current_version
+                # enable
+                if config_cli.device_command == "enable":
+                    if config_cli.device_id is not None:
+                        self.config["parameters"]["device_id"] = config_cli.device_id
+                    if config_cli.device_uuid is not None:
+                        self.config["parameters"]["device_uuid"] = config_cli.device_uuid
+                # disable
+                if config_cli.device_command == "disable":
+                    if config_cli.device_id is not None:
+                        self.config["parameters"]["device_id"] = config_cli.device_id
+                    if config_cli.device_uuid is not None:
+                        self.config["parameters"]["device_uuid"] = config_cli.device_uuid
+                # get
+                if config_cli.device_command == "get":
+                    if config_cli.device_id is not None:
+                        self.config["parameters"]["device_id"] = config_cli.device_id
+                    if config_cli.device_uuid is not None:
+                        self.config["parameters"]["device_uuid"] = config_cli.device_uuid
+                # list
+                if config_cli.device_command == "list":
+                    pass
 
             if config_cli.command == "firmware":
                 if config_cli.firmware_command is not None:
@@ -847,6 +910,25 @@ For use in development environment without SSL certificates and JWT authenticati
     device_subparsers = device_parser.add_subparsers(dest="device_command", required=True)
     # device add
     add_device_parser = device_subparsers.add_parser(name="add", help="Add new device")
+    add_device_parser.add_argument("--uuid", dest="device_uuid", type=str, required=True, help="Device UUIDv4")
+    add_device_parser.add_argument("--pid", dest="device_pid", type=str, required=True, help="ID of the project the device is related to")
+    add_device_parser.add_argument("--model", dest="device_model", type=str, required=False, help="Optional model of the device, user added string")
+    add_device_parser.add_argument("--sn", dest="device_serial_number", type=str, required=False, help="Optional serial number of the device")
+    add_device_parser.add_argument("--version", dest="device_current_version", type=str, required=False, help="Optional version of the device's firmware")
+    # device enable
+    enable_device_parser = device_subparsers.add_parser(name="enable", help="Enable device")
+    enable_device_parser.add_argument("--id", dest="device_id", type=int, required=False, help="ID of the device to be enabled")
+    enable_device_parser.add_argument("--uuid", dest="device_uuid", type=str, required=False, help="UUIDv4 of the device to be enabled")
+    # device disable
+    disable_device_parser = device_subparsers.add_parser(name="disable", help="Disable device")
+    disable_device_parser.add_argument("--id", dest="device_id", type=int, required=False, help="ID of the device to be disabled")
+    disable_device_parser.add_argument("--uuid", dest="device_uuid", type=str, required=False, help="UUIDv4 of the device to be disabled")
+    # device get
+    get_device_parser = device_subparsers.add_parser(name="get", help="Disable device")
+    get_device_parser.add_argument("--id", dest="device_id", type=int, required=False, help="ID of the device to be retrieved")
+    get_device_parser.add_argument("--uuid", dest="device_uuid", type=str, required=False, help="UUIDv4 of the device to be retrieved")
+    # device list
+    list_device_parser = device_subparsers.add_parser(name="list", help="List devices")
 
     # firmware
     firmware_parser = subparsers.add_parser(name="firmware", help="Firmware manipulation operations", )

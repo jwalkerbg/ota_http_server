@@ -86,3 +86,27 @@ class DatabaseService:
 
     def project_get_list(self) -> list[Project]:
         return self._database.project_get_list()
+
+    def add_device(self, device: Device) -> Device:
+        return self._database.add_device(device=device)
+
+    def enable_device_by_id(self, id: int) -> None:
+        return self._database.enable_device_by_id(id=id)
+
+    def enable_device_by_name(self, name: str) -> None:
+        return self._database.enable_device_by_name(name=name)
+
+    def disable_device_by_id(self, id: int) -> None:
+        return self._database.disable_device_by_id(id=id)
+
+    def disable_device_by_name(self, name: str) -> None:
+        return self._database.disable_device_by_name(name=name)
+
+    def get_device_by_id(self, id: int) -> Device | None:
+        return self._database.get_device_by_id(id=id)
+
+    def get_device_by_name(self, name: str) -> Device | None:
+        return self._database.get_device_by_name(name=name)
+
+    def device_get_list(self) -> list[Device]:
+        return self._database.device_get_list()
