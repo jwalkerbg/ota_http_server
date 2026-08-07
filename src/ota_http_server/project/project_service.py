@@ -87,14 +87,14 @@ class ProjectService:
             if project:
                 logger.verbose("Project found: %s", project)
             else:
-                logger.info("Project with ID %d not found.", project_id)
+                logger.verbose("Project with ID %d not found.", project_id)
             return
         if project_name is not None:
             project = db_service.get_project_by_name(project_name)
             if project:
                 logger.verbose("Project found: %s", project)
             else:
-                logger.info("Project with name '%s' not found.", project_name)
+                logger.verbose("Project with name '%s' not found.", project_name)
             return
 
         raise ValueError(
