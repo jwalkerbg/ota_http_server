@@ -323,7 +323,7 @@ class FirmwareFormatter:
             else "-"
         )
 
-        return (
+        values = [
             str(firmware.id),
             str(firmware.project_id),
             firmware.version,
@@ -334,7 +334,7 @@ class FirmwareFormatter:
             firmware.channel,
             created,
             updated
-        )
+        ]
 
         widths = [column.width for column in cls.COLUMNS]
 
