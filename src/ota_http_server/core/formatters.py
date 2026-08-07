@@ -25,9 +25,11 @@ class TableFormatter:
     @staticmethod
     def format_row(
         values: list[str],
-        widths: list[int],
-        alignments: list[str]
+        columns: list[Column]
     ) -> list[str]:
+
+        widths = [column.width for column in columns]
+        alignments = [column.align for column in columns]
 
         # Wrap every cell.
         wrapped = [
@@ -99,11 +101,7 @@ class UserFormatter:
             updated
         ]
 
-        widths = [column.width for column in cls.COLUMNS]
-
-        alignments = [column.align for column in cls.COLUMNS]
-
-        return TableFormatter.format_row(values, widths, alignments)
+        return TableFormatter.format_row(values, cls.COLUMNS)
 
     @classmethod
     def format_list(cls, items: list[User]) -> str:
@@ -167,11 +165,7 @@ class ProjectFormatter:
             updated
         ]
 
-        widths = [column.width for column in cls.COLUMNS]
-
-        alignments = [column.align for column in cls.COLUMNS]
-
-        return TableFormatter.format_row(values, widths, alignments)
+        return TableFormatter.format_row(values, cls.COLUMNS)
 
     @classmethod
     def format_list(cls, items: list[Project]) -> str:
@@ -244,11 +238,7 @@ class DeviceFormatter:
             updated
         ]
 
-        widths = [column.width for column in cls.COLUMNS]
-
-        alignments = [column.align for column in cls.COLUMNS]
-
-        return TableFormatter.format_row(values, widths, alignments)
+        return TableFormatter.format_row(values, cls.COLUMNS)
 
     @classmethod
     def format_list(cls, items: list[Device]) -> str:
@@ -316,11 +306,7 @@ class FirmwareFormatter:
             updated
         ]
 
-        widths = [column.width for column in cls.COLUMNS]
-
-        alignments = [column.align for column in cls.COLUMNS]
-
-        return TableFormatter.format_row(values, widths, alignments)
+        return TableFormatter.format_row(values, cls.COLUMNS)
 
     @classmethod
     def format_list(cls, items: list[Firmware]) -> str:
