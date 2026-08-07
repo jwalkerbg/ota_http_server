@@ -250,7 +250,7 @@ class DeviceFormatter:
             device.model,
             device.serial_number,
             device.current_version,
-            device.last_seen,
+            last_seen,
             status,
             created,
             updated
