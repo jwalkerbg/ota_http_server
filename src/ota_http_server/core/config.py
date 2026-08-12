@@ -764,7 +764,10 @@ class Config:
                         self.config["parameters"]["firmware_version"] = config_cli.firmware_version
                 # list
                 if config_cli.firmware_command == "list":
-                    pass
+                    if config_cli.firmware_record is not None:
+                        self.config["parameters"]["firmware_record"] = True
+                    else:
+                        self.config["parameters"]["firmware_record"] = False
 
         return self.config
 
@@ -1026,6 +1029,7 @@ For use in development environment without SSL certificates and JWT authenticati
     get_firmware_parser.add_argument("--version", dest="firmware_version", type=str, required=False, help="Version of the firmware")
     # firmware list
     list_firmware_parser = firmware_subparsers.add_parser("list", help="List available firmware")
+    list_firmware_parser.add_argument("--record", dest="firmware_record", action="store_const", const=True, help="")
 
     return parser.parse_args()
 

@@ -3,7 +3,7 @@
 from ota_http_server.core.config import Config
 from ota_http_server.core.data_models import User, Project, Device, Firmware
 from ota_http_server.database.database_service import DatabaseService
-from ota_http_server.core.formatters import FirmwareFormatter
+from ota_http_server.core.formatters import FirmwareFormatter, FirmwareListItemFormatter
 from ota_http_server.logger import get_app_logger
 
 logger = get_app_logger(__name__)
@@ -128,9 +128,18 @@ class FirmwareService:
 
     def _list_firmware(self) -> None:
         db_service: DatabaseService = self.cfg.config["db_service"]
-        firmware = db_service.firmware_get_list()
-        if firmware:
-            logger.verbose("\n%s",FirmwareFormatter.format_list(firmware))
+
+        if self.cfg.config["parameters"]["firmware_record"] == True:
+            firmware = db_service.firmware_get_record()
+            if firmware:
+                logger.verbose("\n%s",FirmwareFormatter.format_list(firmware))
+            else:
+                logger.info("No firmware found.")
+
         else:
-            logger.info("No firmwares found.")
+            firmware = db_service.firmware_get_list()
+            if firmware:
+                logger.verbose("\n%s\n",FirmwareListItemFormatter.format_list(firmware))
+            else:
+                logger.info("No firmware found.")
 

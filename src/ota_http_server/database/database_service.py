@@ -2,7 +2,7 @@
 
 from ota_http_server.core.config import Config
 from ota_http_server.database.database_interface import DatabaseInterface
-from ota_http_server.core.data_models import User, Project, Device, Firmware
+from ota_http_server.core.data_models import User, Project, Device, Firmware, FirmwareListItem
 from ota_http_server.logger import get_app_logger
 
 logger = get_app_logger(__name__)
@@ -136,5 +136,8 @@ class DatabaseService:
         ) -> Firmware | None:
         return self._database.firmware_get_by_project_version(project_id=project_id, version=version)
 
-    def firmware_get_list(self) -> list[Firmware]:
+    def firmware_get_record(self) -> list[Firmware]:
+        return self._database.firmware_get_record()
+
+    def firmware_get_list(self) -> list[FirmwareListItem]:
         return self._database.firmware_get_list()

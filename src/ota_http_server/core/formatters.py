@@ -2,7 +2,7 @@
 
 from datetime import datetime
 from textwrap import wrap
-from ota_http_server.core.data_models import User, Project, Device, Firmware, Column
+from ota_http_server.core.data_models import User, Project, Device, Firmware, FirmwareListItem, Column
 
 class TableFormatter:
 
@@ -314,6 +314,50 @@ class FirmwareFormatter:
 
     @classmethod
     def format_list(cls, items: list[Firmware]) -> str:
+
+        lines = [
+            TableFormatter.header(cls.COLUMNS),
+            TableFormatter.separator(cls.COLUMNS),
+        ]
+
+        for item in items:
+            lines.extend(cls.format(item))
+
+        return "\n".join(lines)
+
+class FirmwareListItemFormatter:
+    ID_WIDTH =  5
+    PROJECT_NAME_WIDTH = 10
+    VERSION_WIDTH = 32
+    FILENAME_WIDTH = 32
+    FILESIZE_WIDTH = 10
+    CHANNEL_WIDTH = 10
+
+    COLUMNS = [
+        Column('ID', ID_WIDTH, ">"),
+        Column('Project', PROJECT_NAME_WIDTH, "^"),
+        Column('Version', VERSION_WIDTH, "^"),
+        Column('FileName', FILENAME_WIDTH, "^"),
+        Column('FileSize', FILESIZE_WIDTH, "^"),
+        Column('Channel', CHANNEL_WIDTH, "^")
+    ]
+
+    @classmethod
+    def format(cls, firmware: FirmwareListItem) -> str:
+
+        values = [
+            str(firmware.id),
+            firmware.project_name,
+            firmware.version,
+            firmware.filename,
+            str(firmware.file_size),
+            firmware.channel
+        ]
+
+        return TableFormatter.format_row(values, cls.COLUMNS)
+
+    @classmethod
+    def format_list(cls, items: list[FirmwareListItem]) -> str:
 
         lines = [
             TableFormatter.header(cls.COLUMNS),

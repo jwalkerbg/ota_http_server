@@ -194,6 +194,15 @@ class Firmware:
             f")"
         )
 
+@dataclass
+class FirmwareListItem:
+    id: int
+    project_name: str
+    version: str
+    filename: str
+    file_size: int
+    channel: str
+
 class AppPaths:
     def __init__(self, cfg: Config):
         self._cfg = cfg

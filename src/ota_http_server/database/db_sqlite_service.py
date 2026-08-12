@@ -6,7 +6,7 @@ from datetime import datetime, UTC
 
 from ota_http_server.core.config import Config
 from ota_http_server.database.migration_sqlite3_runner import MigrationRunner
-from ota_http_server.core.data_models import User, Project, Device, Firmware
+from ota_http_server.core.data_models import User, Project, Device, Firmware, FirmwareListItem
 from ota_http_server.core.data_models import AppPaths
 from ota_http_server.logger import get_app_logger
 
@@ -829,6 +829,16 @@ class DatabaseSqliteService:
                     if row["updated_at"] else None,
             )
 
+    def _row_to_firmware_list(self, row: sqlite3.Row)  -> FirmwareListItem:
+        return FirmwareListItem(
+            id=row["id"],
+            project_name=row["project_name"],
+            version=row["version"],
+            filename=row["filename"],
+            file_size=row["file_size"],
+            channel=row["channel"]
+        )
+
     def add_firmware(self, firmware: Firmware) -> Firmware:
 
         now = datetime.now(UTC)
@@ -1085,7 +1095,7 @@ class DatabaseSqliteService:
             (project_id, version),
         )
 
-    def firmware_get_list(self) -> list[Firmware]:
+    def firmware_get_record(self) -> list[Firmware]:
 
         try:
             with self._connect() as conn:
@@ -1113,6 +1123,39 @@ class DatabaseSqliteService:
 
                 return [
                     self._row_to_firmware(row)
+                    for row in rows
+                ]
+
+        except sqlite3.Error as e:
+            raise DatabaseError(
+                "Database error retrieving firmware"
+            ) from e
+
+    def firmware_get_list(self) -> list[FirmwareListItem]:
+
+        try:
+            with self._connect() as conn:
+
+                cursor = conn.execute(
+                    """
+                    SELECT
+                        firmware.id,
+                        projects.name AS project_name,
+                        firmware.version,
+                        firmware.filename,
+                        firmware.file_size,
+                        firmware.channel
+                    FROM firmware
+                    JOIN projects
+                        ON projects.id = firmware.project_id
+                    ORDER BY projects.name, firmware.version;
+                    """
+                )
+
+                rows = cursor.fetchall()
+
+                return [
+                    self._row_to_firmware_list(row)
                     for row in rows
                 ]
 
