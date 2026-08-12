@@ -304,12 +304,6 @@ class DatabaseSqliteService:
         return self._user_get("username", username)
 
     def user_get_list(self) -> list[User]:
-        """
-        Get all users from database.
-
-        Returns:
-            List of User objects. Empty list if no users exist.
-        """
 
         try:
             with self._connect() as conn:
