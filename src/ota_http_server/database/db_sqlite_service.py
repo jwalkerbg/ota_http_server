@@ -797,7 +797,7 @@ class DatabaseSqliteService:
                         created_at,
                         updated_at
                     FROM devices
-                    ORDER BY id
+                    ORDER BY project_id, id
                     """
                 )
 
