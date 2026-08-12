@@ -215,12 +215,12 @@ class DatabaseSqliteService:
                 row = cursor.fetchone()
 
                 if row is None:
-                    raise UserNotFoundError(...)
+                    raise UserNotFoundError(f"User {column}={parameter} not found")
 
             if op:
-                raise UserAlreadyEnabledError(...)
+                raise UserAlreadyEnabledError(f"User {column}={parameter} is already enabled")
             else:
-                raise UserAlreadyDisabledError(...)
+                raise UserAlreadyDisabledError(f"User {column}={parameter} is already disabled")
 
         except sqlite3.Error as e:
             if op:
@@ -465,12 +465,12 @@ class DatabaseSqliteService:
                 row = cursor.fetchone()
 
                 if row is None:
-                    raise ProjectNotFoundError(...)
+                    raise ProjectNotFoundError(f"Project {column}={parameter} not found")
 
             if op:
-                raise ProjectAlreadyEnabledError(...)
+                raise ProjectAlreadyEnabledError(f"Project {column}={parameter} is already enabled")
             else:
-                raise ProjectAlreadyDisabledError(...)
+                raise ProjectAlreadyDisabledError(f"Project {column}={parameter} is already disabled")
 
         except sqlite3.Error as e:
             if op:
@@ -704,12 +704,12 @@ class DatabaseSqliteService:
                 row = cursor.fetchone()
 
                 if row is None:
-                    raise DeviceNotFoundError(...)
+                    raise DeviceNotFoundError(f"Device {column}={parameter} not found")
 
             if op:
-                raise DeviceAlreadyEnabledError(...)
+                raise DeviceAlreadyEnabledError(f"Device {column}={parameter} is already enabled")
             else:
-                raise DeviceAlreadyDisabledError(...)
+                raise DeviceAlreadyDisabledError(f"Device {column}={parameter} is already disabled")
 
         except sqlite3.Error as e:
             if op:
