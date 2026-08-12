@@ -964,7 +964,7 @@ For use in development environment without SSL certificates and JWT authenticati
     enable_project_parser.add_argument("--id", dest="project_id", type=int, required=False, help="ID of the project to be enabled")
     enable_project_parser.add_argument("--name", dest="project_name", type=str, required=False, help="Name of the project to be enabled. Give --id or --name. --id takes precedence.")
     # project disable
-    disable_project_parser = project_subparsers.add_parser(name="disable", help="Enable project")
+    disable_project_parser = project_subparsers.add_parser(name="disable", help="Disable project")
     disable_project_parser.add_argument("--id", dest="project_id", type=int, required=False, help="ID of the project to be disabled")
     disable_project_parser.add_argument("--name", dest="project_name", type=str, required=False, help="Name of the project to be disabled. Give --id or --name. --id takes precedence.")
     # project get
@@ -993,7 +993,7 @@ For use in development environment without SSL certificates and JWT authenticati
     disable_device_parser.add_argument("--id", dest="device_id", type=int, required=False, help="ID of the device to be disabled")
     disable_device_parser.add_argument("--uuid", dest="device_uuid", type=str, required=False, help="UUIDv4 of the device to be disabled")
     # device get
-    get_device_parser = device_subparsers.add_parser(name="get", help="Disable device")
+    get_device_parser = device_subparsers.add_parser(name="get", help="Retrieve device information")
     get_device_parser.add_argument("--id", dest="device_id", type=int, required=False, help="ID of the device to be retrieved")
     get_device_parser.add_argument("--uuid", dest="device_uuid", type=str, required=False, help="UUIDv4 of the device to be retrieved")
     # device list
