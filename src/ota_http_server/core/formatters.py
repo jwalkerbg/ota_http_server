@@ -263,6 +263,7 @@ class FirmwareFormatter:
     FILECHECKSUM_WIDTH = 10
     RELEASE_NOTES = 48
     CHANNEL_WIDTH = 10
+    STATUS_WIDTH =  10
     DATE_WIDTH =  22
 
     COLUMNS = [
@@ -274,6 +275,7 @@ class FirmwareFormatter:
         Column('Checksum', FILECHECKSUM_WIDTH, "^"),
         Column('Release notes', RELEASE_NOTES, "^"),
         Column('Channel', CHANNEL_WIDTH, "^"),
+        Column('Status', STATUS_WIDTH, "^"),
         Column('Created At', DATE_WIDTH, "^"),
         Column('Updated At', DATE_WIDTH, "^")
     ]
@@ -299,10 +301,11 @@ class FirmwareFormatter:
             str(firmware.project_id),
             firmware.version,
             firmware.filename,
-            firmware.file_size,
+            str(firmware.file_size),
             firmware.checksum,
             firmware.release_notes,
             firmware.channel,
+            status,
             created,
             updated
         ]

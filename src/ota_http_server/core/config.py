@@ -67,6 +67,12 @@ class ParametersConfig(TypedDict, total=False):
     device_model: str
     device_serial_number: str
     device_current_version: str
+    firmware_id: int
+    firmware_pid: int
+    firmware_version: str
+    firmware_file: str
+    firmware_release_notes: str
+    firmware_release_channel: str
 
 class DatabaseMySQLConfig(TypedDict, total=False):
     dbhost: str
@@ -154,7 +160,13 @@ class Config:
             'device_pid': None,
             'device_model': None,
             'device_serial_number': None,
-            'device_current_version': None
+            'device_current_version': None,
+            "firmware_id": None,
+            'firmware_pid': None,
+            'firmware_version': None,
+            'firmware_file': None,
+            'firmware_release_notes': None,
+            'firmware_release_channel': None
         },
         'database': {
             'dbtype': "sqlite",
@@ -318,6 +330,24 @@ class Config:
                         "type": "string"
                     },
                     "device_current_version": {
+                        "type": "string"
+                    },
+                    "firmware_id": {
+                        "type": "number"
+                    },
+                    "firmware_pid": {
+                        "type": "number"
+                    },
+                    "firmware_version": {
+                        "type": "string"
+                    },
+                    "firmware_file": {
+                        "type": "string"
+                    },
+                    "firmware_release_notes": {
+                        "type": "string"
+                    },
+                    "firmware_release_channel": {
                         "type": "string"
                     }
                 },
@@ -696,6 +726,45 @@ class Config:
             if config_cli.command == "firmware":
                 if config_cli.firmware_command is not None:
                     self.config["firmware_command"] = config_cli.firmware_command
+                # add
+                if config_cli.firmware_command == "add":
+                    if config_cli.firmware_pid is not None:
+                        self.config["parameters"]["firmware_pid"] = config_cli.firmware_pid
+                    if config_cli.firmware_version is not None:
+                        self.config["parameters"]["firmware_version"] = config_cli.firmware_version
+                    if config_cli.firmware_file is not None:
+                        self.config["parameters"]["firmware_file"] = config_cli.firmware_file
+                    if config_cli.firmware_release_notes is not None:
+                        self.config["parameters"]["firmware_release_notes"] = config_cli.firmware_release_notes
+                    if config_cli.firmware_release_channel is not None:
+                        self.config["parameters"]["firmware_release_channel"] = config_cli.firmware_release_channel
+                # enable
+                if config_cli.firmware_command == "enable":
+                    if config_cli.firmware_id is not None:
+                        self.config["parameters"]["firmware_id"] = config_cli.firmware_id
+                    if config_cli.firmware_pid is not None:
+                        self.config["parameters"]["firmware_pid"] = config_cli.firmware_pid
+                    if config_cli.firmware_version is not None:
+                        self.config["parameters"]["firmware_version"] = config_cli.firmware_version
+                # disable
+                if config_cli.firmware_command == "disable":
+                    if config_cli.firmware_id is not None:
+                        self.config["parameters"]["firmware_id"] = config_cli.firmware_id
+                    if config_cli.firmware_pid is not None:
+                        self.config["parameters"]["firmware_pid"] = config_cli.firmware_pid
+                    if config_cli.firmware_version is not None:
+                        self.config["parameters"]["firmware_version"] = config_cli.firmware_version
+                # get
+                if config_cli.firmware_command == "get":
+                    if config_cli.firmware_id is not None:
+                        self.config["parameters"]["firmware_id"] = config_cli.firmware_id
+                    if config_cli.firmware_pid is not None:
+                        self.config["parameters"]["firmware_pid"] = config_cli.firmware_pid
+                    if config_cli.firmware_version is not None:
+                        self.config["parameters"]["firmware_version"] = config_cli.firmware_version
+                # list
+                if config_cli.firmware_command == "list":
+                    pass
 
         return self.config
 
@@ -935,6 +1004,28 @@ For use in development environment without SSL certificates and JWT authenticati
     firmware_subparsers = firmware_parser.add_subparsers(dest="firmware_command", required=True)
     # firmware add
     add_firmware_parser = firmware_subparsers.add_parser(name="add", help="Add new firmware")
+    add_firmware_parser.add_argument("--pid", dest="firmware_pid", type=int, required=True, help="ID of the project the firmware is related to")
+    add_firmware_parser.add_argument("--version", dest="firmware_version", type=str, required=True, help="Version of the firmware")
+    add_firmware_parser.add_argument("--file", dest="firmware_file", type=str, required=True, help="Path to the firmware file")
+    add_firmware_parser.add_argument("--notes", dest="firmware_release_notes", type=str, required=False, help="Release notes for the firmware")
+    add_firmware_parser.add_argument("--channel", dest="firmware_release_channel", type=str, choices=["stable", "dev", "beta"], default="stable", required=False, help="Release channel for the firmware (e.g., stable, dev, beta)")
+    # firmware enable
+    enable_firmware_parser = firmware_subparsers.add_parser("enable", help="Enable firmware to be downloaded for OTA")
+    enable_firmware_parser.add_argument("--id", dest="firmware_id", type=int, required=False, help="ID of the firmware to be enabled")
+    enable_firmware_parser.add_argument("--pid", dest="firmware_pid", type=int, required=False, help="ID of the project the firmware is related to")
+    enable_firmware_parser.add_argument("--version", dest="firmware_version", type=str, required=False, help="Version of the firmware")
+    # firmware disable
+    disable_firmware_parser = firmware_subparsers.add_parser("disable", help="Disable firmware to be downloaded for OTA")
+    disable_firmware_parser.add_argument("--id", dest="firmware_id", type=int, required=False, help="ID of the firmware to be disabled")
+    disable_firmware_parser.add_argument("--pid", dest="firmware_pid", type=int, required=False, help="ID of the project the firmware is related to")
+    disable_firmware_parser.add_argument("--version", dest="firmware_version", type=str, required=False, help="Version of the firmware")
+    # firmware get
+    get_firmware_parser = firmware_subparsers.add_parser("get", help="Retrieve data for firmware")
+    get_firmware_parser.add_argument("--id", dest="firmware_id", type=int, required=False, help="ID of the firmware to be retrieved")
+    get_firmware_parser.add_argument("--pid", dest="firmware_pid", type=int, required=False, help="ID of the project the firmware is related to")
+    get_firmware_parser.add_argument("--version", dest="firmware_version", type=str, required=False, help="Version of the firmware")
+    # firmware list
+    list_firmware_parser = firmware_subparsers.add_parser("list", help="List available firmware")
 
     return parser.parse_args()
 

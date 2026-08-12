@@ -51,6 +51,18 @@ class DeviceAlreadyEnabledError(Exception):
 class DeviceAlreadyDisabledError(Exception):
     pass
 
+class FirmwareAlreadyExistsError(Exception):
+    pass
+
+class FirmwareNotFoundError(Exception):
+    pass
+
+class FirmwareAlreadyEnabledError(Exception):
+    pass
+
+class FirmwareAlreadyDisabledError(Exception):
+    pass
+
 class DatabaseError(Exception):
     pass
 
@@ -801,3 +813,316 @@ class DatabaseSqliteService:
                 "Database error retrieving devices"
             ) from e
 
+    def _row_to_firmware(self, row: sqlite3.Row) -> Firmware:
+
+            return Firmware(
+                id=row["id"],
+                project_id=row["project_id"],
+                version=row["version"],
+                filename=row["filename"]
+                    if row["filename"] else "",
+                file_size=row["file_size"]
+                    if row["file_size"] else 0,
+                checksum=row["checksum"]
+                    if row["checksum"] else "",
+                release_notes = row["release_notes"]
+                    if row["release_notes"] else "",
+                channel = row["channel"],
+                is_active=bool(row["is_active"]),
+                created_at=datetime.fromisoformat(row["created_at"])
+                    if row["created_at"] else None,
+                updated_at=datetime.fromisoformat(row["updated_at"])
+                    if row["updated_at"] else None,
+            )
+
+    def add_firmware(self, firmware: Firmware) -> Firmware:
+
+        now = datetime.now(UTC)
+
+        try:
+            with self._connect() as conn:
+
+                cursor = conn.execute(
+                    """
+                    INSERT INTO firmware
+                    (
+                        id,
+                        project_id,
+                        version,
+                        filename,
+                        file_size,
+                        checksum,
+                        release_notes,
+                        channel,
+                        is_active,
+                        created_at,
+                        updated_at
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        firmware.id,
+                        firmware.project_id,
+                        firmware.version,
+                        firmware.filename,
+                        firmware.file_size,
+                        firmware.checksum,
+                        firmware.release_notes,
+                        firmware.channel,
+                        int(firmware.is_active),
+                        now.isoformat(),
+                        None
+                    )
+                )
+
+                conn.commit()
+
+                firmware.id = cursor.lastrowid
+                firmware.created_at = now
+                firmware.updated_at = None
+
+                return firmware
+
+        except sqlite3.IntegrityError as e:
+            match e.sqlite_errorname:
+
+                case "SQLITE_CONSTRAINT_UNIQUE":
+                    raise FirmwareAlreadyExistsError(
+                        f"Firmware '{firmware.id}' already exists"
+                    ) from e
+                case "SQLITE_CONSTRAINT_FOREIGNKEY":
+                    raise ProjectNotFoundError(
+                        f"Database Integrity violation: Project with id={firmware.project_id} does not exist"
+                    ) from e
+
+                case _:
+                    raise DatabaseError(
+                        f"Database integrity error creating firmware '{firmware.id}': {str(e)}"
+                    ) from e
+        except sqlite3.Error as e:
+            raise DatabaseError(
+                f"Database error creating firmware '{firmware.uuid}'"
+            ) from e
+
+    def _firmware_enable_disable(
+            self,
+            columns: tuple[str, ...],
+            parameters: tuple[int | str, ...],
+            op: bool
+        ):
+
+        allowed_columns = {
+            "id",
+            "project_id",
+            "version",
+        }
+
+        if not columns:
+            raise ValueError("At least one column is required")
+
+        if len(columns) != len(parameters):
+            raise ValueError(
+                "Number of columns must match number of parameters"
+            )
+
+        lookup = ", ".join(
+            f"{column}={parameter}"
+            for column, parameter in zip(columns, parameters)
+        )
+
+        if op:
+            operation = "1"
+            state = "0"
+        else:
+            operation = "0"
+            state = "1"
+
+        where_clause = " AND ".join(
+            f"{column} = ?" for column in columns
+        )
+
+        now = datetime.now(UTC)
+
+        try:
+            with self._connect() as conn:
+                cursor = conn.execute(
+                    f"""
+                    UPDATE firmware
+                    SET
+                        is_active = {operation},
+                        updated_at = ?
+                    WHERE {where_clause}
+                    AND is_active = {state}
+                    """,
+                    (
+                        now.isoformat(),
+                        *parameters,
+                    )
+                )
+
+                if cursor.rowcount == 1:
+                    conn.commit()
+                    return
+
+                cursor = conn.execute(
+                    f"""
+                    SELECT is_active
+                    FROM firmware
+                    WHERE {where_clause}
+                    """,
+                    parameters,
+                )
+
+                row = cursor.fetchone()
+
+                if row is None:
+                    raise FirmwareNotFoundError(
+                        f"Firmware {lookup} not found"
+                    )
+
+            if op:
+                raise FirmwareAlreadyEnabledError(
+                    f"Firmware {lookup} is already enabled"
+                )
+            else:
+                raise FirmwareAlreadyDisabledError(
+                    f"Firmware {lookup} is already disabled"
+                )
+
+        except sqlite3.Error as e:
+            if op:
+                raise DatabaseError(
+                    f"Database error enabling firmware {lookup}"
+                ) from e
+            else:
+                raise DatabaseError(
+                    f"Database error disabling firmware {lookup}"
+                ) from e
+
+    def enable_firmware_by_id(self, id: int) -> None:
+        self._firmware_enable_disable(("id",), (id,), True)
+
+    def enable_firmware_by_project_version(self, project_id: int, version: str) -> None:
+        self._firmware_enable_disable(("project_id", "version"), (project_id, version), True)
+
+    def disable_firmware_by_id(self, id: int) -> None:
+        self._firmware_enable_disable(("id",), (id,), False)
+
+    def disable_firmware_by_project_version(self, project_id: int, version: str) -> None:
+        self._firmware_enable_disable(("project_id", "version"), (project_id, version), False)
+
+    def _firmware_get(
+            self,
+            columns: tuple[str, ...],
+            parameters: tuple[int | str, ...],
+        ) -> Firmware | None:
+
+        allowed_columns = {
+            "id",
+            "project_id",
+            "version",
+        }
+
+        if not columns:
+            raise ValueError("At least one column is required")
+
+        if len(columns) != len(parameters):
+            raise ValueError(
+                "Number of columns must match number of parameters"
+            )
+
+        where_clause = " AND ".join(
+            f"{column} = ?" for column in columns
+        )
+
+        try:
+            with self._connect() as conn:
+
+                cursor = conn.execute(
+                    f"""
+                    SELECT
+                        id,
+                        project_id,
+                        version,
+                        filename,
+                        file_size,
+                        checksum,
+                        release_notes,
+                        channel,
+                        is_active,
+                        created_at,
+                        updated_at
+                    FROM firmware
+                    WHERE {where_clause}
+                    """,
+                    parameters,
+                )
+
+                row = cursor.fetchone()
+
+                if row is None:
+                    return None
+
+                return self._row_to_firmware(row)
+
+        except sqlite3.Error as e:
+            raise DatabaseError(
+                f"Database error retrieving firmware {column}={parameter}"
+            ) from e
+
+    def firmware_get_by_id(
+        self,
+        firmware_id: int,
+    ) -> Firmware | None:
+
+        return self._firmware_get(
+            ("id",),
+            (firmware_id,),
+        )
+
+    def firmware_get_by_project_version(
+        self,
+        project_id: int,
+        version: str,
+    ) -> Firmware | None:
+
+        return self._firmware_get(
+            ("project_id", "version"),
+            (project_id, version),
+        )
+
+    def firmware_get_list(self) -> list[Firmware]:
+
+        try:
+            with self._connect() as conn:
+
+                cursor = conn.execute(
+                    """
+                    SELECT
+                        id,
+                        project_id,
+                        version,
+                        filename,
+                        file_size,
+                        checksum,
+                        release_notes,
+                        channel,
+                        is_active,
+                        created_at,
+                        updated_at
+                    FROM firmware
+                    ORDER BY project_id, id
+                    """
+                )
+
+                rows = cursor.fetchall()
+
+                return [
+                    self._row_to_firmware(row)
+                    for row in rows
+                ]
+
+        except sqlite3.Error as e:
+            raise DatabaseError(
+                "Database error retrieving firmware"
+            ) from e

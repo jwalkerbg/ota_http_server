@@ -162,6 +162,7 @@ class Firmware:
     checksum: str       # SHA-256 hash
     release_notes: str  # Optional notes
     channel: str        # stable, beta, dev
+    is_active: bool     # Disable OTA for this firmware
     created_at: Optional[datetime]
     updated_at: Optional[datetime]  # Audit information
 
@@ -181,12 +182,13 @@ class Firmware:
         return(
             f"Firmware("
             f"ID:{self.id}, "
-            "version:{self.version}, "
+            f"version:{self.version}, "
             f"filename:{self.filename}, "
             f"file_size:{self.file_size}, "
             f"checksum:{self.checksum}, "
             f"release_notes:{self.release_notes}, "
             f"channel:{self.channel}, "
+            f"is_active:{self.is_active}, "
             f"created_at:{created_at}, "
             f"updated_at:{updated_at}"
             f")"

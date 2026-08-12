@@ -3,6 +3,7 @@
 from ota_http_server.core.config import Config
 from ota_http_server.core.data_models import User, Project, Device, Firmware
 from ota_http_server.database.database_service import DatabaseService
+from ota_http_server.core.formatters import FirmwareFormatter
 from ota_http_server.logger import get_app_logger
 
 logger = get_app_logger(__name__)
@@ -33,17 +34,103 @@ class FirmwareService:
             logger.debug("Invalid firmware command received: %s", command)
 
     def _add_firmware(self) -> None:
-        pass
+        pid = self.cfg.config["parameters"]["firmware_pid"]
+        version = self.cfg.config["parameters"]["firmware_version"]
+        file_path = self.cfg.config["parameters"]["firmware_file"]
+        release_notes = self.cfg.config["parameters"]["firmware_release_notes"]
+        release_channel = self.cfg.config["parameters"]["firmware_release_channel"]
+
+        # must measure file_size here
+        # must calculate checksum here
+
+        firmware = Firmware(
+            id=None,
+            project_id=pid,
+            version=version,
+            filename=file_path,
+            file_size=0,
+            checksum="",
+            release_notes=release_notes,
+            channel=release_channel,
+            is_active=True,
+            created_at=None,
+            updated_at=None
+        )
+
+        db_service: DatabaseService = self.cfg.config["db_service"]
+        db_service.add_firmware(firmware)
 
     def _enable_firmware(self) -> None:
-        pass
+        id = self.cfg.config["parameters"]["firmware_id"]
+        pid = self.cfg.config["parameters"]["firmware_pid"]
+        version = self.cfg.config["parameters"]["firmware_version"]
+
+        db_service: DatabaseService = self.cfg.config["db_service"]
+
+        if id is not None:
+
+            db_service.enable_firmware_by_id(id)
+            return
+
+        if pid is not None and version is not None:
+            db_service.enable_firmware_by_project_version(pid, version)
+            return
+
+        raise ValueError(
+            "Firmware id or project id plus version must be provided"
+        )
 
     def _disable_firmware(self) -> None:
-        pass
+        id = self.cfg.config["parameters"]["firmware_id"]
+        pid = self.cfg.config["parameters"]["firmware_pid"]
+        version = self.cfg.config["parameters"]["firmware_version"]
+
+        db_service: DatabaseService = self.cfg.config["db_service"]
+
+        if id is not None:
+            db_service.disable_firmware_by_id(id)
+            return
+
+        if pid is not None and version is not None:
+            db_service.disable_firmware_by_project_version(pid, version)
+            return
+
+        raise ValueError(
+            "Firmware id or project id plus version must be provided"
+        )
 
     def _get_firmware(self) -> None:
-        pass
+        id = self.cfg.config["parameters"]["firmware_id"]
+        pid = self.cfg.config["parameters"]["firmware_pid"]
+        version = self.cfg.config["parameters"]["firmware_version"]
+
+        db_service: DatabaseService = self.cfg.config["db_service"]
+
+        if id is not None:
+            firmware = db_service.get_firmware_by_id(id)
+            if firmware:
+                logger.verbose("Firmware found: %s", firmware)
+            else:
+                logger.verbose("Firmware with ID = %d not found", id)
+            return
+
+        if pid is not None and version is not None:
+            firmware = db_service.firmware_get_by_project_version(project_id=pid, version=version)
+            if firmware:
+                logger.verbose("Firmware found: %s", firmware)
+            else:
+                logger.verbose("Firmware with pid = %d and version = %s not found", pid, version)
+            return
+
+        raise ValueError(
+            "Firmware id or project id plus version must be provided"
+        )
 
     def _list_firmware(self) -> None:
-        pass
+        db_service: DatabaseService = self.cfg.config["db_service"]
+        firmware = db_service.firmware_get_list()
+        if firmware:
+            logger.verbose("\n%s",FirmwareFormatter.format_list(firmware))
+        else:
+            logger.info("No firmwares found.")
 

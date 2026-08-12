@@ -110,3 +110,31 @@ class DatabaseService:
 
     def device_get_list(self) -> list[Device]:
         return self._database.device_get_list()
+
+    def add_firmware(self, firmware: Firmware) -> Firmware:
+        return self._database.add_firmware(firmware=firmware)
+
+    def enable_firmware_by_id(self, id: int) -> None:
+        return self._database.enable_firmware_by_id(id=id)
+
+    def enable_firmware_by_project_version(self, project_id: int, version: str) -> None:
+        return self._database.enable_firmware_by_project_version(project_id=project_id, version=version)
+
+    def disable_firmware_by_id(self, id: int) -> None:
+        return self._database.disable_firmware_by_id(id=id)
+
+    def disable_firmware_by_project_version(self, project_id: int, version: str) -> None:
+        return self._database.disable_firmware_by_project_version(project_id=project_id, version=version)
+
+    def get_firmware_by_id(self, id: int) -> Firmware | None:
+        return self._database.get_firmware_by_id(id=id)
+
+    def firmware_get_by_project_version(
+            self,
+            project_id: int,
+            version: str,
+        ) -> Firmware | None:
+        return self._database.firmware_get_by_project_version(project_id=project_id, version=version)
+
+    def firmware_get_list(self) -> list[Firmware]:
+        return self._database.firmware_get_list()
