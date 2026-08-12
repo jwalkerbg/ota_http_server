@@ -126,5 +126,5 @@ class DeviceService:
         if devices:
             logger.verbose("\n%s",DeviceFormatter.format_list(devices))
         else:
-            logger.info("No projects found.")
+            logger.info("No devices found.")
 
