@@ -2,7 +2,7 @@
 
 from datetime import datetime
 from textwrap import wrap
-from ota_http_server.core.data_models import User, Project, Device, Firmware, FirmwareListItem, Column
+from ota_http_server.core.data_models import User, Project, Device, DeviceListItem, Firmware, FirmwareListItem, Column
 
 class TableFormatter:
 
@@ -208,6 +208,10 @@ class DeviceFormatter:
     def format(cls, device: Device) -> str:
         status = "active" if device.is_active else "disabled"
 
+        model = device.model if device.model else "-"
+        serial_number = device.serial_number if device.serial_number else "-"
+        current_version = device.current_version if device.current_version else "-"
+
         last_seen = (
             device.last_seen.strftime("%Y-%m-%d %H:%M:%S")
             if device.last_seen
@@ -230,9 +234,9 @@ class DeviceFormatter:
             str(device.id),
             device.uuid,
             str(device.project_id),
-            device.model,
-            device.serial_number,
-            device.current_version,
+            model,
+            serial_number,
+            current_version,
             last_seen,
             status,
             created,
@@ -243,6 +247,69 @@ class DeviceFormatter:
 
     @classmethod
     def format_list(cls, items: list[Device]) -> str:
+
+        lines = [
+            TableFormatter.header(cls.COLUMNS),
+            TableFormatter.separator(cls.COLUMNS),
+        ]
+
+        for item in items:
+            lines.extend(cls.format(item))
+
+        return "\n".join(lines)
+
+class DeviceListItemFormatter:
+    ID_WIDTH =  5
+    DEVICE_UUID_WIDTH = 36
+    PROJECT_NAME_WIDTH = 10
+    MODEL_WIDTH = 16
+    SERIALN_WIDTH = 32
+    CURRENT_VERSION_WIDTH = 32
+    DATE_WIDTH =  22
+    STATUS_WIDTH =  10
+
+    COLUMNS = [
+        Column('ID', ID_WIDTH, "^"),
+        Column('UUID', DEVICE_UUID_WIDTH, "^"),
+        Column('Project', PROJECT_NAME_WIDTH, "^"),
+        Column('Model', MODEL_WIDTH, "^"),
+        Column('Serial #', SERIALN_WIDTH, "^"),
+        Column('Current version', CURRENT_VERSION_WIDTH, "^"),
+        Column('Last seen', DATE_WIDTH, "^"),
+        Column('Status', STATUS_WIDTH, "^")
+    ]
+
+    @classmethod
+    def format(cls, device: DeviceListItem) -> str:
+        status = "active" if device.is_active else "disabled"
+
+        model = device.model if device.model else "-"
+        serial_number = device.serial_number if device.serial_number else "-"
+        current_version = device.current_version if device.current_version else "-"
+
+        last_seen = (
+            device.last_seen.strftime("%Y-%m-%d %H:%M:%S")
+            if device.last_seen
+            else "-"
+        )
+
+        values = [
+            str(device.id),
+            device.uuid,
+            device.project_name,
+            model,
+            serial_number,
+            current_version,
+            last_seen,
+            status
+        ]
+
+        print(values)
+
+        return TableFormatter.format_row(values, cls.COLUMNS)
+
+    @classmethod
+    def format_list(cls, items: list[DeviceListItem]) -> str:
 
         lines = [
             TableFormatter.header(cls.COLUMNS),

@@ -153,6 +153,17 @@ class Device:
         )
 
 @dataclass
+class DeviceListItem:
+    id: int
+    uuid: str
+    project_name: str
+    model: str
+    serial_number: str
+    current_version: str
+    last_seen: Optional[datetime]
+    is_active: bool
+
+@dataclass
 class Firmware:
     id: Optional[int]   # the database primary key. It is None before the object is inserted into SQLite.
     project_id: int     # FK → Projects: Which project owns this firmware

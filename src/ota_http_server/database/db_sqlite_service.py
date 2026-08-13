@@ -6,7 +6,7 @@ from datetime import datetime, UTC
 
 from ota_http_server.core.config import Config
 from ota_http_server.database.migration_sqlite3_runner import MigrationRunner
-from ota_http_server.core.data_models import User, Project, Device, Firmware, FirmwareListItem
+from ota_http_server.core.data_models import User, Project, Device, DeviceListItem, Firmware, FirmwareListItem
 from ota_http_server.core.data_models import AppPaths
 from ota_http_server.logger import get_app_logger
 
@@ -571,10 +571,8 @@ class DatabaseSqliteService:
                 uuid=row["uuid"],
                 project_id=row["project_id"],
                 model=row["model"],
-                serial_number=row["serial_number"]
-                    if row["serial_number"] else "",
-                current_version=row["current_version"]
-                    if row["current_version"] else "",
+                serial_number=row["serial_number"],
+                current_version=row["current_version"],
                 last_seen=datetime.fromisoformat(row["last_seen"])
                     if row["last_seen"] else None,
                 is_active=bool(row["is_active"]),
@@ -772,7 +770,7 @@ class DatabaseSqliteService:
     def get_device_by_name(self, name: str) -> Device | None:
         return self._device_get("uuid", name)
 
-    def device_get_list(self) -> list[Device]:
+    def device_get_record(self) -> list[Device]:
 
         try:
             with self._connect() as conn:
@@ -805,6 +803,51 @@ class DatabaseSqliteService:
         except sqlite3.Error as e:
             raise DatabaseError(
                 "Database error retrieving devices"
+            ) from e
+
+    def device_get_list(self) -> list[DeviceListItem]:
+
+        try:
+            with self._connect() as conn:
+
+                cursor = conn.execute(
+                    """
+                    SELECT
+                        devices.id,
+                        devices.uuid AS uuid,
+                        projects.name AS project_name,
+                        devices.model,
+                        devices.serial_number,
+                        devices.current_version,
+                        devices.last_seen,
+                        devices.is_active
+                    FROM devices
+                    JOIN projects
+                        ON projects.id = devices.project_id
+                    ORDER BY projects.name, devices.id
+                    """
+                )
+
+                rows = cursor.fetchall()
+
+                return [
+                    DeviceListItem(
+                        id=row["id"],
+                        uuid=row["uuid"],
+                        project_name=row["project_name"],
+                        model=row["model"],
+                        serial_number=row["serial_number"],
+                        current_version=row["current_version"],
+                        last_seen=datetime.fromisoformat(row["last_seen"])
+                            if row["last_seen"] else None,
+                        is_active=bool(row["is_active"]),
+                    )
+                    for row in rows
+                ]
+
+        except sqlite3.Error as e:
+            raise DatabaseError(
+                "Database error retrieving device list"
             ) from e
 
     def _row_to_firmware(self, row: sqlite3.Row) -> Firmware:

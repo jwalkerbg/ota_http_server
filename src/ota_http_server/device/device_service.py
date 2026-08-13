@@ -3,7 +3,7 @@
 from ota_http_server.core.config import Config
 from ota_http_server.core.data_models import User, Project, Device
 from ota_http_server.database.database_service import DatabaseService
-from ota_http_server.core.formatters import DeviceFormatter
+from ota_http_server.core.formatters import DeviceFormatter, DeviceListItemFormatter
 from ota_http_server.logger import get_app_logger
 
 logger = get_app_logger(__name__)
@@ -122,9 +122,17 @@ class DeviceService:
 
     def _list_devices(self) -> None:
         db_service: DatabaseService = self.cfg.config["db_service"]
-        devices = db_service.device_get_list()
-        if devices:
-            logger.verbose("\n%s",DeviceFormatter.format_list(devices))
+
+        if self.cfg.config["parameters"]["device_record"]:
+            devices = db_service.device_get_record()
+            if devices:
+                logger.verbose("\n%s",DeviceFormatter.format_list(devices))
+            else:
+                logger.info("No devices found.")
         else:
-            logger.info("No devices found.")
+            devices = db_service.device_get_list()
+            if devices:
+                logger.verbose("\n%s",DeviceListItemFormatter.format_list(devices))
+            else:
+                logger.info("No devices found.")
 

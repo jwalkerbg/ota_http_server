@@ -721,7 +721,10 @@ class Config:
                         self.config["parameters"]["device_uuid"] = config_cli.device_uuid
                 # list
                 if config_cli.device_command == "list":
-                    pass
+                    if config_cli.device_record is not None:
+                        self.config["parameters"]["device_record"] = True
+                    else:
+                        self.config["parameters"]["device_record"] = False
 
             if config_cli.command == "firmware":
                 if config_cli.firmware_command is not None:
@@ -1001,6 +1004,7 @@ For use in development environment without SSL certificates and JWT authenticati
     get_device_parser.add_argument("--uuid", dest="device_uuid", type=str, required=False, help="UUIDv4 of the device to be retrieved")
     # device list
     list_device_parser = device_subparsers.add_parser(name="list", help="List devices")
+    list_device_parser.add_argument("--record", dest="device_record", action="store_const", const=True, help="List full records of devices, including all fields. If not specified, only a summary of devices will be listed.")
 
     # firmware
     firmware_parser = subparsers.add_parser(name="firmware", help="Firmware manipulation operations", )
@@ -1029,7 +1033,7 @@ For use in development environment without SSL certificates and JWT authenticati
     get_firmware_parser.add_argument("--version", dest="firmware_version", type=str, required=False, help="Version of the firmware")
     # firmware list
     list_firmware_parser = firmware_subparsers.add_parser("list", help="List available firmware")
-    list_firmware_parser.add_argument("--record", dest="firmware_record", action="store_const", const=True, help="")
+    list_firmware_parser.add_argument("--record", dest="firmware_record", action="store_const", const=True, help="List full records of firmware, including all fields. If not specified, only a summary of firmware will be listed.")
 
     return parser.parse_args()
 
