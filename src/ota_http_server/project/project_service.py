@@ -2,7 +2,7 @@
 
 from ota_http_server.core.config import Config
 from ota_http_server.core.data_models import User, Project
-from ota_http_server.core.formatters import ProjectFormatter
+from ota_http_server.core.formatters import ProjectFormatter,ProjectListItemFormatter
 from ota_http_server.database.database_service import DatabaseService
 from ota_http_server.logger import get_app_logger
 
@@ -103,8 +103,16 @@ class ProjectService:
 
     def _list_projects(self) -> None:
         db_service: DatabaseService = self.cfg.config["db_service"]
-        projects = db_service.project_get_list()
-        if projects:
-            logger.verbose("\n%s",ProjectFormatter.format_list(projects))
+        project_record = self.cfg.config["parameters"].get("project_record", False)
+        if project_record:
+            projects = db_service.project_get_record()
+            if projects:
+                logger.verbose("\n%s", ProjectFormatter.format_list(projects))
+            else:
+                logger.info("No projects found.")
         else:
-            logger.info("No projects found.")
+            projects = db_service.project_get_list()
+            if projects:
+                logger.verbose("\n%s", ProjectListItemFormatter.format_list(projects))
+            else:
+                logger.info("No projects found.")

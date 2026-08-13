@@ -2,7 +2,7 @@
 
 from datetime import datetime
 from textwrap import wrap
-from ota_http_server.core.data_models import User, Project, Device, DeviceListItem, Firmware, FirmwareListItem, Column
+from ota_http_server.core.data_models import User, Project, ProjectListItem, Device, DeviceListItem, Firmware, FirmwareListItem, Column
 
 class TableFormatter:
 
@@ -170,6 +170,56 @@ class ProjectFormatter:
 
     @classmethod
     def format_list(cls, items: list[Project]) -> str:
+
+        lines = [
+            TableFormatter.header(cls.COLUMNS),
+            TableFormatter.separator(cls.COLUMNS),
+        ]
+
+        for item in items:
+            lines.extend(cls.format(item))
+
+        return "\n".join(lines)
+
+class ProjectListItemFormatter:
+
+    ID_WIDTH =  5
+    NAME_WIDTH = 10
+    USERNAME_WIDTH = 20
+    DISPLAY_NAME_WIDTH = 32
+    DESCRIPTION_WIDTH = 48
+    CREATED_BY_WIDTH = 20
+    STATUS_WIDTH =  10
+
+    COLUMNS = [
+        Column('ID', ID_WIDTH, "^"),
+        Column('Name', NAME_WIDTH, "^"),
+        Column('Display name', DISPLAY_NAME_WIDTH, "^"),
+        Column('Description', DESCRIPTION_WIDTH, "^"),
+        Column('Created by', CREATED_BY_WIDTH, "^"),
+        Column('Status', STATUS_WIDTH, "^")
+    ]
+
+    @classmethod
+    def format(cls, project: ProjectListItem) -> list[str]:
+
+        display_name = project.display_name if project.display_name else "-"
+        description = project.description if project.description else "-"
+        status = "active" if project.is_active else "disabled"
+
+        values = [
+            str(project.id),
+            project.name,
+            display_name,
+            description,
+            project.created_by_username,
+            status
+        ]
+
+        return TableFormatter.format_row(values, cls.COLUMNS)
+
+    @classmethod
+    def format_list(cls, items: list[ProjectListItem]) -> str:
 
         lines = [
             TableFormatter.header(cls.COLUMNS),
@@ -349,6 +399,11 @@ class FirmwareFormatter:
 
     @classmethod
     def format(cls, firmware: Firmware) -> str:
+
+        version = firmware.version if firmware.version else "-"
+        filename = firmware.filename if firmware.filename else "-"
+        file_size = str(firmware.file_size) if firmware.file_size else "-"
+        channel = firmware.channel if firmware.channel else "-"
         status = "active" if firmware.is_active else "disabled"
 
         created = (
@@ -366,12 +421,12 @@ class FirmwareFormatter:
         values = [
             str(firmware.id),
             str(firmware.project_id),
-            firmware.version,
-            firmware.filename,
-            str(firmware.file_size),
+            version,
+            filename,
+            file_size,
             firmware.checksum,
             firmware.release_notes,
-            firmware.channel,
+            channel,
             status,
             created,
             updated
@@ -412,13 +467,18 @@ class FirmwareListItemFormatter:
     @classmethod
     def format(cls, firmware: FirmwareListItem) -> str:
 
+        version = firmware.version if firmware.version else "-"
+        filename = firmware.filename if firmware.filename else "-"
+        file_size = str(firmware.file_size) if firmware.file_size else "-"
+        channel = firmware.channel if firmware.channel else "-"
+
         values = [
             str(firmware.id),
             firmware.project_name,
-            firmware.version,
-            firmware.filename,
-            str(firmware.file_size),
-            firmware.channel
+            version,
+            filename,
+            file_size,
+            channel
         ]
 
         return TableFormatter.format_row(values, cls.COLUMNS)

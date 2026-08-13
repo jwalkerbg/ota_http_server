@@ -2,7 +2,7 @@
 
 from ota_http_server.core.config import Config
 from ota_http_server.database.database_interface import DatabaseInterface
-from ota_http_server.core.data_models import User, Project, Device, DeviceListItem, Firmware, FirmwareListItem
+from ota_http_server.core.data_models import User, Project, ProjectListItem, Device, DeviceListItem, Firmware, FirmwareListItem
 from ota_http_server.logger import get_app_logger
 
 logger = get_app_logger(__name__)
@@ -84,7 +84,10 @@ class DatabaseService:
     def get_project_by_name(self, name: str) -> Project | None:
         return self._database.get_project_by_name(name)
 
-    def project_get_list(self) -> list[Project]:
+    def project_get_record(self) -> list[Project]:
+        return self._database.project_get_record()
+
+    def project_get_list(self) -> list[ProjectListItem]:
         return self._database.project_get_list()
 
     def add_device(self, device: Device) -> Device:

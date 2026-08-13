@@ -104,6 +104,15 @@ class Project:
         )
 
 @dataclass
+class ProjectListItem:
+    id: int
+    name: str
+    display_name: str
+    description: str
+    created_by_username: str
+    is_active: bool
+
+@dataclass
 class Device:
     id: Optional[int]   # the database primary key. It is None before the object is inserted into SQLite.
     uuid: str           # Unique hardware identifier (UUIDv4)

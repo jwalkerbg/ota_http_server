@@ -684,7 +684,10 @@ class Config:
                         self.config["parameters"]["project_name"] = config_cli.project_name
                 # list
                 if config_cli.project_command == 'list':
-                    pass
+                    if config_cli.project_record is not None:
+                        self.config["parameters"]["project_record"] = True
+                    else:
+                        self.config["parameters"]["project_record"] = False
 
             if config_cli.command == "device":
                 if config_cli.device_command is not None:
@@ -979,6 +982,7 @@ For use in development environment without SSL certificates and JWT authenticati
     get_project_parser.add_argument("--name", dest="project_name", type=str, required=False, help="Name of the project to be retrieved. Give --id or --name. --id takes precedence.")
     # project list
     list_project_parser = project_subparsers.add_parser(name="list", help="List all projects")
+    list_project_parser.add_argument("--record", dest="project_record", action="store_const", const=True, help="List full records of projects, including all fields. If not specified, only a summary of projects will be listed.")
 
     # device
     device_parser = subparsers.add_parser(name="device", help="Devices manipulation operations")

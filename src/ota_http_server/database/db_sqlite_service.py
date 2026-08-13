@@ -6,7 +6,7 @@ from datetime import datetime, UTC
 
 from ota_http_server.core.config import Config
 from ota_http_server.database.migration_sqlite3_runner import MigrationRunner
-from ota_http_server.core.data_models import User, Project, Device, DeviceListItem, Firmware, FirmwareListItem
+from ota_http_server.core.data_models import ProjectListItem, User, Project, Device, DeviceListItem, Firmware, FirmwareListItem
 from ota_http_server.core.data_models import AppPaths
 from ota_http_server.logger import get_app_logger
 
@@ -531,7 +531,7 @@ class DatabaseSqliteService:
     def get_project_by_name(self, name: str) -> Project | None:
         return self._project_get("name", name)
 
-    def project_get_list(self) -> list[Project]:
+    def project_get_record(self) -> list[Project]:
 
         try:
             with self._connect() as conn:
@@ -562,6 +562,46 @@ class DatabaseSqliteService:
         except sqlite3.Error as e:
             raise DatabaseError(
                 "Database error retrieving projects"
+            ) from e
+
+    def project_get_list(self) -> list[ProjectListItem]:
+
+        try:
+            with self._connect() as conn:
+
+                cursor = conn.execute(
+                    """
+                    SELECT
+                        projects.id,
+                        projects.name,
+                        projects.display_name,
+                        projects.description,
+                        users.username AS created_by_username,
+                        projects.is_active
+                    FROM projects
+                    JOIN users
+                        ON users.id = projects.created_by
+                    ORDER BY projects.name
+                    """
+                )
+
+                rows = cursor.fetchall()
+
+                return [
+                    ProjectListItem(
+                        id=row["id"],
+                        name=row["name"],
+                        display_name=row["display_name"],
+                        description=row["description"],
+                        created_by_username=row["created_by_username"],
+                        is_active=bool(row["is_active"]),
+                    )
+                    for row in rows
+                ]
+
+        except sqlite3.Error as e:
+            raise DatabaseError(
+                "Database error retrieving project list"
             ) from e
 
     def _row_to_device(self, row: sqlite3.Row) -> Device:
@@ -856,14 +896,10 @@ class DatabaseSqliteService:
                 id=row["id"],
                 project_id=row["project_id"],
                 version=row["version"],
-                filename=row["filename"]
-                    if row["filename"] else "",
-                file_size=row["file_size"]
-                    if row["file_size"] else 0,
-                checksum=row["checksum"]
-                    if row["checksum"] else "",
-                release_notes = row["release_notes"]
-                    if row["release_notes"] else "",
+                filename=row["filename"],
+                file_size=row["file_size"],
+                checksum=row["checksum"],
+                release_notes = row["release_notes"],
                 channel = row["channel"],
                 is_active=bool(row["is_active"]),
                 created_at=datetime.fromisoformat(row["created_at"])
