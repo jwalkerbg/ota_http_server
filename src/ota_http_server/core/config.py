@@ -47,8 +47,6 @@ class ParametersConfig(TypedDict, total=False):
     firmware_dir: str
     url_firmware: str
     ota_audit_log: str
-    ota_db: str
-    ota_db_cache_ttl: int
     app_directory: str
     init_db_migrate: bool
     migrate_dry_run: bool
@@ -141,8 +139,6 @@ class Config:
             'firmware_dir': "firmware",
             'url_firmware': "firmware",
             'ota_audit_log': "ota_audit_log.csv",
-            'ota_db': "ota_db.toml",
-            'ota_db_cache_ttl': 300,
             'app_directory': "C:\\ProgramData\\ota_http_server",
             'init_db_migrate': True,
             'migrate_dry_run': False,
@@ -271,12 +267,6 @@ class Config:
                     },
                     "ota_audit_log": {
                         "type": "string"
-                    },
-                    "ota_db": {
-                        "type": "string"
-                    },
-                    "ota_db_cache_ttl": {
-                        "type": "number"
                     },
                     "app_directory": {
                         "type": "string"
@@ -489,8 +479,6 @@ class Config:
                 "ota_audit_log": os.getenv("OTA_AUDIT_LOG"),
                 "jwt_issuer": os.getenv("OTA_JWT_ISSUER"),
                 "jwt_audience": os.getenv("OTA_JWT_AUDIENCE"),
-                "ota_db": os.getenv("OTA_DATABASE"),
-                "ota_db_cache_ttl": os.getenv("OTA_DB_CACHE_TTL"),
                 "app_directory": os.getenv("OTA_APP_DIRECTORY")
             },
             "database": {
@@ -581,10 +569,6 @@ class Config:
                     self.config['parameters']['jwt_audience'] = config_cli.jwt_audience
                 if config_cli.admin_secret is not None:
                     self.config['parameters']['admin_secret'] = config_cli.admin_secret
-                if config_cli.ota_db is not None:
-                    self.config["parameters"]["ota_db"] = config_cli.ota_db
-                if config_cli.ota_db_cache_ttl is not None:
-                    self.config["parameters"]["ota_db_cache_ttl"] = config_cli.ota_db_cache_ttl
                 if config_cli.app_directory is not None:
                     self.config["parameters"]["app_directory"] = config_cli.app_directory
                 # server parameters
@@ -902,10 +886,6 @@ For use in development environment without SSL certificates and JWT authenticati
     jwt_group.add_argument("--jwt-issuer", dest="jwt_issuer", type=str, help="JWT issuer claim value, overrides OTA_JWT_ISSUER environment variable")
     jwt_group.add_argument("--jwt-audience", dest="jwt_audience", type=str, help="JWT audience claim value, overrides OTA_JWT_AUDIENCE environment variable")
     jwt_group.add_argument("--admin-secret", dest="admin_secret", type=str, help="Admin secret key, overrides OTA_ADMIN_SECRET environment variable")
-
-    db_toml_group = run_parser.add_argument_group("TOML Database")
-    db_toml_group.add_argument("--ota-db", dest="ota_db", type=str, help="Path to the OTA database file (default 'ota_db.toml'), overrides OTA_DB environment variable")
-    db_toml_group.add_argument("--ota-db-cache-ttl", dest="ota_db_cache_ttl", type=int, help="Cache time-to-live for the OTA database in seconds (default 300), overrides OTA_DB_CACHE_TTL environment variable")
 
     server_group = run_parser.add_argument_group("Server", description="""Server configuration options
   Firmware URL has format host:port/url_firmware/project/version.
