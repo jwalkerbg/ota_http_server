@@ -58,7 +58,7 @@ class FirmwareService:
         )
 
         db_service: DatabaseService = self.cfg.config["db_service"]
-        db_service.add_firmware(firmware)
+        db_service.firmware_add(firmware)
 
     def _enable_firmware(self) -> None:
         id = self.cfg.config["parameters"]["firmware_id"]
@@ -69,11 +69,11 @@ class FirmwareService:
 
         if id is not None:
 
-            db_service.enable_firmware_by_id(id)
+            db_service.firmware_enable_by_id(id)
             return
 
         if pid is not None and version is not None:
-            db_service.enable_firmware_by_project_version(pid, version)
+            db_service.firmware_enable_by_project_version(pid, version)
             return
 
         raise ValueError(
@@ -88,11 +88,11 @@ class FirmwareService:
         db_service: DatabaseService = self.cfg.config["db_service"]
 
         if id is not None:
-            db_service.disable_firmware_by_id(id)
+            db_service.firmware_disable_by_id(id)
             return
 
         if pid is not None and version is not None:
-            db_service.disable_firmware_by_project_version(pid, version)
+            db_service.firmware_disable_by_project_version(pid, version)
             return
 
         raise ValueError(
@@ -107,7 +107,7 @@ class FirmwareService:
         db_service: DatabaseService = self.cfg.config["db_service"]
 
         if id is not None:
-            firmware = db_service.get_firmware_by_id(id)
+            firmware = db_service.firmware_get_by_id(id)
             if firmware:
                 logger.verbose("Firmware found: %s", firmware)
             else:

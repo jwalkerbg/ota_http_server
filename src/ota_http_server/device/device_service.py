@@ -58,7 +58,7 @@ class DeviceService:
             )
 
         db_service: DatabaseService = self.cfg.config["db_service"]
-        db_service.add_device(device)
+        db_service.device_add(device)
 
     def _enable_device(self) -> None:
         id = self.cfg.config["parameters"]["device_id"]
@@ -67,10 +67,10 @@ class DeviceService:
         db_service: DatabaseService = self.cfg.config["db_service"]
 
         if id is not None:
-            db_service.enable_device_by_id(id)
+            db_service.device_enable_by_id(id)
             return
         if uuid is not None:
-            db_service.enable_device_by_name(uuid)
+            db_service.device_enable_by_name(uuid)
             return
 
         raise ValueError(
@@ -84,10 +84,10 @@ class DeviceService:
         db_service: DatabaseService = self.cfg.config["db_service"]
 
         if id is not None:
-            db_service.disable_device_by_id(id)
+            db_service.device_disable_by_id(id)
             return
         if uuid is not None:
-            db_service.disable_device_by_name(uuid)
+            db_service.device_disable_by_name(uuid)
             return
 
         raise ValueError(
@@ -101,7 +101,7 @@ class DeviceService:
         db_service: DatabaseService = self.cfg.config["db_service"]
 
         if id is not None:
-            device = db_service.get_device_by_id(id)
+            device = db_service.device_get_by_id(id)
             if device:
                 logger.verbose("Device found: %s", device)
             else:
@@ -109,7 +109,7 @@ class DeviceService:
             return
 
         if uuid is not None:
-            device = db_service.get_device_by_name(uuid)
+            device = db_service.device_get_by_name(uuid)
             if device:
                 logger.verbose("Device found: %s", device)
             else:

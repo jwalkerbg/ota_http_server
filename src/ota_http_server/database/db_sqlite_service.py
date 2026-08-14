@@ -89,10 +89,10 @@ class DatabaseSqliteService:
     def rollback(self):
         self.migration_runner.migrate_down()
 
-    def add_user(self, name: str, email: str):
-        logger.info('add_user executed')
+    def user_add(self, name: str, email: str):
+        logger.info('user_add executed')
 
-    def add_user(self, user: User) -> User:
+    def user_add(self, user: User) -> User:
         """
         Add a new user to the database.
 
@@ -351,7 +351,7 @@ class DatabaseSqliteService:
                     if row["updated_at"] else None,
             )
 
-    def add_project(self, project: Project) -> Project:
+    def project_add(self, project: Project) -> Project:
 
         now = datetime.now(UTC)
 
@@ -476,16 +476,16 @@ class DatabaseSqliteService:
                     f"Database error disabling project {column}={parameter}"
                 ) from e
 
-    def enable_project_by_id(self, id: int) -> None:
+    def project_enable_by_id(self, id: int) -> None:
         return self._project_enable_disable("id", id, True)
 
-    def enable_project_by_name(self, name: str) -> None:
+    def project_enable_by_name(self, name: str) -> None:
         return self._project_enable_disable("name", name, True)
 
-    def disable_project_by_id(self, id: int) -> None:
+    def project_disable_by_id(self, id: int) -> None:
         return self._project_enable_disable("id", id, False)
 
-    def disable_project_by_name(self, name: str) -> Project |None:
+    def project_disable_by_name(self, name: str) -> Project |None:
         return self._project_enable_disable("name", name, False)
 
     def _project_get(self, column: str, parameter: int | str) -> Project | None:
@@ -525,10 +525,10 @@ class DatabaseSqliteService:
                 f"Database error retrieving project {column}={parameter}"
             ) from e
 
-    def get_project_by_id(self, id: int) -> Project | None:
+    def project_get_by_id(self, id: int) -> Project | None:
         return self._project_get("id", id)
 
-    def get_project_by_name(self, name: str) -> Project | None:
+    def project_get_by_name(self, name: str) -> Project | None:
         return self._project_get("name", name)
 
     def project_get_record(self) -> list[Project]:
@@ -622,7 +622,7 @@ class DatabaseSqliteService:
                     if row["updated_at"] else None,
             )
 
-    def add_device(self, device: Device) -> Device:
+    def device_add(self, device: Device) -> Device:
 
         now = datetime.now(UTC)
 
@@ -753,16 +753,16 @@ class DatabaseSqliteService:
                     f"Database error disabling device {column}={parameter}"
                 ) from e
 
-    def enable_device_by_id(self, id: int) -> None:
+    def device_enable_by_id(self, id: int) -> None:
         return self._device_enable_disable("id", id, True)
 
-    def enable_device_by_name(self, name: str) -> None:
+    def device_enable_by_name(self, name: str) -> None:
         return self._device_enable_disable("uuid", name, True)
 
-    def disable_device_by_id(self, id: int) -> None:
+    def device_disable_by_id(self, id: int) -> None:
         return self._device_enable_disable("id", id, False)
 
-    def disable_device_by_name(self, name: str) -> None:
+    def device_disable_by_name(self, name: str) -> None:
         return self._device_enable_disable("uuid", name, False)
 
     def _device_get(self, column: str, parameter: int | str) -> Device | None:
@@ -804,10 +804,10 @@ class DatabaseSqliteService:
                 f"Database error retrieving device {column}={parameter}"
             ) from e
 
-    def get_device_by_id(self, id: int) -> Device | None:
+    def device_get_by_id(self, id: int) -> Device | None:
         return self._device_get("id", id)
 
-    def get_device_by_name(self, name: str) -> Device | None:
+    def device_get_by_name(self, name: str) -> Device | None:
         return self._device_get("uuid", name)
 
     def device_get_record(self) -> list[Device]:
@@ -918,7 +918,7 @@ class DatabaseSqliteService:
             channel=row["channel"]
         )
 
-    def add_firmware(self, firmware: Firmware) -> Firmware:
+    def firmware_add(self, firmware: Firmware) -> Firmware:
 
         now = datetime.now(UTC)
 
@@ -1082,16 +1082,16 @@ class DatabaseSqliteService:
                     f"Database error disabling firmware {lookup}"
                 ) from e
 
-    def enable_firmware_by_id(self, id: int) -> None:
+    def firmware_enable_by_id(self, id: int) -> None:
         self._firmware_enable_disable(("id",), (id,), True)
 
-    def enable_firmware_by_project_version(self, project_id: int, version: str) -> None:
+    def firmware_enable_by_project_version(self, project_id: int, version: str) -> None:
         self._firmware_enable_disable(("project_id", "version"), (project_id, version), True)
 
-    def disable_firmware_by_id(self, id: int) -> None:
+    def firmware_disable_by_id(self, id: int) -> None:
         self._firmware_enable_disable(("id",), (id,), False)
 
-    def disable_firmware_by_project_version(self, project_id: int, version: str) -> None:
+    def firmware_disable_by_project_version(self, project_id: int, version: str) -> None:
         self._firmware_enable_disable(("project_id", "version"), (project_id, version), False)
 
     def _firmware_get(

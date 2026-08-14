@@ -45,17 +45,17 @@ class UserService:
         user = User(id=None, username=username, password_hash=password_hash, email=email, role=role, is_active=True, created_at=None, updated_at=None)
 
         db_service: DatabaseService = self.cfg.config["db_service"]
-        db_service.add_user(user)
+        db_service.user_add(user)
 
     def _enable_user(self) -> None:
         db_service: DatabaseService = self.cfg.config["db_service"]
         user_id = self.cfg.config["parameters"]['user_id']
         username = self.cfg.config['parameters']['username']
         if user_id is not None:
-            db_service.enable_user_by_id(user_id)
+            db_service.user_enable_by_id(user_id)
             return
         if username is not None:
-            db_service.enable_user_by_username(username)
+            db_service.user_enable_by_username(username)
             return
 
         raise ValueError(
@@ -67,10 +67,10 @@ class UserService:
         user_id = self.cfg.config["parameters"]['user_id']
         username = self.cfg.config['parameters']['username']
         if user_id is not None:
-            db_service.disable_user_by_id(user_id)
+            db_service.user_disable_by_id(user_id)
             return
         if username is not None:
-            db_service.disable_user_by_username(username)
+            db_service.user_disable_by_username(username)
             return
 
         raise ValueError(

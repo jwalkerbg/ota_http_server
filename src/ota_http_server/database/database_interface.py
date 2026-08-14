@@ -15,19 +15,19 @@ class DatabaseInterface(Protocol):
     def rollback(self) -> None:
         ...
 
-    def add_user(self, user: User) -> User:
+    def user_add(self, user: User) -> User:
         ...
 
-    def enable_user_by_id(self, user_id: int) -> None:
+    def user_enable_by_id(self, user_id: int) -> None:
         ...
 
-    def enable_user_by_username(self, username: str) -> None:
+    def user_enable_by_username(self, username: str) -> None:
         ...
 
-    def disable_user_by_id(self, user_id: int) -> None:
+    def user_disable_by_id(self, user_id: int) -> None:
         ...
 
-    def disable_user_by_username(self, username: str) -> None:
+    def user_disable_by_username(self, username: str) -> None:
         ...
 
     def user_get_by_id(self, user_id: int) -> User | None:
@@ -39,25 +39,25 @@ class DatabaseInterface(Protocol):
     def user_get_list(self) -> list[User]:
         ...
 
-    def add_project(self, project: Project) -> Project:
+    def project_add(self, project: Project) -> Project:
         ...
 
-    def enable_project_by_id(self, id: int) -> None:
+    def project_enable_by_id(self, id: int) -> None:
         ...
 
-    def enable_project_by_name(self, name: str) -> None:
+    def project_enable_by_name(self, name: str) -> None:
         ...
 
-    def disable_project_by_id(self, id: int) -> None:
+    def project_disable_by_id(self, id: int) -> None:
         ...
 
-    def disable_project_by_name(self, name: str) -> None:
+    def project_disable_by_name(self, name: str) -> None:
         ...
 
-    def get_project_by_id(self, id: int) -> Project | None:
+    def project_get_by_id(self, id: int) -> Project | None:
         ...
 
-    def get_project_by_name(self, name: str) -> Project | None:
+    def project_get_by_name(self, name: str) -> Project | None:
         ...
 
     def project_get_record(self) -> list[Project]:
@@ -66,25 +66,25 @@ class DatabaseInterface(Protocol):
     def project_get_list(self) -> list[ProjectListItem]:
         ...
 
-    def add_device(self, device: Device) -> Device:
+    def device_add(self, device: Device) -> Device:
         ...
 
-    def enable_device_by_id(self, id: int) -> None:
+    def device_enable_by_id(self, id: int) -> None:
         ...
 
-    def enable_device_by_name(self, name: str) -> None:
+    def device_enable_by_name(self, name: str) -> None:
         ...
 
-    def disable_device_by_id(self, id: int) -> None:
+    def device_disable_by_id(self, id: int) -> None:
         ...
 
-    def disable_device_by_name(self, name: str) -> None:
+    def device_disable_by_name(self, name: str) -> None:
         ...
 
-    def get_device_by_id(self, id: int) -> Device | None:
+    def device_get_by_id(self, id: int) -> Device | None:
         ...
 
-    def get_device_by_name(self, name: str) -> Device | None:
+    def device_get_by_name(self, name: str) -> Device | None:
         ...
 
     def device_get_record(self) -> list[Device]:
@@ -93,22 +93,22 @@ class DatabaseInterface(Protocol):
     def device_get_list(self) -> list[DeviceListItem]:
         ...
 
-    def add_firmware(self, firmware: Firmware) -> Firmware:
+    def firmware_add(self, firmware: Firmware) -> Firmware:
         ...
 
-    def enable_firmware_by_id(self, id: int) -> None:
+    def firmware_enable_by_id(self, id: int) -> None:
         ...
 
-    def enable_firmware_by_project_version(self, project_id: int, version: str) -> None:
+    def firmware_enable_by_project_version(self, project_id: int, version: str) -> None:
         ...
 
-    def disable_firmware_by_id(self, id: int) -> None:
+    def firmware_disable_by_id(self, id: int) -> None:
         ...
 
-    def disable_firmware_by_project_version(self, project_id: int, version: str) -> None:
+    def firmware_disable_by_project_version(self, project_id: int, version: str) -> None:
         ...
 
-    def get_firmware_by_id(self, id: int) -> Firmware | None:
+    def firmware_get_by_id(self, id: int) -> Firmware | None:
         ...
 
     def firmware_get_by_project_version(self, project_id: int, version: str,) -> Firmware | None:

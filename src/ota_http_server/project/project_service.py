@@ -46,17 +46,17 @@ class ProjectService:
         project = Project(id=None, name=name, display_name=display_name, description=description, created_by=created_by, is_active=True, created_at=None, updated_at=None)
 
         db_service: DatabaseService = self.cfg.config["db_service"]
-        db_service.add_project(project)
+        db_service.project_add(project)
 
     def _enable_project(self) -> None:
         db_service: DatabaseService = self.cfg.config["db_service"]
         project_id = self.cfg.config["parameters"]['project_id']
         project_name = self.cfg.config['parameters']['project_name']
         if project_id is not None:
-            db_service.enable_project_by_id(project_id)
+            db_service.project_enable_by_id(project_id)
             return
         if project_name is not None:
-            db_service.enable_project_by_name(project_name)
+            db_service.project_enable_by_name(project_name)
             return
 
         raise ValueError(
@@ -68,10 +68,10 @@ class ProjectService:
         project_id = self.cfg.config["parameters"]['project_id']
         project_name = self.cfg.config['parameters']['project_name']
         if project_id is not None:
-            db_service.disable_project_by_id(project_id)
+            db_service.project_disable_by_id(project_id)
             return
         if project_name is not None:
-            db_service.disable_project_by_name(project_name)
+            db_service.project_disable_by_name(project_name)
             return
 
         raise ValueError(
@@ -83,14 +83,14 @@ class ProjectService:
         project_id = self.cfg.config["parameters"]['project_id']
         project_name = self.cfg.config['parameters']['project_name']
         if project_id is not None:
-            project = db_service.get_project_by_id(project_id)
+            project = db_service.project_get_by_id(project_id)
             if project:
                 logger.verbose("Project found: %s", project)
             else:
                 logger.verbose("Project with ID %d not found.", project_id)
             return
         if project_name is not None:
-            project = db_service.get_project_by_name(project_name)
+            project = db_service.project_get_by_name(project_name)
             if project:
                 logger.verbose("Project found: %s", project)
             else:
