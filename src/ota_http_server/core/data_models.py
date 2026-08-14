@@ -263,13 +263,20 @@ class AppPaths:
         try:
             self.www_dir.mkdir(exist_ok=True)
             logger.verbose(f"Ensured %s",self.www_dir)
-        except:
-            logger.error("Cannot create application data directory '%s': %s",self.www_dir,e)
+        except OSError as e:
+            logger.error("Cannot create www directory '%s': %s",self.www_dir,e)
+            raise
+
+        try:
+            self.firmware_dir.mkdir(exist_ok=True)
+            logger.verbose("Ensured %s",self.firmware_dir)
+        except OSError as e:
+            logger.error("Cannot create firmware directory '%s': %s",self.firmware_dir,e)
             raise
 
         try:
             self.logs_dir.mkdir(exist_ok=True)
             logger.verbose("Ensured %s",self.logs_dir)
-        except:
-            logger.error("Cannot create application data directory '%s': %s",self.logs_dir,e)
+        except OSError as e:
+            logger.error("Cannot create logs directory '%s': %s",self.logs_dir,e)
             raise
