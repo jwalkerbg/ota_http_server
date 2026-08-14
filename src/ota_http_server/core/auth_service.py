@@ -98,10 +98,11 @@ class AuthService:
         if issuer and not hmac.compare_digest(issuer, expected_issuer):
             abort(403, "Token issuer mismatch")
 
-        # 5️⃣.4️⃣ Verify "sub" claim is present (device identity)
         if verify_sub:
+            # 5️⃣.4️⃣ Verify "sub" claim is present (device identity)
             if "sub" not in payload:
                 abort(403, "Token missing 'sub' claim for device identity")
+            # 5️⃣.5️⃣ Verify "sub" claim matches X-Device-ID header or ?device_id= query param
             request_device_id = request.headers.get("X-Device-ID")
             if not request_device_id:
                 request_device_id = request.args.get("device_id")  # Allow device_id in query param as fallback for GET requests
