@@ -118,13 +118,12 @@ def create_app(cfg: Config) -> Flask:
             payload = authservice.verify_token(project, verify_sub=True)
             # 2. Extract identity
             device_id = payload["sub"]
-            project = payload["project"]
 
             # 3. Check membership
             device_rec = dbservice.device_get_by_name(device_id)
             if device_rec is None or device_rec.project_id != project_rec.id:
                 abort(403, "Device not registered for project")
-            # 4. Check firmware permission
+            # 4. Check device permission
             if not device_rec.is_active:
                 abort(403, "Device not allowed to download firmware")
 
@@ -155,10 +154,52 @@ def create_app(cfg: Config) -> Flask:
 
     @app.route(f'/{url_firmware}/<project>/latest')
     def latest_firmware(project:str) -> Response:
-        authservice.verify_token(project, verify_sub=False)  # Allow latest version check without device identity, but still require valid token for project
-        project_dir, _, version_files = get_sorted_versions(project)
-        latest_file, _ = version_files[-1]
-        file_path = (Path(project_dir) / latest_file).resolve()
+        project_rec = dbservice.project_get_by_name(project)
+        if project_rec is None:
+            abort(404, "Project not found")
+        if not project_rec.is_active:
+            abort(403, "Project is disabled")
+
+        if use_jwt:
+            # 1. Decode JWT
+            payload = authservice.verify_token(project, verify_sub=True)
+            # 2. Extract identity
+            device_id = payload["sub"]
+
+            # 3. Check membership
+            device_rec = dbservice.device_get_by_name(device_id)
+            if device_rec is None or device_rec.project_id != project_rec.id:
+                abort(403, "Device not registered for project")
+            # 4. Check device permission
+            if not device_rec.is_active:
+                abort(403, "Device not allowed to download firmware")
+
+        firmware_records = [
+            fw for fw in dbservice.firmware_get_record()
+            if fw.project_id == project_rec.id
+        ]
+        if not firmware_records:
+            abort(404, "No firmware metadata found for project")
+
+        latest_firmware_rec = max(firmware_records, key=lambda fw: fw.version)
+        if not latest_firmware_rec.is_active:
+            abort(403, "Latest firmware is disabled")
+
+        file_path = (
+            Path(www_dir)
+            / Path(firmware_dir)
+            / Path(project)
+            / Path(latest_firmware_rec.filename)
+        ).resolve()
+
+        allowed_dir = (
+            Path(www_dir) / Path(firmware_dir) / Path(project)
+        ).resolve()
+        if not file_path.is_relative_to(allowed_dir):  # Python >= 3.9
+            abort(403, "Access to this path is forbidden")
+        if not file_path.is_file():
+            abort(404, "Firmware file not found")
+
         return send_file(file_path, conditional=True)
 
     @app.route(f'/{url_firmware}/<project>/versions')
