@@ -36,7 +36,7 @@ class FirmwareService:
     def _add_firmware(self) -> None:
         pid = self.cfg.config["parameters"]["firmware_pid"]
         version = self.cfg.config["parameters"]["firmware_version"]
-        file_path = self.cfg.config["parameters"]["firmware_file"]
+        filename = self.cfg.config["parameters"]["firmware_file"]
         release_notes = self.cfg.config["parameters"]["firmware_release_notes"]
         release_channel = self.cfg.config["parameters"]["firmware_release_channel"]
 
@@ -47,7 +47,7 @@ class FirmwareService:
             id=None,
             project_id=pid,
             version=version,
-            filename=file_path,
+            filename=filename,
             file_size=0,
             checksum="",
             release_notes=release_notes,
