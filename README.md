@@ -75,7 +75,7 @@ Supports optional **JWT-based authentication** and can run in two modes:
                       v
  +-------------------------------------------+
  | Firmware Files (www/<project>/<bin file>) |
- |  url path /firmware/<project>/<bin file>  |
+ |   url path /firmware/<project>/<version>  |
  +-------------------------------------------+
 ```
 
@@ -235,6 +235,10 @@ Default Hardcoded  → fallback values
 
 This is an example URL:
 
+`https://ota.mycompany.com:8070/firmware/projectA/01.00.02?token=<JWT>`
+
+Use `/<url_firmware>/<project>/<version>` as the canonical request format.
+
 `https://ota.mycompany.com:8070/firmware/projectA/projectA-01.00.02.bin?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...`
 
 The server root directory is `www` by default, relative to the directory where OTA server is started. It can be changed in `config.toml` with the parameter `www_dir` or with the CLI option `--www-dir`.
@@ -244,7 +248,9 @@ The directory name in the file system can be changed by `firmware_dir` parameter
 
 Next element in the URL is the project name. If JWT is used it must be the same with the value of `project` field in JWT.
 
-After the project name real binary image file name follows.
+After the project name firmware version follows. The server resolves the
+version to the real binary image file name using firmware metadata in the
+database.
 
 An eventual JWT is at the end.
 
@@ -348,7 +354,7 @@ ProxyPassReverse "/" "balancer://flaskcluster/"
 JWT authentication is enabled by default. Clients can pass JWT in the header or as an URL parameter.
 
 ```
-GET /firmware/projectA/firmware_v1.bin?token=<JWT>
+GET /firmware/projectA/01.00.02?token=<JWT>
 ```
 
 ## JWT-Based Authentication for OTA Access
@@ -487,8 +493,10 @@ or equivalently as a query parameter:
 
 **Example firmware download**
 
+Use firmware version in the URL path (not the filename).
+
 ```html
-GET /firmware/projectA/projectA-01.00.02.bin
+GET /firmware/projectA/01.00.02
 Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 ```
 or
@@ -533,12 +541,12 @@ Browsers usually cache this file, so it will only be requested once. Devices ini
 
 With token
 ```bash
-https://mycompany.com/firmware/projectA/firmware_01.00.02.bin?token=<JWT>
+https://mycompany.com/firmware/projectA/01.00.02?token=<JWT>
 ```
 
 Without token
 ```bash
-https://mycompany.com/firmware/projectA/firmware_01.00.02.bin
+https://mycompany.com/firmware/projectA/01.00.02
 ```
 
 ## Code Quality and Static Analysis

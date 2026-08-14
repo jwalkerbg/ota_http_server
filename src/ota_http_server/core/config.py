@@ -908,7 +908,8 @@ For use in development environment without SSL certificates and JWT authenticati
     db_toml_group.add_argument("--ota-db-cache-ttl", dest="ota_db_cache_ttl", type=int, help="Cache time-to-live for the OTA database in seconds (default 300), overrides OTA_DB_CACHE_TTL environment variable")
 
     server_group = run_parser.add_argument_group("Server", description="""Server configuration options
-  Firmware URL has format host:port/url_firmware/project/filename-prefix-version.bin.
+  Firmware URL has format host:port/url_firmware/project/version.
+  The version is resolved through firmware metadata in the database.
   'url_firmware' is usually 'firmware' and corresponds to 'firmware-dir' in the file system under 'www-dir'.
   'www-dir' is the root directory of the http server.""")
     server_group.add_argument("--host", dest="host", help="Listening host")
