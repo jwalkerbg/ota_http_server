@@ -1,7 +1,11 @@
 # firmware_service.py
 
+import hashlib
+import shutil
+from pathlib import Path
+
 from ota_http_server.core.config import Config
-from ota_http_server.core.data_models import User, Project, Device, Firmware
+from ota_http_server.core.data_models import Firmware, AppPaths
 from ota_http_server.database.database_service import DatabaseService
 from ota_http_server.core.formatters import FirmwareFormatter, FirmwareListItemFormatter
 from ota_http_server.logger import get_app_logger
@@ -11,6 +15,13 @@ logger = get_app_logger(__name__)
 class FirmwareService:
     def __init__(self, cfg: Config):
         self.cfg = cfg
+
+    def _sha256_file(self, file_path: Path) -> str:
+        digest = hashlib.sha256()
+        with file_path.open("rb") as source:
+            for chunk in iter(lambda: source.read(1024 * 1024), b""):
+                digest.update(chunk)
+        return digest.hexdigest()
 
     # CLI command handler for user operations
 
@@ -36,18 +47,15 @@ class FirmwareService:
     def _add_firmware(self) -> None:
         pid = self.cfg.config["parameters"]["firmware_pid"]
         version = self.cfg.config["parameters"]["firmware_version"]
-        filename = self.cfg.config["parameters"]["firmware_file"]
+        source_file = self.cfg.config["parameters"]["firmware_file"]
         release_notes = self.cfg.config["parameters"]["firmware_release_notes"]
         release_channel = self.cfg.config["parameters"]["firmware_release_channel"]
-
-        # must measure file_size here
-        # must calculate checksum here
 
         firmware = Firmware(
             id=None,
             project_id=pid,
             version=version,
-            filename=filename,
+            filename="",
             file_size=0,
             checksum="",
             release_notes=release_notes,
@@ -58,6 +66,48 @@ class FirmwareService:
         )
 
         db_service: DatabaseService = self.cfg.config["db_service"]
+        app_paths: AppPaths = self.cfg.config["parameters"]["app_paths"]
+
+        project = db_service.project_get_by_id(pid)
+        if project is None:
+            raise ValueError(f"Project with ID {pid} does not exist")
+
+        source_path = Path(source_file).expanduser().resolve(strict=True)
+        if not source_path.is_file():
+            raise ValueError(f"Firmware file path must point to a file: {source_path}")
+
+        duplicate = next(
+            (
+                record for record in db_service.firmware_get_record()
+                if record.project_id == pid
+                and record.version == version
+                and record.channel == release_channel
+            ),
+            None,
+        )
+        if duplicate is not None:
+            raise ValueError(
+                f"Firmware already exists for project_id={pid}, version={version}, channel={release_channel}"
+            )
+
+        project_dir = app_paths.ensure_project_dir(project.name)
+        destination_path = (project_dir / source_path.name).resolve()
+
+        if destination_path.exists() and source_path != destination_path:
+            raise FileExistsError(
+                f"Destination firmware file already exists: {destination_path}"
+            )
+
+        if source_path != destination_path:
+            shutil.copy2(source_path, destination_path)
+            logger.info("Uploaded firmware file '%s' to '%s'", source_path, destination_path)
+        else:
+            logger.info("Firmware file '%s' already in target project directory", source_path)
+
+        firmware.filename = destination_path.name
+        firmware.file_size = destination_path.stat().st_size
+        firmware.checksum = self._sha256_file(destination_path)
+
         db_service.firmware_add(firmware)
 
     def _enable_firmware(self) -> None:
@@ -142,4 +192,3 @@ class FirmwareService:
                 logger.verbose("\n%s\n",FirmwareListItemFormatter.format_list(firmware))
             else:
                 logger.info("No firmware found.")
-

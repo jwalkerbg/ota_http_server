@@ -245,8 +245,18 @@ class AppPaths:
     def firmware_dir(self) -> Path:
         return self.www_dir / self._cfg.config["parameters"]["firmware_dir"]
 
-    def project_dir(self,project) -> Path:
+    def project_dir(self, project: str) -> Path:
         return self.firmware_dir / project
+
+    def ensure_project_dir(self, project: str) -> Path:
+        project_dir = self.project_dir(project)
+        try:
+            project_dir.mkdir(parents=True, exist_ok=True)
+            logger.verbose("Ensured %s", project_dir)
+        except OSError as e:
+            logger.error("Cannot create project firmware directory '%s': %s", project_dir, e)
+            raise
+        return project_dir
 
     def ensure_directories(self) -> None:
         """Create all required application directories."""
