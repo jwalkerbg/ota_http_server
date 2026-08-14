@@ -36,6 +36,9 @@ class DatabaseInterface(Protocol):
     def user_get_by_username(self, username: str) -> User | None:
         ...
 
+    def user_is_active(self, user_id: int) -> bool:
+        ...
+
     def user_get_list(self) -> list[User]:
         ...
 
@@ -58,6 +61,9 @@ class DatabaseInterface(Protocol):
         ...
 
     def project_get_by_name(self, name: str) -> Project | None:
+        ...
+
+    def project_is_active(self, project_id: int) -> bool:
         ...
 
     def project_get_record(self) -> list[Project]:
@@ -87,6 +93,9 @@ class DatabaseInterface(Protocol):
     def device_get_by_name(self, name: str) -> Device | None:
         ...
 
+    def device_is_active(self, device_id: int) -> bool:
+        ...
+
     def device_get_record(self) -> list[Device]:
         ...
 
@@ -112,6 +121,9 @@ class DatabaseInterface(Protocol):
         ...
 
     def firmware_get_by_project_version(self, project_id: int, version: str,) -> Firmware | None:
+        ...
+
+    def firmware_is_active(self, firmware_id: int) -> bool:
         ...
 
     def firmware_get_record(self) -> list[Firmware]:

@@ -303,6 +303,19 @@ class DatabaseSqliteService:
     def user_get_by_username(self, username: str) -> User | None:
         return self._user_get("username", username)
 
+    def user_is_active(self, user_id: int) -> bool:
+        try:
+            with self._connect() as conn:
+                row = conn.execute(
+                    "SELECT is_active FROM users WHERE id = ?",
+                    (user_id,),
+                ).fetchone()
+                return bool(row["is_active"]) if row is not None else False
+        except sqlite3.Error as e:
+            raise DatabaseError(
+                f"Database error checking whether user {user_id} is active"
+            ) from e
+
     def user_get_list(self) -> list[User]:
 
         try:
@@ -530,6 +543,19 @@ class DatabaseSqliteService:
 
     def project_get_by_name(self, name: str) -> Project | None:
         return self._project_get("name", name)
+
+    def project_is_active(self, project_id: int) -> bool:
+        try:
+            with self._connect() as conn:
+                row = conn.execute(
+                    "SELECT is_active FROM projects WHERE id = ?",
+                    (project_id,),
+                ).fetchone()
+                return bool(row["is_active"]) if row is not None else False
+        except sqlite3.Error as e:
+            raise DatabaseError(
+                f"Database error checking whether project {project_id} is active"
+            ) from e
 
     def project_get_record(self) -> list[Project]:
 
@@ -809,6 +835,19 @@ class DatabaseSqliteService:
 
     def device_get_by_name(self, name: str) -> Device | None:
         return self._device_get("uuid", name)
+
+    def device_is_active(self, device_id: int) -> bool:
+        try:
+            with self._connect() as conn:
+                row = conn.execute(
+                    "SELECT is_active FROM devices WHERE id = ?",
+                    (device_id,),
+                ).fetchone()
+                return bool(row["is_active"]) if row is not None else False
+        except sqlite3.Error as e:
+            raise DatabaseError(
+                f"Database error checking whether device {device_id} is active"
+            ) from e
 
     def device_get_record(self) -> list[Device]:
 
@@ -1173,6 +1212,19 @@ class DatabaseSqliteService:
             ("project_id", "version"),
             (project_id, version),
         )
+
+    def firmware_is_active(self, firmware_id: int) -> bool:
+        try:
+            with self._connect() as conn:
+                row = conn.execute(
+                    "SELECT is_active FROM firmware WHERE id = ?",
+                    (firmware_id,),
+                ).fetchone()
+                return bool(row["is_active"]) if row is not None else False
+        except sqlite3.Error as e:
+            raise DatabaseError(
+                f"Database error checking whether firmware {firmware_id} is active"
+            ) from e
 
     def firmware_get_record(self) -> list[Firmware]:
 

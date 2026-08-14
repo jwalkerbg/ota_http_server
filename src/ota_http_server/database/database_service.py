@@ -60,6 +60,9 @@ class DatabaseService:
     def user_get_by_username(self, username: str) -> User | None:
         return self._database.user_get_by_username(username)
 
+    def user_is_active(self, user_id: int) -> bool:
+        return self._database.user_is_active(user_id)
+
     def user_get_list(self) -> list[User]:
         return self._database.user_get_list()
 
@@ -83,6 +86,9 @@ class DatabaseService:
 
     def project_get_by_name(self, name: str) -> Project | None:
         return self._database.project_get_by_name(name)
+
+    def project_is_active(self, project_id: int) -> bool:
+        return self._database.project_is_active(project_id)
 
     def project_get_record(self) -> list[Project]:
         return self._database.project_get_record()
@@ -110,6 +116,9 @@ class DatabaseService:
 
     def device_get_by_name(self, name: str) -> Device | None:
         return self._database.device_get_by_name(name=name)
+
+    def device_is_active(self, device_id: int) -> bool:
+        return self._database.device_is_active(device_id)
 
     def device_get_record(self) -> list[Device]:
         return self._database.device_get_record()
@@ -141,6 +150,9 @@ class DatabaseService:
             version: str,
         ) -> Firmware | None:
         return self._database.firmware_get_by_project_version(project_id=project_id, version=version)
+
+    def firmware_is_active(self, firmware_id: int) -> bool:
+        return self._database.firmware_is_active(firmware_id)
 
     def firmware_get_record(self) -> list[Firmware]:
         return self._database.firmware_get_record()
