@@ -204,8 +204,23 @@ def create_app(cfg: Config) -> Flask:
 
     @app.route(f'/{url_firmware}/<project>/versions')
     def list_versions(project:str) -> Response:
-        authservice.verify_token(project, verify_sub=False)  # Allow version listing without device identity, but still require valid token for project
-        _, versions, _ = get_sorted_versions(project)
+        project_rec = dbservice.project_get_by_name(project)
+        if project_rec is None:
+            abort(404, "Project not found")
+        if not project_rec.is_active:
+            abort(403, "Project is disabled")
+
+        if use_jwt:
+            authservice.verify_token(project, verify_sub=False)
+
+        firmware_records = [
+            fw for fw in dbservice.firmware_get_record()
+            if fw.project_id == project_rec.id
+        ]
+        if not firmware_records:
+            abort(404, "No firmware metadata found for project")
+
+        versions = sorted(fw.version for fw in firmware_records)
         return jsonify({
             "versions": versions,
             "count": len(versions),
