@@ -112,19 +112,33 @@ class FirmwareService:
         db_service.firmware_add(firmware)
 
     def _replace_firmware(self) -> None:
-        pid = self.cfg.config["parameters"]["firmware_pid"]
-        version = self.cfg.config["parameters"]["firmware_version"]
+        firmware_id = self.cfg.config["parameters"].get("firmware_id")
+        pid = self.cfg.config["parameters"].get("firmware_pid")
+        version = self.cfg.config["parameters"].get("firmware_version")
         source_file = self.cfg.config["parameters"]["firmware_file"]
 
         db_service: DatabaseService = self.cfg.config["db_service"]
-        project = db_service.project_get_by_id(pid)
-        if project is None:
-            raise ValueError(f"Project with ID {pid} does not exist")
 
-        existing = db_service.firmware_get_by_project_version(project_id=pid, version=version)
-        if existing is None:
-            logger.info("No uploaded firmware found for project_id=%s and version=%s. Nothing to replace.", pid, version)
-            return
+        if firmware_id is not None:
+            existing = db_service.firmware_get_by_id(firmware_id)
+            if existing is None:
+                logger.info("No uploaded firmware found for firmware_id=%s. Nothing to replace.", firmware_id)
+                return
+            project = db_service.project_get_by_id(existing.project_id)
+            if project is None:
+                raise ValueError(f"Project with ID {existing.project_id} does not exist")
+            pid = existing.project_id
+            version = existing.version
+        else:
+            if pid is None or version is None:
+                raise ValueError("Firmware id or project id plus version must be provided")
+            project = db_service.project_get_by_id(pid)
+            if project is None:
+                raise ValueError(f"Project with ID {pid} does not exist")
+            existing = db_service.firmware_get_by_project_version(project_id=pid, version=version)
+            if existing is None:
+                logger.info("No uploaded firmware found for project_id=%s and version=%s. Nothing to replace.", pid, version)
+                return
 
         source_path = Path(source_file).expanduser().resolve(strict=True)
         if not source_path.is_file():
