@@ -56,8 +56,11 @@ class DatabaseMySQLService:
     def user_is_active(self, user_id: int) -> bool:
         self._unsupported("user_is_active")
 
-    def user_get_list(self) -> list[User]:
+    def user_get_list(self, is_active: bool | None = None) -> list[User]:
         self._unsupported("user_get_list")
+
+    def user_get_record(self, is_active: bool | None = None) -> list[User]:
+        self._unsupported("user_get_record")
 
     def project_add(self, project: Project) -> Project:
         self._unsupported("project_add")

@@ -2,9 +2,12 @@ import sys
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
+import pytest
+
 from ota_http_server.core.config import parse_args
-from ota_http_server.core.data_models import Firmware, Project
+from ota_http_server.core.data_models import Firmware, Project, User
 from ota_http_server.firmware.firmware_service import FirmwareService
+from ota_http_server.user.user_service import UserService
 
 
 def test_parse_args_replace_command(monkeypatch):
@@ -222,3 +225,74 @@ def test_replace_firmware_skips_if_no_existing_version(tmp_path):
 
     assert not any(project_dir.iterdir())
     cfg.config["db_service"].firmware_replace.assert_not_called()
+
+
+def test_parse_args_user_list_status_filters(monkeypatch):
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "ota_http_server",
+            "--dbtype",
+            "sqlite",
+            "user",
+            "list",
+            "--record",
+            "--enabled",
+        ],
+    )
+
+    parsed = parse_args()
+    assert parsed.user_command == "list"
+    assert parsed.user_record is True
+    assert parsed.user_status == "enabled"
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "ota_http_server",
+            "--dbtype",
+            "sqlite",
+            "user",
+            "list",
+            "--disabled",
+        ],
+    )
+
+    parsed = parse_args()
+    assert parsed.user_record is None
+    assert parsed.user_status == "disabled"
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "ota_http_server",
+            "--dbtype",
+            "sqlite",
+            "user",
+            "list",
+            "--enabled",
+            "--disabled",
+        ],
+    )
+
+    with pytest.raises(SystemExit):
+        parse_args()
+
+
+def test_user_service_filters_list_by_status():
+    cfg = SimpleNamespace()
+    cfg.config = {
+        "parameters": {"user_status": "enabled", "user_record": True},
+        "db_service": MagicMock(),
+    }
+    cfg.config["db_service"].user_get_record.return_value = [
+        User(1, "alpha", "hash1", "a@example.com", "admin", True, None, None),
+        User(2, "beta", "hash2", "b@example.com", "viewer", False, None, None),
+    ]
+
+    UserService(cfg)._list_users()
+
+    cfg.config["db_service"].user_get_record.assert_called_once_with(is_active=True)

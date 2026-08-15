@@ -316,13 +316,11 @@ class DatabaseSqliteService:
                 f"Database error checking whether user {user_id} is active"
             ) from e
 
-    def user_get_list(self) -> list[User]:
+    def user_get_list(self, is_active: bool | None = None) -> list[User]:
 
         try:
             with self._connect() as conn:
-
-                cursor = conn.execute(
-                    """
+                query = """
                     SELECT
                         id,
                         username,
@@ -333,10 +331,14 @@ class DatabaseSqliteService:
                         created_at,
                         updated_at
                     FROM users
-                    ORDER BY username
-                    """
-                )
+                """
+                params: tuple[object, ...] = ()
+                if is_active is not None:
+                    query += " WHERE is_active = ?"
+                    params = (1 if is_active else 0,)
+                query += " ORDER BY username"
 
+                cursor = conn.execute(query, params)
                 rows = cursor.fetchall()
 
                 return [
@@ -348,6 +350,9 @@ class DatabaseSqliteService:
             raise DatabaseError(
                 "Database error retrieving users"
             ) from e
+
+    def user_get_record(self, is_active: bool | None = None) -> list[User]:
+        return self.user_get_list(is_active=is_active)
 
     def _row_to_project(self, row: sqlite3.Row) -> Project:
 

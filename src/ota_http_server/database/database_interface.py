@@ -39,7 +39,10 @@ class DatabaseInterface(Protocol):
     def user_is_active(self, user_id: int) -> bool:
         ...
 
-    def user_get_list(self) -> list[User]:
+    def user_get_list(self, is_active: bool | None = None) -> list[User]:
+        ...
+
+    def user_get_record(self, is_active: bool | None = None) -> list[User]:
         ...
 
     def project_add(self, project: Project) -> Project:

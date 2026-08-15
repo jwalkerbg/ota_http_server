@@ -57,6 +57,8 @@ class ParametersConfig(TypedDict, total=False):
     user_password: str
     user_email: str
     user_role: str
+    user_record: bool
+    user_status: str | None
     project_id: int
     project_name: str
     device_id: int
@@ -149,6 +151,8 @@ class Config:
             'user_password': None,
             'user_email': None,
             'user_role': None,
+            'user_record': False,
+            'user_status': None,
             'project_id': None,
             'project_name': None,
             'device_id': None,
@@ -296,6 +300,12 @@ class Config:
                         "type": "string"
                     },
                     "user_role": {
+                        "type": "string"
+                    },
+                    "user_record": {
+                        "type": "boolean"
+                    },
+                    "user_status": {
                         "type": "string"
                     },
                     "project_id": {
@@ -633,7 +643,14 @@ class Config:
                         self.config["parameters"]["username"] = config_cli.username
                 # list
                 if config_cli.user_command == 'list':
-                    pass
+                    if getattr(config_cli, 'user_record', None) is not None:
+                        self.config["parameters"]["user_record"] = config_cli.user_record
+                    else:
+                        self.config["parameters"]["user_record"] = False
+                    if getattr(config_cli, 'user_status', None) is not None:
+                        self.config["parameters"]["user_status"] = config_cli.user_status
+                    else:
+                        self.config["parameters"]["user_status"] = None
 
             if config_cli.command == 'project':
                 if config_cli.project_command is not None:
@@ -949,6 +966,10 @@ For use in development environment without SSL certificates and JWT authenticati
     get_user_parser.add_argument("--username", dest="username", type=str, required=False, help="Username of the user to be retrieved. Give --user-id or --username. --user-id takes precedence.")
     # list
     list_user_parser = user_subparsers.add_parser(name="list", help="List all users")
+    list_user_parser.add_argument("--record", dest="user_record", action="store_const", const=True, help="List full records of users, including all fields. If not specified, only a summary of users will be listed.")
+    user_status_group = list_user_parser.add_mutually_exclusive_group()
+    user_status_group.add_argument("--enabled", dest="user_status", action="store_const", const="enabled", help="List enabled users only")
+    user_status_group.add_argument("--disabled", dest="user_status", action="store_const", const="disabled", help="List disabled users only")
 
     # project
     project_parser = subparsers.add_parser(name="project", help="Projects manipulation operations")
