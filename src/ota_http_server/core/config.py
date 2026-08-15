@@ -752,6 +752,14 @@ class Config:
                         self.config["parameters"]["firmware_pid"] = config_cli.firmware_pid
                     if config_cli.firmware_version is not None:
                         self.config["parameters"]["firmware_version"] = config_cli.firmware_version
+                # replace
+                if config_cli.firmware_command == "replace":
+                    if config_cli.firmware_pid is not None:
+                        self.config["parameters"]["firmware_pid"] = config_cli.firmware_pid
+                    if config_cli.firmware_version is not None:
+                        self.config["parameters"]["firmware_version"] = config_cli.firmware_version
+                    if config_cli.firmware_file is not None:
+                        self.config["parameters"]["firmware_file"] = config_cli.firmware_file
                 # list
                 if config_cli.firmware_command == "list":
                     if config_cli.firmware_record is not None:
@@ -1016,6 +1024,11 @@ For use in development environment without SSL certificates and JWT authenticati
     get_firmware_parser.add_argument("--id", dest="firmware_id", type=int, required=False, help="ID of the firmware to be retrieved")
     get_firmware_parser.add_argument("--pid", dest="firmware_pid", type=int, required=False, help="ID of the project the firmware is related to")
     get_firmware_parser.add_argument("--version", dest="firmware_version", type=str, required=False, help="Version of the firmware")
+    # firmware replace
+    replace_firmware_parser = firmware_subparsers.add_parser("replace", help="Replace an uploaded firmware file for a project version")
+    replace_firmware_parser.add_argument("--pid", dest="firmware_pid", type=int, required=True, help="ID of the project the firmware is related to")
+    replace_firmware_parser.add_argument("--version", dest="firmware_version", type=str, required=True, help="Version of the firmware to replace")
+    replace_firmware_parser.add_argument("--file", dest="firmware_file", type=str, required=True, help="Path to the new firmware file")
     # firmware list
     list_firmware_parser = firmware_subparsers.add_parser("list", help="List available firmware")
     list_firmware_parser.add_argument("--record", dest="firmware_record", action="store_const", const=True, help="List full records of firmware, including all fields. If not specified, only a summary of firmware will be listed.")

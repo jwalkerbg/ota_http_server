@@ -105,6 +105,9 @@ class DatabaseInterface(Protocol):
     def firmware_add(self, firmware: Firmware) -> Firmware:
         ...
 
+    def firmware_replace(self, firmware_id: int, filename: str, file_size: int, checksum: str) -> Firmware:
+        ...
+
     def firmware_enable_by_id(self, id: int) -> None:
         ...
 

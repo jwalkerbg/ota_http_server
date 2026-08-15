@@ -122,6 +122,9 @@ class DatabaseMySQLService:
     def firmware_add(self, firmware: Firmware) -> Firmware:
         self._unsupported("firmware_add")
 
+    def firmware_replace(self, firmware_id: int, filename: str, file_size: int, checksum: str) -> Firmware:
+        self._unsupported("firmware_replace")
+
     def firmware_enable_by_id(self, id: int) -> None:
         self._unsupported("firmware_enable_by_id")
 
