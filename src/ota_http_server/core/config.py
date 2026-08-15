@@ -64,6 +64,8 @@ class ParametersConfig(TypedDict, total=False):
     device_id: int
     device_uuid: str
     device_pid: str
+    device_record: bool
+    device_status: str | None
     device_model: str
     device_serial_number: str
     device_current_version: str
@@ -158,6 +160,8 @@ class Config:
             'device_id': None,
             'device_uuid': None,
             'device_pid': None,
+            'device_record': False,
+            'device_status': None,
             'device_model': None,
             'device_serial_number': None,
             'device_current_version': None,
@@ -322,6 +326,12 @@ class Config:
                     },
                     "device_pid": {
                         "type": "number"
+                    },
+                    "device_record": {
+                        "type": "boolean"
+                    },
+                    "device_status": {
+                        "type": "string"
                     },
                     "device_model": {
                         "type": "string"
@@ -725,10 +735,18 @@ class Config:
                         self.config["parameters"]["device_uuid"] = config_cli.device_uuid
                 # list
                 if config_cli.device_command == "list":
-                    if config_cli.device_record is not None:
-                        self.config["parameters"]["device_record"] = True
+                    if getattr(config_cli, "device_record", None) is not None:
+                        self.config["parameters"]["device_record"] = config_cli.device_record
                     else:
                         self.config["parameters"]["device_record"] = False
+                    if getattr(config_cli, "device_status", None) is not None:
+                        self.config["parameters"]["device_status"] = config_cli.device_status
+                    else:
+                        self.config["parameters"]["device_status"] = None
+                    if getattr(config_cli, "device_pid", None) is not None:
+                        self.config["parameters"]["device_pid"] = config_cli.device_pid
+                    else:
+                        self.config["parameters"]["device_pid"] = None
 
             if config_cli.command == "firmware":
                 if config_cli.firmware_command is not None:
@@ -1021,6 +1039,10 @@ For use in development environment without SSL certificates and JWT authenticati
     # device list
     list_device_parser = device_subparsers.add_parser(name="list", help="List devices")
     list_device_parser.add_argument("--record", dest="device_record", action="store_const", const=True, help="List full records of devices, including all fields. If not specified, only a summary of devices will be listed.")
+    device_status_group = list_device_parser.add_mutually_exclusive_group()
+    device_status_group.add_argument("--enabled", dest="device_status", action="store_const", const="enabled", help="List enabled devices only")
+    device_status_group.add_argument("--disabled", dest="device_status", action="store_const", const="disabled", help="List disabled devices only")
+    list_device_parser.add_argument("--pid", dest="device_pid", type=int, required=False, help="List devices for project ID only")
 
     # firmware
     firmware_parser = subparsers.add_parser(name="firmware", help="Firmware manipulation operations", )

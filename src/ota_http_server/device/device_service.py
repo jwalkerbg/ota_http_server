@@ -122,17 +122,25 @@ class DeviceService:
 
     def _list_devices(self) -> None:
         db_service: DatabaseService = self.cfg.config["db_service"]
+        device_status = self.cfg.config["parameters"].get("device_status")
+        is_active = None if device_status is None else device_status == "enabled"
+        project_id = self.cfg.config["parameters"].get("device_pid")
 
         if self.cfg.config["parameters"]["device_record"]:
-            devices = db_service.device_get_record()
+            devices = db_service.device_get_record(
+                is_active=is_active,
+                project_id=project_id,
+            )
             if devices:
                 logger.verbose("\n%s",DeviceFormatter.format_list(devices))
             else:
                 logger.info("No devices found.")
         else:
-            devices = db_service.device_get_list()
+            devices = db_service.device_get_list(
+                is_active=is_active,
+                project_id=project_id,
+            )
             if devices:
                 logger.verbose("\n%s",DeviceListItemFormatter.format_list(devices))
             else:
                 logger.info("No devices found.")
-

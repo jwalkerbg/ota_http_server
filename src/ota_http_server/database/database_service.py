@@ -123,11 +123,25 @@ class DatabaseService:
     def device_is_active(self, device_id: int) -> bool:
         return self._database.device_is_active(device_id)
 
-    def device_get_record(self) -> list[Device]:
-        return self._database.device_get_record()
+    def device_get_record(
+        self,
+        is_active: bool | None = None,
+        project_id: int | None = None,
+    ) -> list[Device]:
+        return self._database.device_get_record(
+            is_active=is_active,
+            project_id=project_id,
+        )
 
-    def device_get_list(self) -> list[DeviceListItem]:
-        return self._database.device_get_list()
+    def device_get_list(
+        self,
+        is_active: bool | None = None,
+        project_id: int | None = None,
+    ) -> list[DeviceListItem]:
+        return self._database.device_get_list(
+            is_active=is_active,
+            project_id=project_id,
+        )
 
     def firmware_add(self, firmware: Firmware) -> Firmware:
         return self._database.firmware_add(firmware=firmware)

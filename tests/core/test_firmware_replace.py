@@ -6,6 +6,7 @@ import pytest
 
 from ota_http_server.core.config import parse_args
 from ota_http_server.core.data_models import Firmware, Project, User
+from ota_http_server.device.device_service import DeviceService
 from ota_http_server.firmware.firmware_service import FirmwareService
 from ota_http_server.user.user_service import UserService
 
@@ -296,3 +297,81 @@ def test_user_service_filters_list_by_status():
     UserService(cfg)._list_users()
 
     cfg.config["db_service"].user_get_record.assert_called_once_with(is_active=True)
+
+
+def test_parse_args_device_list_filters(monkeypatch):
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "ota_http_server",
+            "--dbtype",
+            "sqlite",
+            "device",
+            "list",
+            "--record",
+            "--enabled",
+            "--pid",
+            "14",
+        ],
+    )
+
+    parsed = parse_args()
+    assert parsed.device_command == "list"
+    assert parsed.device_record is True
+    assert parsed.device_status == "enabled"
+    assert parsed.device_pid == 14
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "ota_http_server",
+            "--dbtype",
+            "sqlite",
+            "device",
+            "list",
+            "--disabled",
+        ],
+    )
+    parsed = parse_args()
+    assert parsed.device_record is None
+    assert parsed.device_status == "disabled"
+    assert parsed.device_pid is None
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "ota_http_server",
+            "--dbtype",
+            "sqlite",
+            "device",
+            "list",
+            "--enabled",
+            "--disabled",
+        ],
+    )
+    with pytest.raises(SystemExit):
+        parse_args()
+
+
+def test_device_service_filters_record_list_by_status_and_project_id():
+    cfg = SimpleNamespace()
+    cfg.config = {
+        "parameters": {
+            "device_record": True,
+            "device_status": "disabled",
+            "device_pid": 12,
+        },
+        "db_service": MagicMock(),
+    }
+    cfg.config["db_service"].device_get_record.return_value = []
+
+    DeviceService(cfg)._list_devices()
+
+    cfg.config["db_service"].device_get_record.assert_called_once_with(
+        is_active=False,
+        project_id=12,
+    )
+    cfg.config["db_service"].device_get_list.assert_not_called()

@@ -99,10 +99,18 @@ class DatabaseInterface(Protocol):
     def device_is_active(self, device_id: int) -> bool:
         ...
 
-    def device_get_record(self) -> list[Device]:
+    def device_get_record(
+        self,
+        is_active: bool | None = None,
+        project_id: int | None = None,
+    ) -> list[Device]:
         ...
 
-    def device_get_list(self) -> list[DeviceListItem]:
+    def device_get_list(
+        self,
+        is_active: bool | None = None,
+        project_id: int | None = None,
+    ) -> list[DeviceListItem]:
         ...
 
     def firmware_add(self, firmware: Firmware) -> Firmware:

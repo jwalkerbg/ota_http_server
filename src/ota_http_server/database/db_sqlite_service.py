@@ -854,13 +854,39 @@ class DatabaseSqliteService:
                 f"Database error checking whether device {device_id} is active"
             ) from e
 
-    def device_get_record(self) -> list[Device]:
+    def _build_device_filters(
+        self,
+        is_active: bool | None = None,
+        project_id: int | None = None,
+    ) -> tuple[str, tuple[object, ...]]:
+        filters: list[str] = []
+        params: list[object] = []
+        if is_active is not None:
+            filters.append("devices.is_active = ?")
+            params.append(1 if is_active else 0)
+        if project_id is not None:
+            filters.append("devices.project_id = ?")
+            params.append(project_id)
+        where_clause = ""
+        if filters:
+            where_clause = " WHERE " + " AND ".join(filters)
+        return where_clause, tuple(params)
+
+    def device_get_record(
+        self,
+        is_active: bool | None = None,
+        project_id: int | None = None,
+    ) -> list[Device]:
 
         try:
             with self._connect() as conn:
+                where_clause, params = self._build_device_filters(
+                    is_active=is_active,
+                    project_id=project_id,
+                )
 
                 cursor = conn.execute(
-                    """
+                    f"""
                     SELECT
                         id,
                         uuid,
@@ -873,8 +899,10 @@ class DatabaseSqliteService:
                         created_at,
                         updated_at
                     FROM devices
+                    {where_clause}
                     ORDER BY project_id, id
-                    """
+                    """,
+                    params
                 )
 
                 rows = cursor.fetchall()
@@ -889,13 +917,21 @@ class DatabaseSqliteService:
                 "Database error retrieving devices"
             ) from e
 
-    def device_get_list(self) -> list[DeviceListItem]:
+    def device_get_list(
+        self,
+        is_active: bool | None = None,
+        project_id: int | None = None,
+    ) -> list[DeviceListItem]:
 
         try:
             with self._connect() as conn:
+                where_clause, params = self._build_device_filters(
+                    is_active=is_active,
+                    project_id=project_id,
+                )
 
                 cursor = conn.execute(
-                    """
+                    f"""
                     SELECT
                         devices.id,
                         devices.uuid AS uuid,
@@ -908,8 +944,10 @@ class DatabaseSqliteService:
                     FROM devices
                     JOIN projects
                         ON projects.id = devices.project_id
+                    {where_clause}
                     ORDER BY projects.name, devices.id
-                    """
+                    """,
+                    params,
                 )
 
                 rows = cursor.fetchall()
