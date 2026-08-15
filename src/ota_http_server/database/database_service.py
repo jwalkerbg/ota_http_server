@@ -129,6 +129,9 @@ class DatabaseService:
     def firmware_add(self, firmware: Firmware) -> Firmware:
         return self._database.firmware_add(firmware=firmware)
 
+    def firmware_replace(self, firmware_id: int, filename: str, file_size: int, checksum: str) -> Firmware:
+        return self._database.firmware_replace(firmware_id=firmware_id, filename=filename, file_size=file_size, checksum=checksum)
+
     def firmware_enable_by_id(self, id: int) -> None:
         return self._database.firmware_enable_by_id(id=id)
 

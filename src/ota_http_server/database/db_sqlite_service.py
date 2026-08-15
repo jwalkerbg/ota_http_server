@@ -1026,6 +1026,63 @@ class DatabaseSqliteService:
                 f"Database error creating firmware '{firmware.uuid}'"
             ) from e
 
+    def firmware_replace(self, firmware_id: int, filename: str, file_size: int, checksum: str) -> Firmware:
+        try:
+            with self._connect() as conn:
+                row = conn.execute(
+                    """
+                    SELECT
+                        id,
+                        project_id,
+                        version,
+                        filename,
+                        file_size,
+                        checksum,
+                        release_notes,
+                        channel,
+                        is_active,
+                        created_at,
+                        updated_at
+                    FROM firmware
+                    WHERE id = ?
+                    """,
+                    (firmware_id,),
+                ).fetchone()
+
+                if row is None:
+                    raise FirmwareNotFoundError(f"Firmware id={firmware_id} not found")
+
+                updated = self._row_to_firmware(row)
+                updated.filename = filename
+                updated.file_size = file_size
+                updated.checksum = checksum
+                updated.updated_at = datetime.now(UTC)
+
+                conn.execute(
+                    """
+                    UPDATE firmware
+                    SET
+                        filename = ?,
+                        file_size = ?,
+                        checksum = ?,
+                        updated_at = ?
+                    WHERE id = ?
+                    """,
+                    (
+                        updated.filename,
+                        updated.file_size,
+                        updated.checksum,
+                        updated.updated_at.isoformat(),
+                        firmware_id,
+                    ),
+                )
+                conn.commit()
+                return updated
+        except sqlite3.Error as e:
+            raise DatabaseError(
+                f"Database error updating firmware '{firmware_id}'"
+            ) from e
+
     def _firmware_enable_disable(
             self,
             columns: tuple[str, ...],
