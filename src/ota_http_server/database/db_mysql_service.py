@@ -161,8 +161,16 @@ class DatabaseMySQLService:
     def firmware_is_active(self, firmware_id: int) -> bool:
         self._unsupported("firmware_is_active")
 
-    def firmware_get_record(self) -> list[Firmware]:
+    def firmware_get_record(
+        self,
+        is_active: bool | None = None,
+        project_id: int | None = None,
+    ) -> list[Firmware]:
         self._unsupported("firmware_get_record")
 
-    def firmware_get_list(self) -> list[FirmwareListItem]:
+    def firmware_get_list(
+        self,
+        is_active: bool | None = None,
+        project_id: int | None = None,
+    ) -> list[FirmwareListItem]:
         self._unsupported("firmware_get_list")

@@ -1326,13 +1326,39 @@ class DatabaseSqliteService:
                 f"Database error checking whether firmware {firmware_id} is active"
             ) from e
 
-    def firmware_get_record(self) -> list[Firmware]:
+    def _build_firmware_filters(
+        self,
+        is_active: bool | None = None,
+        project_id: int | None = None,
+    ) -> tuple[str, tuple[object, ...]]:
+        filters: list[str] = []
+        params: list[object] = []
+        if is_active is not None:
+            filters.append("firmware.is_active = ?")
+            params.append(1 if is_active else 0)
+        if project_id is not None:
+            filters.append("firmware.project_id = ?")
+            params.append(project_id)
+        where_clause = ""
+        if filters:
+            where_clause = " WHERE " + " AND ".join(filters)
+        return where_clause, tuple(params)
+
+    def firmware_get_record(
+        self,
+        is_active: bool | None = None,
+        project_id: int | None = None,
+    ) -> list[Firmware]:
 
         try:
             with self._connect() as conn:
+                where_clause, params = self._build_firmware_filters(
+                    is_active=is_active,
+                    project_id=project_id,
+                )
 
                 cursor = conn.execute(
-                    """
+                    f"""
                     SELECT
                         id,
                         project_id,
@@ -1346,8 +1372,10 @@ class DatabaseSqliteService:
                         created_at,
                         updated_at
                     FROM firmware
+                    {where_clause}
                     ORDER BY project_id, id
-                    """
+                    """,
+                    params
                 )
 
                 rows = cursor.fetchall()
@@ -1362,13 +1390,21 @@ class DatabaseSqliteService:
                 "Database error retrieving firmware"
             ) from e
 
-    def firmware_get_list(self) -> list[FirmwareListItem]:
+    def firmware_get_list(
+        self,
+        is_active: bool | None = None,
+        project_id: int | None = None,
+    ) -> list[FirmwareListItem]:
 
         try:
             with self._connect() as conn:
+                where_clause, params = self._build_firmware_filters(
+                    is_active=is_active,
+                    project_id=project_id,
+                )
 
                 cursor = conn.execute(
-                    """
+                    f"""
                     SELECT
                         firmware.id,
                         projects.name AS project_name,
@@ -1379,8 +1415,10 @@ class DatabaseSqliteService:
                     FROM firmware
                     JOIN projects
                         ON projects.id = firmware.project_id
+                    {where_clause}
                     ORDER BY projects.name, firmware.version;
-                    """
+                    """,
+                    params
                 )
 
                 rows = cursor.fetchall()

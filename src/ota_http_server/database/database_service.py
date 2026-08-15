@@ -174,8 +174,16 @@ class DatabaseService:
     def firmware_is_active(self, firmware_id: int) -> bool:
         return self._database.firmware_is_active(firmware_id)
 
-    def firmware_get_record(self) -> list[Firmware]:
-        return self._database.firmware_get_record()
+    def firmware_get_record(
+        self,
+        is_active: bool | None = None,
+        project_id: int | None = None,
+    ) -> list[Firmware]:
+        return self._database.firmware_get_record(is_active=is_active, project_id=project_id)
 
-    def firmware_get_list(self) -> list[FirmwareListItem]:
-        return self._database.firmware_get_list()
+    def firmware_get_list(
+        self,
+        is_active: bool | None = None,
+        project_id: int | None = None,
+    ) -> list[FirmwareListItem]:
+        return self._database.firmware_get_list(is_active=is_active, project_id=project_id)

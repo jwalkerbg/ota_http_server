@@ -237,15 +237,19 @@ class FirmwareService:
     def _list_firmware(self) -> None:
         db_service: DatabaseService = self.cfg.config["db_service"]
 
+        firmware_status = self.cfg.config["parameters"].get("firmware_status")
+        is_active = None if firmware_status is None else firmware_status == "enabled"
+        project_id = self.cfg.config["parameters"].get("firmware_pid")
+
         if self.cfg.config["parameters"]["firmware_record"] == True:
-            firmware = db_service.firmware_get_record()
+            firmware = db_service.firmware_get_record(is_active=is_active, project_id=project_id)
             if firmware:
                 logger.verbose("\n%s",FirmwareFormatter.format_list(firmware))
             else:
                 logger.info("No firmware found.")
 
         else:
-            firmware = db_service.firmware_get_list()
+            firmware = db_service.firmware_get_list(is_active=is_active, project_id=project_id)
             if firmware:
                 logger.verbose("\n%s\n",FirmwareListItemFormatter.format_list(firmware))
             else:

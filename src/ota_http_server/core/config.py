@@ -75,6 +75,8 @@ class ParametersConfig(TypedDict, total=False):
     firmware_file: str
     firmware_release_notes: str
     firmware_release_channel: str
+    firmware_record: bool
+    firmware_status: str | None
 
 class DatabaseMySQLConfig(TypedDict, total=False):
     dbhost: str
@@ -170,7 +172,9 @@ class Config:
             'firmware_version': None,
             'firmware_file': None,
             'firmware_release_notes': None,
-            'firmware_release_channel': None
+            'firmware_release_channel': None,
+            'firmware_record': False,
+            'firmware_status': None
         },
         'database': {
             'dbtype': "sqlite",
@@ -358,6 +362,12 @@ class Config:
                         "type": "string"
                     },
                     "firmware_release_channel": {
+                        "type": "string"
+                    },
+                    "firmware_record": {
+                        "type": "boolean"
+                    },
+                    "firmware_status": {
                         "type": "string"
                     }
                 },
@@ -803,6 +813,14 @@ class Config:
                         self.config["parameters"]["firmware_record"] = True
                     else:
                         self.config["parameters"]["firmware_record"] = False
+                    if getattr(config_cli, "firmware_status", None) is not None:
+                        self.config["parameters"]["firmware_status"] = config_cli.firmware_status
+                    else:
+                        self.config["parameters"]["firmware_status"] = None
+                    if getattr(config_cli, "firmware_pid", None) is not None:
+                        self.config["parameters"]["firmware_pid"] = config_cli.firmware_pid
+                    else:
+                        self.config["parameters"]["firmware_pid"] = None
 
         return self.config
 
@@ -1078,6 +1096,10 @@ For use in development environment without SSL certificates and JWT authenticati
     # firmware list
     list_firmware_parser = firmware_subparsers.add_parser("list", help="List available firmware")
     list_firmware_parser.add_argument("--record", dest="firmware_record", action="store_const", const=True, help="List full records of firmware, including all fields. If not specified, only a summary of firmware will be listed.")
+    firmware_status_group = list_firmware_parser.add_mutually_exclusive_group()
+    firmware_status_group.add_argument("--enabled", dest="firmware_status", action="store_const", const="enabled", help="List enabled firmware only")
+    firmware_status_group.add_argument("--disabled", dest="firmware_status", action="store_const", const="disabled", help="List disabled firmware only")
+    list_firmware_parser.add_argument("--pid", dest="firmware_pid", type=int, required=False, help="List firmware for project ID only")
 
     return parser.parse_args()
 
