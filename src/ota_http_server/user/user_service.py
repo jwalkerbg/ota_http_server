@@ -96,9 +96,17 @@ class UserService:
 
     def _list_users(self) -> None:
         db_service: DatabaseService = self.cfg.config["db_service"]
-        users = db_service.user_get_list()
+        user_record = self.cfg.config["parameters"].get("user_record", False)
+        user_status = self.cfg.config["parameters"].get("user_status")
+        is_active = None if user_status is None else user_status == "enabled"
+
+        if user_record:
+            users = db_service.user_get_record(is_active=is_active)
+        else:
+            users = db_service.user_get_list(is_active=is_active)
+
         if users:
-            logger.verbose("\n%s",UserFormatter.format_list(users))
+            logger.verbose("\n%s", UserFormatter.format_list(users))
         else:
             logger.verbose("No users found")
 

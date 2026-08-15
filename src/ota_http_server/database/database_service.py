@@ -63,8 +63,11 @@ class DatabaseService:
     def user_is_active(self, user_id: int) -> bool:
         return self._database.user_is_active(user_id)
 
-    def user_get_list(self) -> list[User]:
-        return self._database.user_get_list()
+    def user_get_list(self, is_active: bool | None = None) -> list[User]:
+        return self._database.user_get_list(is_active=is_active)
+
+    def user_get_record(self, is_active: bool | None = None) -> list[User]:
+        return self._database.user_get_record(is_active=is_active)
 
     def project_add(self, project: Project) -> Project:
         return self._database.project_add(project)
