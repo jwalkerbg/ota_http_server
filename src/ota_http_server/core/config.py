@@ -61,6 +61,9 @@ class ParametersConfig(TypedDict, total=False):
     user_status: str | None
     project_id: int
     project_name: str
+    project_display_name: str
+    project_description: str
+    project_created_by: int
     device_id: int
     device_uuid: str
     device_pid: str
@@ -159,6 +162,9 @@ class Config:
             'user_status': None,
             'project_id': None,
             'project_name': None,
+            'project_display_name': None,
+            'project_description': None,
+            'project_created_by': None,
             'device_id': None,
             'device_uuid': None,
             'device_pid': None,
@@ -321,6 +327,15 @@ class Config:
                     },
                     "project_name": {
                         "type": "string"
+                    },
+                    "project_display_name" : {
+                        "type": "string"
+                    },
+                    "project_description": {
+                        "type": "string"
+                    },
+                    "project_created_by": {
+                        "type": "number"
                     },
                     "device_id": {
                         "type": "number"
@@ -683,8 +698,8 @@ class Config:
                         self.config["parameters"]["project_display_name"] = config_cli.project_display_name
                     if config_cli.project_description is not None:
                         self.config["parameters"]["project_description"] = config_cli.project_description
-                    if config_cli.created_by is not None:
-                        self.config["parameters"]["created_by"] = config_cli.created_by
+                    if config_cli.project_created_by is not None:
+                        self.config["parameters"]["project_created_by"] = config_cli.project_created_by
                 # enable
                 if config_cli.project_command == "enable":
                     if config_cli.project_id is not None:
@@ -1015,7 +1030,7 @@ For use in development environment without SSL certificates and JWT authenticati
     add_project_parser.add_argument("--name", dest="project_name", type=str, required=True, help="Name of the new created project")
     add_project_parser.add_argument("--display_name", dest="project_display_name", type=str, required=False, help="Display name of the new created project")
     add_project_parser.add_argument("--description", dest="project_description", type=str, required=False, help="Description of the new created project")
-    add_project_parser.add_argument("--created-by", dest="created_by", type=int, required=True, help="ID of the user who created the project")
+    add_project_parser.add_argument("--created-by", dest="project_created_by", type=int, required=True, help="ID of the user who created the project")
     # project enable
     enable_project_parser = project_subparsers.add_parser(name="enable", help="Enable project")
     enable_project_parser.add_argument("--id", dest="project_id", type=int, required=False, help="ID of the project to be enabled")

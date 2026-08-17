@@ -158,8 +158,10 @@ class ProjectFormatter:
         values = [
             str(project.id),
             project.name,
-            project.display_name,
-            project.description,
+            project.display_name
+                if project.display_name else "-",
+            project.description
+                if project.description else "-",
             str(project.created_by),
             status,
             created,
@@ -210,8 +212,10 @@ class ProjectListItemFormatter:
         values = [
             str(project.id),
             project.name,
-            display_name,
-            description,
+            display_name
+                if display_name else "-",
+            description
+                if description else "-",
             project.created_by_username,
             status
         ]

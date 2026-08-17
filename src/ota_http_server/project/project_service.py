@@ -39,9 +39,7 @@ class ProjectService:
         if display_name is None:
             display_name = name
         description = self.cfg.config["parameters"]["project_description"]
-        if description is None:
-            description = ""
-        created_by = self.cfg.config["parameters"]["created_by"]
+        created_by = self.cfg.config["parameters"]["project_created_by"]
 
         project = Project(id=None, name=name, display_name=display_name, description=description, created_by=created_by, is_active=True, created_at=None, updated_at=None)
 
