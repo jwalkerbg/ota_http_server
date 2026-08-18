@@ -138,14 +138,9 @@ def create_app(cfg: Config) -> Flask:
 
         filename = firmware_rec.filename
 
-        file_path = (
-            Path(www_dir) / Path(firmware_dir) / Path(project) / Path(filename)
-        ).resolve()
-        allowed_dir = (
-            Path(www_dir) / Path(firmware_dir) / Path(project)
-        ).resolve()
-        if not file_path.is_relative_to(allowed_dir):  # Python >= 3.9
-            abort(403, "Access to this path is forbidden")
+        app_paths = cfg.config['parameters']['app_paths']
+        project_dir = app_paths.project_dir(project).resolve()
+        file_path = (project_dir / Path(filename)).resolve()
 
         logger.info("Serving firmware from: %s", file_path)
         if not file_path.is_file():
@@ -185,18 +180,11 @@ def create_app(cfg: Config) -> Flask:
         if not latest_firmware_rec.is_active:
             abort(403, "Latest firmware is disabled")
 
-        file_path = (
-            Path(www_dir)
-            / Path(firmware_dir)
-            / Path(project)
-            / Path(latest_firmware_rec.filename)
-        ).resolve()
+        app_paths = cfg.config['parameters']['app_paths']
+        project_dir = app_paths.project_dir(project).resolve()
+        file_path = (project_dir / Path(latest_firmware_rec.filename)).resolve()
 
-        allowed_dir = (
-            Path(www_dir) / Path(firmware_dir) / Path(project)
-        ).resolve()
-        if not file_path.is_relative_to(allowed_dir):  # Python >= 3.9
-            abort(403, "Access to this path is forbidden")
+        logger.info("Serving firmware from: %s", file_path)
         if not file_path.is_file():
             abort(404, "Firmware file not found")
 
