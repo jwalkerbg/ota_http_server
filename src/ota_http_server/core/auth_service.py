@@ -94,8 +94,7 @@ class AuthService:
 
         # 5️⃣.3️⃣ Verify issuer claim if present (optional, but good practice)
         issuer = payload.get("iss")
-        expected_issuer = app.config.get("jwt_issuer", "ota_http_server")
-        if issuer and not hmac.compare_digest(issuer, expected_issuer):
+        if issuer and not hmac.compare_digest(issuer, self.jwt_issuer):
             abort(403, "Token issuer mismatch")
 
         if verify_sub:
