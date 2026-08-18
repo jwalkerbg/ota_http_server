@@ -92,7 +92,10 @@ def create_app(cfg: Config) -> Flask:
     def log_audit_event(ip:str|None, action:str, details:str) -> None:
         """Append a token generation audit log entry."""
         timestamp = datetime.now(UTC).isoformat()
-        os.makedirs(os.path.dirname(ota_audit_log) or ".", exist_ok=True)
+
+        app_paths = cfg.config['parameters']['app_paths']
+        ota_audit_log = (app_paths.logs_dir / Path(cfg.config['parameters']['ota_audit_log'])).resolve()
+
         new_file = not os.path.exists(ota_audit_log)
         with open(ota_audit_log, "a", newline="", encoding="utf-8") as csvfile:
             writer = csv.writer(csvfile)
