@@ -12,6 +12,7 @@ import hmac
 from .data_models import TokenResult
 from .auth_service import AuthService
 from ota_http_server.database.database_service import DatabaseService
+from ota_http_server.firmware.filename_validation import validate_firmware_filename
 from ota_http_server.logger import get_app_logger
 from ota_http_server.core.config import Config
 
@@ -104,6 +105,17 @@ def create_app(cfg: Config) -> Flask:
             writer.writerow([timestamp, ip, action, details])
         logger.info(f"[AUDIT] %s | %s | %s | %s", timestamp, ip, action, details)
 
+    def get_firmware_file_path(project: str, filename: str) -> Path:
+        try:
+            validate_firmware_filename(filename)
+        except ValueError as exc:
+            logger.warning("Rejected unsafe firmware filename '%s' for project '%s': %s", filename, project, exc)
+            abort(404, "Firmware file not found")
+
+        app_paths = cfg.config['parameters']['app_paths']
+        project_dir = app_paths.project_dir(project).resolve()
+        return (project_dir / filename).resolve()
+
     # ---------------------------------------------------------------
     #                          ROUTES
     # ---------------------------------------------------------------
@@ -139,11 +151,7 @@ def create_app(cfg: Config) -> Flask:
         if not firmware_rec.is_active:
             abort(403, "Firmware is disabled")
 
-        filename = firmware_rec.filename
-
-        app_paths = cfg.config['parameters']['app_paths']
-        project_dir = app_paths.project_dir(project).resolve()
-        file_path = (project_dir / Path(filename)).resolve()
+        file_path = get_firmware_file_path(project, firmware_rec.filename)
 
         logger.info("Serving firmware from: %s", file_path)
         if not file_path.is_file():
@@ -183,9 +191,7 @@ def create_app(cfg: Config) -> Flask:
         if not latest_firmware_rec.is_active:
             abort(403, "Latest firmware is disabled")
 
-        app_paths = cfg.config['parameters']['app_paths']
-        project_dir = app_paths.project_dir(project).resolve()
-        file_path = (project_dir / Path(latest_firmware_rec.filename)).resolve()
+        file_path = get_firmware_file_path(project, latest_firmware_rec.filename)
 
         logger.info("Serving firmware from: %s", file_path)
         if not file_path.is_file():

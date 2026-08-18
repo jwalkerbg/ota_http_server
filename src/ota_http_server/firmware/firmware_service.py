@@ -8,6 +8,7 @@ from ota_http_server.core.config import Config
 from ota_http_server.core.data_models import Firmware, AppPaths
 from ota_http_server.database.database_service import DatabaseService
 from ota_http_server.core.formatters import FirmwareFormatter, FirmwareListItemFormatter
+from ota_http_server.firmware.filename_validation import validate_firmware_filename
 from ota_http_server.logger import get_app_logger
 
 logger = get_app_logger(__name__)
@@ -51,6 +52,8 @@ class FirmwareService:
         source_file = self.cfg.config["parameters"]["firmware_file"]
         release_notes = self.cfg.config["parameters"]["firmware_release_notes"]
         release_channel = self.cfg.config["parameters"]["firmware_release_channel"]
+
+        validate_firmware_filename(source_file)
 
         firmware = Firmware(
             id=None,

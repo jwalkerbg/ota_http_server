@@ -1084,7 +1084,7 @@ For use in development environment without SSL certificates and JWT authenticati
     add_firmware_parser = firmware_subparsers.add_parser(name="add", help="Add new firmware")
     add_firmware_parser.add_argument("--pid", dest="firmware_pid", type=int, required=True, help="ID of the project the firmware is related to")
     add_firmware_parser.add_argument("--version", dest="firmware_version", type=str, required=True, help="Version of the firmware")
-    add_firmware_parser.add_argument("--file", dest="firmware_file", type=str, required=True, help="Path to the firmware file")
+    add_firmware_parser.add_argument("--file", dest="firmware_file", type=str, required=True, help="Firmware filename without path elements")
     add_firmware_parser.add_argument("--notes", dest="firmware_release_notes", type=str, required=False, help="Release notes for the firmware")
     add_firmware_parser.add_argument("--channel", dest="firmware_release_channel", type=str, choices=["stable", "dev", "beta"], default="stable", required=False, help="Release channel for the firmware (e.g., stable, dev, beta)")
     # firmware enable
