@@ -121,6 +121,190 @@ ota_http_server --help
 * Built-in favicon.ico serving
 * Load balancing for multiple Flask instances
 
+## Database
+
+The application keeps firmware and metadata in a relational database. By default it uses SQLite (`ota_db.sqlite`), but the project also supports a MySQL backend through the `database` configuration section. The database model is centered around four main entities: users, projects, devices, and firmware records.
+
+### Users
+
+The `users` table stores application accounts used for authentication and access control.
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `id` | INTEGER PRIMARY KEY AUTOINCREMENT | Internal row identifier |
+| `username` | TEXT | Unique account name |
+| `password_hash` | TEXT | Stored as a hash, never as plaintext |
+| `email` | TEXT | Unique email address |
+| `role` | TEXT | Role-based access control (`admin`, `operator`, `viewer`) |
+| `is_active` | INTEGER | `1` = enabled, `0` = disabled |
+| `created_at` | TEXT | Created timestamp |
+| `updated_at` | TEXT | Last modification timestamp |
+
+The `users` table is the parent record for project ownership and for any future admin actions tied to a specific operator.
+
+### Projects
+
+The `projects` table groups firmware releases into logical product families.
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `id` | INTEGER PRIMARY KEY AUTOINCREMENT | Internal row identifier |
+| `name` | TEXT | Unique project key, used in URLs and lookups |
+| `display_name` | TEXT | Human-readable project label |
+| `description` | TEXT | Optional description |
+| `created_by` | INTEGER | Foreign key to `users.id` |
+| `is_active` | INTEGER | `1` = enabled, `0` = disabled |
+| `created_at` | TEXT | Created timestamp |
+| `updated_at` | TEXT | Last modification timestamp |
+
+A project belongs to a single creator user and may be enabled or disabled without deleting its history.
+
+### Devices
+
+The `devices` table tracks hardware instances that are allowed to receive OTA updates. In the application layer the identifier is exposed as a UUID-style device ID, but the database column is represented as `device_id`.
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `id` | INTEGER PRIMARY KEY AUTOINCREMENT | Internal row identifier |
+| `device_id` | TEXT | Unique device identifier (UUID or similar) |
+| `project_id` | INTEGER | Foreign key to `projects.id` |
+| `model` | TEXT | Device model name |
+| `serial_number` | TEXT | Optional manufacturer serial number |
+| `current_version` | TEXT | Last known firmware version |
+| `last_seen` | TEXT | Last time the device contacted the server |
+| `is_active` | INTEGER | `1` = active, `0` = disabled |
+| `created_at` | TEXT | Created timestamp |
+| `updated_at` | TEXT | Last modification timestamp |
+
+The schema enforces a unique `device_id`, and the `serial_number` column also has a unique partial index when it is not null.
+
+### Firmware
+
+The `firmware` table stores binary metadata for each project version. Each row represents a specific version and channel combination.
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `id` | INTEGER PRIMARY KEY AUTOINCREMENT | Internal row identifier |
+| `project_id` | INTEGER | Foreign key to `projects.id` |
+| `version` | TEXT | Firmware version label |
+| `filename` | TEXT | File name stored on disk |
+| `file_size` | INTEGER | File size in bytes |
+| `checksum` | TEXT | Checksum for integrity validation |
+| `release_notes` | TEXT | Optional release notes |
+| `channel` | TEXT | `stable`, `beta`, or `dev` |
+| `created_at` | TEXT | Created timestamp |
+| `updated_at` | TEXT | Last modification timestamp |
+
+The table contains a unique constraint on `(project_id, version, channel)` so a project cannot register the same version twice on the same channel.
+
+## Database Migrations
+
+The database schema is versioned through Python migration scripts located in `src/ota_http_server/database/migrations/sqlite` (and the MySQL migration directory for MySQL deployments).
+
+Migration files follow the naming convention:
+
+```text
+NNN_name_of_migration.py
+```
+
+Example:
+
+```text
+001_create_user_table.py
+002_create_projects_table.py
+003_create_devices_table.py
+004_create_firmware_table.py
+```
+
+Each migration implements an `up(conn)` method to apply schema changes and a `down(conn)` method to roll them back. The runner maintains a `schema_version` table to record the latest successfully applied migration.
+
+Typical migration commands are:
+
+```bash
+ota_http_server db init-db --migrate
+ota_http_server db migrate
+ota_http_server db migrate --dry-run
+ota_http_server db rollback
+ota_http_server db rollback --all
+```
+
+`db init-db` creates the database if needed; with `--migrate` it applies the migration set immediately. `db migrate` runs any pending migrations in order. `db rollback` reverts the most recent migration, while `--all` rolls back all applied migrations.
+
+## Command-Line Interface
+
+The project exposes a single entry-point command named `ota_http_server` with subcommands for server startup, database maintenance, and CRUD operations for users, projects, devices, and firmware.
+
+### Global and server options
+
+Common entry points include:
+
+```bash
+ota_http_server --help
+ota_http_server runserver --help
+```
+
+Server configuration options include host, port, certificate settings, JWT flags, and database connection parameters. The database can be selected with `--dbtype` (`sqlite` or `mysql`), while SQLite file path is controlled with `--dbfile`.
+
+### Database operations
+
+```bash
+ota_http_server db init-db --migrate
+ota_http_server db migrate --dry-run
+ota_http_server db rollback --all
+```
+
+These commands are used to prepare the database and to keep the schema synchronized with the codebase.
+
+### User operations
+
+```bash
+ota_http_server user add --name admin --password secret --email admin@example.com --role admin
+ota_http_server user list --record
+ota_http_server user list --enabled
+ota_http_server user get --username admin
+ota_http_server user enable --user-id 1
+ota_http_server user disable --username admin
+```
+
+User records support creation, retrieval, listing, and activation/deactivation.
+
+### Project operations
+
+```bash
+ota_http_server project add --name smart_home --display_name "Smart Home" --description "Main project" --created-by 1
+ota_http_server project list --record
+ota_http_server project get --name smart_home
+ota_http_server project enable --id 1
+ota_http_server project disable --name smart_home
+```
+
+Projects group firmware and devices, and each project can be enabled or disabled independently.
+
+### Device operations
+
+```bash
+ota_http_server device add --uuid 11111111-2222-3333-4444-555555666666 --pid 1 --model ESP32 --sn ABC123 --version 1.2.0
+ota_http_server device list --pid 1
+ota_http_server device get --uuid 11111111-2222-3333-4444-555555666666
+ota_http_server device enable --id 1
+ota_http_server device disable --uuid 11111111-2222-3333-4444-555555666666
+```
+
+Devices are associated with a project and maintain their current firmware version and last-seen status.
+
+### Firmware operations
+
+```bash
+ota_http_server firmware add --pid 1 --version 1.2.0 --file firmware_v1_2_0.bin --notes "Bug fixes" --channel stable
+ota_http_server firmware list --pid 1
+ota_http_server firmware get --pid 1 --version 1.2.0
+ota_http_server firmware enable --pid 1 --version 1.2.0
+ota_http_server firmware disable --id 2
+ota_http_server firmware replace --id 2 --file firmware_v1_2_1.bin
+```
+
+Firmware records include release metadata, binary checksum information, and active/inactive status for OTA distribution.
+
 ## Editable project - directory Structure
 
 ```
