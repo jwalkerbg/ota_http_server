@@ -148,6 +148,7 @@ class AuthService:
         payload = {
             "aud": self.jwt_audience or app.config.get("jwt_audience", "ota_api"),
             "exp": now_ts + expires_seconds,
+            "current_vs": current_vs,
             "download_vs": download_vs,
             "iat": now_ts,
             "iss": self.jwt_issuer or app.config.get("jwt_issuer", "ota_http_server"),
