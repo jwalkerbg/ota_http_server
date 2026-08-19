@@ -18,7 +18,11 @@ verbose = 3
 dbtype = "sqlite"
 
 [database.mysql]
+dbhost = "localhost"
 dbport = 3306
+database = "ota_db"
+dbuser = "ota_user"
+dbpassword = "SlavaUkraini"
 
 [database.sqlite]
 db_file = "ota_db.sqlite"
