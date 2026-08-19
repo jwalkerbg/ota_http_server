@@ -3,6 +3,7 @@
 from typing import NoReturn
 
 from ota_http_server.core.config import Config
+from ota_http_server.database.migration_mysql_runner import MigrationMySQLRunner
 from ota_http_server.core.data_models import (
     User,
     Project,
@@ -17,6 +18,7 @@ from ota_http_server.core.data_models import (
 class DatabaseMySQLService:
     def __init__(self, cfg: Config):
         self.cfg = cfg
+        self.migration_runner = MigrationMySQLRunner(cfg)
 
     def _unsupported(self, action: str) -> NoReturn:
         raise NotImplementedError(
@@ -24,13 +26,13 @@ class DatabaseMySQLService:
         )
 
     def init_db(self) -> None:
-        self._unsupported("init_db")
+        self.migration_runner.migrate_up()
 
     def migrate(self) -> None:
-        self._unsupported("migrate")
+        self.migration_runner.migrate_up()
 
     def rollback(self) -> None:
-        self._unsupported("rollback")
+        self.migration_runner.migrate_down()
 
     def user_add(self, user: User) -> User:
         self._unsupported("user_add")
