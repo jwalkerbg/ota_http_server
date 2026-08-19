@@ -556,29 +556,50 @@ GET /firmware/projectA/01.00.02?token=<JWT>
 
 ## JWT-Based Authentication for OTA Access
 
-The OTA server uses JSON Web Tokens (JWTs) instead of static tokens.
-Each device (ESP32, etc.) must present a valid JWT when requesting firmware files or version information.
+The OTA server supports JWT-based access control for firmware downloads and version lookups. JWT authentication is enabled by default; it can be disabled with `--no-jwt` or the configuration flag `no_jwt = true`.
 
-JWTs are short-lived, cryptographically signed tokens that the OTA server verifies using a secret key.
-This improves security, enables per-device authorization, and supports expiration and revocation.
+The current implementation enforces the token on the OTA endpoints that serve firmware and metadata:
 
-By default JWT tokens are used. The OTA server may be commanded to not use them with the command line option `--no-jwt`.
+- `/firmware/<project>/<version>`
+- `/firmware/<project>/latest`
+- `/firmware/<project>/versions`
 
-### Token Generation
+The security model is intentionally strict:
+
+- the token must be valid and unexpired
+- the token must match the requested project
+- the token must have the required roles (`device`, `fw_download`)
+- the audience and issuer must match the configured values
+- the token subject (`sub`) must match the client identity (`X-Device-ID` header or `?device_id=` query parameter)
+
+### Token format and trust model
+
+JWTs are created by the server on demand and signed with the configured secret and algorithm. The actual implementation verifies the token using the configured `jwt_secret`, `jwt_algorithm`, `jwt_issuer`, and `jwt_audience` values.
+
+The verification flow in the current code allows:
+
+- `Authorization: Bearer <token>`
+- `?token=<token>` for `GET` and `HEAD` requests only
+
+For non-safe HTTP methods, query-string tokens are rejected with `405`.
+
+### Token generation
 
 Tokens are issued dynamically via the admin endpoint:
 
-```html
+```http
 POST /admin/generate_token
 ```
-**Request headers**
 
-Header | Description
--------|------------
-| X-Admin-Secret | The administrator secret (must match the server’s ADMIN_SECRET environment variable). |
-| Content-Type | Must be application/json. |
+Required headers:
 
-**Request body**
+| Header | Required | Description |
+| --- | --- | --- |
+| `X-Admin-Secret` | Yes | Matches the configured server secret, usually stored in `OTA_ADMIN_SECRET` |
+| `Content-Type` | Yes | Must be `application/json` |
+
+Request body:
+
 ```json
 {
   "device_id": "e6f87d77-4216-4be1-ab83-b5fa6792b747",
@@ -588,13 +609,24 @@ Header | Description
   "download_vs": "2.0.0"
 }
 ```
-* `device_id` — The unique UUID of the device that will perform OTA.
-* `project` — The firmware project name (must match the folder name under /firmware/).
-* `expires_seconds` (optional) — Token lifetime in seconds (default: value of JWT_DEFAULT_EXPIRY_SECONDS).
-* `current_vs` — Current firmware version; stored in the token for auditing.
-* `download_vs` — The version that shall be served later.
 
-**Example curl command (Linux/macOS)**
+Fields in the request body:
+
+- `device_id` — UUID for the device that will use the token
+- `project` — Target project name, must match the OTA project
+- `expires_seconds` — Optional, token lifetime in seconds; the server caps it by `jwt_max_expiry`
+- `current_vs` — Optional current device firmware version; accepted by the API but not included in the token payload in the current implementation
+- `download_vs` — Required; this is the firmware version the token authorizes the device to download
+
+The server currently enforces a minimum validation set:
+
+- `device_id` must be a valid UUID
+- `project` must be provided
+- `download_vs` must be provided
+- `expires_seconds` is clamped to `jwt_max_expiry`
+
+Example:
+
 ```bash
 curl -X POST https://yourserver:8070/admin/generate_token \
   -H "X-Admin-Secret: $OTA_ADMIN_SECRET" \
@@ -607,128 +639,120 @@ curl -X POST https://yourserver:8070/admin/generate_token \
         "download_vs": "2.0.0"
       }'
 ```
-**Example curl command (Windows)**
-```bash
-curl -X POST https://yourserver:8070/admin/generate_token ^
-  -H "X-Admin-Secret: %OTA_ADMIN_SECRET%" ^
-  -H "Content-Type: application/json" ^
-  -d "{\"device_id\": \"e6f87d77-4216-4be1-ab83-b5fa6792b747\", \"project\": \"smart_fan\"}"
-```
 
-The response contains a signed JWT and metadata:
+The response is a JSON object containing the signed JWT and the payload used to generate it:
+
 ```json
 {
-    "expires_at": "2026-04-19T09:13:32+00:00",
-    "payload": {
-        "aud": "ota_api",
-        "exp": 1776590012,
-        "download_vs": "2.0.0",
-        "iat": 1776588212,
-        "iss": "ota_http_server",
-        "jti": "e6f87d77-4216-4be1-ab83-b5fa6792b747-1776588212",
-        "project": "smart_fan",
-        "roles": [
-            "device",
-            "ota_client"
-        ],
-        "sub": "e6f87d77-4216-4be1-ab83-b5fa6792b747"
-    },
-    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJlNmY4N2Q3Ny00MjE2LTRiZTEtYWI4My1iNWZhNjc5MmI3NDciLCJwcm9qZWN0Ijoic21hcnRfZmFuIiwicm9sZXMiOlsiZGV2aWNlIiwib3RhX2NsaWVudCJdLCJpc3MiOiJvdGFfaHR0cF9zZXJ2ZXIiLCJpYXQiOjE3NzY1ODgyMTIsImV4cCI6MTc3NjU5MDAxMiwianRpIjoiZTZmODdkNzctNDIxNi00YmUxLWFiODMtYjVmYTY3OTJiNzQ3LTE3NzY1ODgyMTIiLCJmd192ZXJzaW9uIjoiMDEuMDAuMDIifQ.pgybmqVDz2uAZ5zb6L90HrYJ1KPqIAq-CH8S597IyhU"
+  "token": "eyJ...",
+  "expires_at": "2026-08-19T14:00:00+00:00",
+  "payload": {
+    "aud": "ota_api",
+    "exp": 1755585600,
+    "download_vs": "2.0.0",
+    "iat": 1755585000,
+    "iss": "ota_http_server",
+    "jti": "e6f87d77-4216-4be1-ab83-b5fa6792b747-1755585000",
+    "project": "smart_fan",
+    "roles": [
+      "device",
+      "fw_download"
+    ],
+    "sub": "e6f87d77-4216-4be1-ab83-b5fa6792b747"
+  }
 }
 ```
 
-### JWT Payload Fields
+### JWT claims used by the current implementation
 
-Field | Description
-------|------------
-| `aud` | Audience (example: "ota_api") |
-| `iat` | Issued-At timestamp (UNIX time). |
-| `exp` | Expiration time — after this time the token becomes invalid. |
-| `fw_version` | Current firmware version reported when the token was generated. |
-| `iat` | Issued at time |
-| `iss` | Issuer of JWT |
-| `jti` | Unique token ID (JWT ID). Helps detect re-use or revoke individual tokens. |
-| `project` | Project name — firmware group or directory name. Used to verify access. |
-| `roles` | List of logical roles; currently includes "device" and "ota_client". |
-| `sub` | Device unique identifier (UUIDv4). Identifies which device the token belongs to. |
+The current code verifies and relies on these claims:
 
-### JWT Generation Logic
+| Claim | Meaning |
+| --- | --- |
+| `aud` | Target audience, must match `jwt_audience` (default: `ota_api`) |
+| `exp` | Expiration timestamp; token is rejected when expired |
+| `iat` | Issued-at timestamp |
+| `iss` | Issuer, must match `jwt_issuer` (default: `ota_http_server`) |
+| `jti` | Unique identifier of the generated token |
+| `project` | Project name the token is valid for |
+| `roles` | Must contain both `device` and `fw_download` |
+| `sub` | Device identity; must match the `X-Device-ID` header or `device_id` query parameter |
+| `download_vs` | Version the token authorizes the device to download |
 
-Internally, the server uses:
+The code does not currently emit a `fw_version` claim and does not use `current_vs` as a payload field.
 
-```python
-    def create_device_token(device_id:str, project:str, current_fw:str="1.0.0", expires_seconds:int=jwt_expiry) -> tuple[str, Dict[str, Any]]:
-        """Generate a timezone-aware JWT for OTA clients (devices)."""
-        now = datetime.now(UTC)
-        payload = {
-            "aud": "ota_api",
-            "exp": int((now + timedelta(seconds=expires_seconds)).timestamp()),
-            "fw_version": current_fw,
-            "iat": int(now.timestamp()),
-            "iss": app.config.get("jwt_issuer, "ota_http_server"),
-            "jti": f"{device_id}-{int(now.timestamp())}",
-            "project": project,
-            "roles": ["device", "fw_download"],
-            "sub": device_id
-        }
-        return jwt.encode(payload, jwt_secret, algorithm=jwt_algorithm), payload
+### Token verification rules
+
+When a request reaches an OTA endpoint, the server does the following:
+
+1. Reads the token from `Authorization: Bearer ...` or `?token=...`
+2. Verifies the signature and expiry using the configured secret and algorithm
+3. Checks the `aud` claim against `jwt_audience`
+4. Checks the `iss` claim against `jwt_issuer`
+5. Confirms the token is for the requested project
+6. Enforces required roles: `device`, `fw_download`
+7. Verifies the `sub` claim matches the device identifier supplied by the client
+8. Allows the request only if the device is registered for that project and active
+
+### Token usage by devices
+
+A device should send the token as a bearer token in the HTTP header when possible:
+
+```http
+GET /firmware/projectA/1.2.0
+Authorization: Bearer <jwt>
+X-Device-ID: e6f87d77-4216-4be1-ab83-b5fa6792b747
 ```
 
-### Token Usage (Devices)
+For `GET` and `HEAD` requests, a query-string token is also accepted:
 
-Each OTA-capable device must include its token in every request to the OTA server:
-
-**Authorization header**
-
-```html
-Authorization: Bearer <jwt_token_here>
-```
-or equivalently as a query parameter:
-```
-?token=<jwt_token_here>
+```http
+GET /firmware/projectA/1.2.0?token=<jwt>&device_id=e6f87d77-4216-4be1-ab83-b5fa6792b747
 ```
 
-**Example firmware download**
+The server does not permit query string tokens for non-safe methods.
 
-Use firmware version in the URL path (not the filename).
+### Version metadata endpoints
 
-```html
-GET /firmware/projectA/01.00.02
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-```
-or
-```html
-GET /firmware/projectA/projectA-01.00.02.bin?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+The server exposes project metadata endpoints that can also be protected by JWT verification:
+
+```http
+GET /firmware/projectA/latest
+GET /firmware/projectA/versions
 ```
 
-### Audit Logging
+The `/versions` endpoint verifies the token with `verify_sub=False`, which means a valid token can be used to read the available versions, but the device identity is not required for that specific call.
 
-Each successful token generation is logged for traceability:
+### Audit logging
 
+Token generation is logged for traceability. On success the server records an audit event with the device ID, project, and expiration time.
+
+Example log entry:
+
+```text
+[2026-08-19T14:00:00+00:00] [AUDIT] device=e6f87d77-4216-4be1-ab83-b5fa6792b747 project=smart_fan exp=1755585600
 ```
-[2025-10-09T15:34:12Z] [AUDIT] Action=generate_token IP=203.0.113.7 device=e6f87d77-4216-4be1-ab83-b5fa6792b747 project=projectA exp=1739085000
-```
 
-This allows tracking which admin generated which tokens and when.
+### Security notes
 
-### Security Notes
+- Keep `OTA_ADMIN_SECRET` out of source control; prefer environment variables or secret stores
+- Always use HTTPS in production when issuing and consuming tokens
+- Use short expirations (for example 5–60 minutes) and rotate secrets as part of operational hygiene
+- Do not reuse tokens across devices or projects
+- Prefer `Authorization: Bearer ...` over query parameters, because query parameters are less safe and are limited to `GET`/`HEAD`
 
-* The admin secret (X-Admin-Secret) must never be hardcoded.
-It is read from the environment variable `OTA_ADMIN_SECRET`.
-Set it securely before starting the server:
+### Recommended additions and code-alignment changes
 
-```bash
-Linux:
-export OTA_ADMIN_SECRET="your-very-long-secret-value"
-```
-```bash
-Windows:
-setx OTA_ADMIN_SECRET "your-very-long-secret-value"
-```
-* Always use HTTPS when issuing or using tokens.
-* Tokens are short-lived by design; keep expiry short (5–60 minutes).
-* Devices should request a new token only when needed, not store them permanently.
+The current code is already close to the intended model, but a few documentation and implementation refinements would make the behavior clearer:
 
+1. Document that `download_vs` is the effective authorization version and that `current_vs` is only an optional metadata field
+2. Explicitly state that `sub` must match `X-Device-ID` or `device_id`
+3. Clarify that `?token=` is only accepted for safe methods, not for `POST` or other write operations
+4. Document the `jwt_max_expiry` cap and the fact that `expires_seconds` is clamped to that upper bound
+5. Consider adding a formal `current_vs` claim in the JWT if the server needs to audit the running firmware version inside the token itself
+6. Consider documenting a future token revocation mechanism if the project later adds one
+
+These recommendations align the documentation with the implemented JWT flow while also capturing the current security model precisely.
 ## Favicon
 
 The server automatically serves ```/favicon.ico``` from the ```www/``` directory if present.
