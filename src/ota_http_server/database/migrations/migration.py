@@ -1,7 +1,7 @@
 # migration.py
 
 from abc import ABC, abstractmethod
-import sqlite3
+from typing import Any
 
 class Migration(ABC):
     """Base class for all database migrations."""
@@ -10,11 +10,11 @@ class Migration(ABC):
     description: str
 
     @abstractmethod
-    def up(self, conn: sqlite3.Connection) -> None:
+    def up(self, conn: Any) -> None:
         """Apply the migration."""
         pass
 
     @abstractmethod
-    def down(self, conn: sqlite3.Connection) -> None:
+    def down(self, conn: Any) -> None:
         """Rollback the migration."""
         pass
