@@ -636,6 +636,7 @@ The response is a JSON object containing the signed JWT and the payload used to 
   "payload": {
     "aud": "ota_api",
     "exp": 1755585600,
+    "current_vs": "1.0.0",
     "download_vs": "2.0.0",
     "iat": 1755585000,
     "iss": "ota_http_server",
@@ -664,9 +665,10 @@ The current code verifies and relies on these claims:
 | `project` | Project name the token is valid for |
 | `roles` | Must contain both `device` and `fw_download` |
 | `sub` | Device identity; must match the `X-Device-ID` header or `device_id` query parameter |
+| `current_vs` | Device firmware version at token creation time |
 | `download_vs` | Version the token authorizes the device to download |
 
-The code does not currently emit a `fw_version` claim and does not use `current_vs` as a payload field.
+The `current_vs` claim is now included in the token payload so the token carries both the device’s current firmware version and the authorized target version.
 
 ### Token verification rules
 
@@ -728,18 +730,16 @@ Example log entry:
 - Do not reuse tokens across devices or projects
 - Prefer `Authorization: Bearer ...` over query parameters, because query parameters are less safe and are limited to `GET`/`HEAD`
 
-### Recommended additions and code-alignment changes
+### Recommended additions and implementation notes
 
-The current code is already close to the intended model, but a few documentation and implementation refinements would make the behavior clearer:
+The JWT flow is now aligned with the codebase:
 
-1. Document that `download_vs` is the effective authorization version and that `current_vs` is only an optional metadata field
-2. Explicitly state that `sub` must match `X-Device-ID` or `device_id`
-3. Clarify that `?token=` is only accepted for safe methods, not for `POST` or other write operations
-4. Document the `jwt_max_expiry` cap and the fact that `expires_seconds` is clamped to that upper bound
-5. Consider adding a formal `current_vs` claim in the JWT if the server needs to audit the running firmware version inside the token itself
-6. Consider documenting a future token revocation mechanism if the project later adds one
-
-These recommendations align the documentation with the implemented JWT flow while also capturing the current security model precisely.
+1. `download_vs` is the effective authorization version for the OTA transfer
+2. `current_vs` is recorded in the JWT payload when the token is issued, so the device state is preserved with the authorization grant
+3. `sub` must match the `X-Device-ID` header or `device_id` query parameter
+4. `?token=` is accepted only for safe methods (`GET` and `HEAD`)
+5. `expires_seconds` is capped by `jwt_max_expiry` before the token is signed
+6. Future revocation and rotation policies can still be added later, but the current token model is now explicit and auditable
 ## Favicon
 
 The server automatically serves ```/favicon.ico``` from the ```www/``` directory if present.
