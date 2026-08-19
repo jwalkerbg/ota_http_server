@@ -5,7 +5,7 @@ import sys
 import logging
 import colorama
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, UTC
 
 TAGNAME = "invoices"
 
@@ -22,7 +22,7 @@ class CustomFormatter(logging.Formatter):
             return f"{message}"
 
         # Original prefix formatting
-        log_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        log_time = datetime.now(UTC).isoformat()
         log_message = f"{log_time} - {record.name} - {record.levelname} - {message}"
         return log_message
 

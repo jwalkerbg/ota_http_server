@@ -1,7 +1,7 @@
 # core/auth.py
 
 from typing import Any, Dict
-from datetime import datetime, time, timedelta, timezone
+from datetime import datetime, time, timedelta, timezone, UTC
 from flask import request, abort, current_app as app
 import jwt
 from uuid import UUID
@@ -94,14 +94,14 @@ class AuthService:
 
         # 5️⃣.3️⃣ Verify issuer claim if present (optional, but good practice)
         issuer = payload.get("iss")
-        expected_issuer = app.config.get("jwt_issuer", "ota_http_server")
-        if issuer and not hmac.compare_digest(issuer, expected_issuer):
+        if issuer and not hmac.compare_digest(issuer, self.jwt_issuer):
             abort(403, "Token issuer mismatch")
 
-        # 5️⃣.4️⃣ Verify "sub" claim is present (device identity)
         if verify_sub:
+            # 5️⃣.4️⃣ Verify "sub" claim is present (device identity)
             if "sub" not in payload:
                 abort(403, "Token missing 'sub' claim for device identity")
+            # 5️⃣.5️⃣ Verify "sub" claim matches X-Device-ID header or ?device_id= query param
             request_device_id = request.headers.get("X-Device-ID")
             if not request_device_id:
                 request_device_id = request.args.get("device_id")  # Allow device_id in query param as fallback for GET requests
@@ -112,7 +112,7 @@ class AuthService:
 
         # 6️⃣ Log successful authentication
         device_id = payload.get("sub", "unknown")
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         logger.info(f"[%s] [AUTH] OK - Device=%s, Project=%s, Source=%s", now, device_id, token_project, source)
 
         return payload
@@ -142,12 +142,13 @@ class AuthService:
 
         expires_seconds = min(data.get("expires_seconds", self.jwt_expiry), self.jwt_max_expiry)  # Cap expiry to 30 minutes for security
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         now_ts = int(now.timestamp())
 
         payload = {
             "aud": self.jwt_audience or app.config.get("jwt_audience", "ota_api"),
             "exp": now_ts + expires_seconds,
+            "current_vs": current_vs,
             "download_vs": download_vs,
             "iat": now_ts,
             "iss": self.jwt_issuer or app.config.get("jwt_issuer", "ota_http_server"),

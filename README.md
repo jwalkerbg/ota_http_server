@@ -8,6 +8,19 @@
     - [Producing distributable package](#producing-distributable-package)
     - [Run the server.](#run-the-server)
   - [Features](#features)
+  - [Database](#database)
+    - [Users](#users)
+    - [Projects](#projects)
+    - [Devices](#devices)
+    - [Firmware](#firmware)
+  - [Database Migrations](#database-migrations)
+  - [Command-Line Interface](#command-line-interface)
+    - [Global and server options](#global-and-server-options)
+    - [Database operations](#database-operations)
+    - [User operations](#user-operations)
+    - [Project operations](#project-operations)
+    - [Device operations](#device-operations)
+    - [Firmware operations](#firmware-operations)
   - [Editable project - directory Structure](#editable-project---directory-structure)
   - [Configuration](#configuration)
     - [Default Hardcoded Values (Lowest Priority).](#default-hardcoded-values-lowest-priority)
@@ -75,7 +88,7 @@ Supports optional **JWT-based authentication** and can run in two modes:
                       v
  +-------------------------------------------+
  | Firmware Files (www/<project>/<bin file>) |
- |  url path /firmware/<project>/<bin file>  |
+ |   url path /firmware/<project>/<version>  |
  +-------------------------------------------+
 ```
 
@@ -120,6 +133,190 @@ ota_http_server --help
 * Easy integration behind Apache reverse proxy
 * Built-in favicon.ico serving
 * Load balancing for multiple Flask instances
+
+## Database
+
+The application keeps firmware and metadata in a relational database. By default it uses SQLite (`ota_db.sqlite`), but the project also supports a MySQL backend through the `database` configuration section. The database model is centered around four main entities: users, projects, devices, and firmware records.
+
+### Users
+
+The `users` table stores application accounts used for authentication and access control.
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `id` | INTEGER PRIMARY KEY AUTOINCREMENT | Internal row identifier |
+| `username` | TEXT | Unique account name |
+| `password_hash` | TEXT | Stored as a hash, never as plaintext |
+| `email` | TEXT | Unique email address |
+| `role` | TEXT | Role-based access control (`admin`, `operator`, `viewer`) |
+| `is_active` | INTEGER | `1` = enabled, `0` = disabled |
+| `created_at` | TEXT | Created timestamp |
+| `updated_at` | TEXT | Last modification timestamp |
+
+The `users` table is the parent record for project ownership and for any future admin actions tied to a specific operator.
+
+### Projects
+
+The `projects` table groups firmware releases into logical product families.
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `id` | INTEGER PRIMARY KEY AUTOINCREMENT | Internal row identifier |
+| `name` | TEXT | Unique project key, used in URLs and lookups |
+| `display_name` | TEXT | Human-readable project label |
+| `description` | TEXT | Optional description |
+| `created_by` | INTEGER | Foreign key to `users.id` |
+| `is_active` | INTEGER | `1` = enabled, `0` = disabled |
+| `created_at` | TEXT | Created timestamp |
+| `updated_at` | TEXT | Last modification timestamp |
+
+A project belongs to a single creator user and may be enabled or disabled without deleting its history.
+
+### Devices
+
+The `devices` table tracks hardware instances that are allowed to receive OTA updates. In the application layer the identifier is exposed as a UUID-style device ID, but the database column is represented as `device_id`.
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `id` | INTEGER PRIMARY KEY AUTOINCREMENT | Internal row identifier |
+| `device_id` | TEXT | Unique device identifier (UUID or similar) |
+| `project_id` | INTEGER | Foreign key to `projects.id` |
+| `model` | TEXT | Device model name |
+| `serial_number` | TEXT | Optional manufacturer serial number |
+| `current_version` | TEXT | Last known firmware version |
+| `last_seen` | TEXT | Last time the device contacted the server |
+| `is_active` | INTEGER | `1` = active, `0` = disabled |
+| `created_at` | TEXT | Created timestamp |
+| `updated_at` | TEXT | Last modification timestamp |
+
+The schema enforces a unique `device_id`, and the `serial_number` column also has a unique partial index when it is not null.
+
+### Firmware
+
+The `firmware` table stores binary metadata for each project version. Each row represents a specific version and channel combination.
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `id` | INTEGER PRIMARY KEY AUTOINCREMENT | Internal row identifier |
+| `project_id` | INTEGER | Foreign key to `projects.id` |
+| `version` | TEXT | Firmware version label |
+| `filename` | TEXT | File name stored on disk |
+| `file_size` | INTEGER | File size in bytes |
+| `checksum` | TEXT | Checksum for integrity validation |
+| `release_notes` | TEXT | Optional release notes |
+| `channel` | TEXT | `stable`, `beta`, or `dev` |
+| `created_at` | TEXT | Created timestamp |
+| `updated_at` | TEXT | Last modification timestamp |
+
+The table contains a unique constraint on `(project_id, version, channel)` so a project cannot register the same version twice on the same channel.
+
+## Database Migrations
+
+The database schema is versioned through Python migration scripts located in `src/ota_http_server/database/migrations/sqlite` (and the MySQL migration directory for MySQL deployments).
+
+Migration files follow the naming convention:
+
+```text
+NNN_name_of_migration.py
+```
+
+Example:
+
+```text
+001_create_user_table.py
+002_create_projects_table.py
+003_create_devices_table.py
+004_create_firmware_table.py
+```
+
+Each migration implements an `up(conn)` method to apply schema changes and a `down(conn)` method to roll them back. The runner maintains a `schema_version` table to record the latest successfully applied migration.
+
+Typical migration commands are:
+
+```bash
+ota_http_server db init-db --migrate
+ota_http_server db migrate
+ota_http_server db migrate --dry-run
+ota_http_server db rollback
+ota_http_server db rollback --all
+```
+
+`db init-db` creates the database if needed; with `--migrate` it applies the migration set immediately. `db migrate` runs any pending migrations in order. `db rollback` reverts the most recent migration, while `--all` rolls back all applied migrations.
+
+## Command-Line Interface
+
+The project exposes a single entry-point command named `ota_http_server` with subcommands for server startup, database maintenance, and CRUD operations for users, projects, devices, and firmware.
+
+### Global and server options
+
+Common entry points include:
+
+```bash
+ota_http_server --help
+ota_http_server runserver --help
+```
+
+Server configuration options include host, port, certificate settings, JWT flags, and database connection parameters. The database can be selected with `--dbtype` (`sqlite` or `mysql`), while SQLite file path is controlled with `--dbfile`.
+
+### Database operations
+
+```bash
+ota_http_server db init-db --migrate
+ota_http_server db migrate --dry-run
+ota_http_server db rollback --all
+```
+
+These commands are used to prepare the database and to keep the schema synchronized with the codebase.
+
+### User operations
+
+```bash
+ota_http_server user add --name admin --password secret --email admin@example.com --role admin
+ota_http_server user list --record
+ota_http_server user list --enabled
+ota_http_server user get --username admin
+ota_http_server user enable --user-id 1
+ota_http_server user disable --username admin
+```
+
+User records support creation, retrieval, listing, and activation/deactivation.
+
+### Project operations
+
+```bash
+ota_http_server project add --name smart_home --display_name "Smart Home" --description "Main project" --created-by 1
+ota_http_server project list --record
+ota_http_server project get --name smart_home
+ota_http_server project enable --id 1
+ota_http_server project disable --name smart_home
+```
+
+Projects group firmware and devices, and each project can be enabled or disabled independently.
+
+### Device operations
+
+```bash
+ota_http_server device add --uuid 11111111-2222-3333-4444-555555666666 --pid 1 --model ESP32 --sn ABC123 --version 1.2.0
+ota_http_server device list --pid 1
+ota_http_server device get --uuid 11111111-2222-3333-4444-555555666666
+ota_http_server device enable --id 1
+ota_http_server device disable --uuid 11111111-2222-3333-4444-555555666666
+```
+
+Devices are associated with a project and maintain their current firmware version and last-seen status.
+
+### Firmware operations
+
+```bash
+ota_http_server firmware add --pid 1 --version 1.2.0 --file firmware_v1_2_0.bin --notes "Bug fixes" --channel stable
+ota_http_server firmware list --pid 1
+ota_http_server firmware get --pid 1 --version 1.2.0
+ota_http_server firmware enable --pid 1 --version 1.2.0
+ota_http_server firmware disable --id 2
+ota_http_server firmware replace --id 2 --file firmware_v1_2_1.bin
+```
+
+Firmware records include release metadata, binary checksum information, and active/inactive status for OTA distribution.
 
 ## Editable project - directory Structure
 
@@ -235,6 +432,10 @@ Default Hardcoded  → fallback values
 
 This is an example URL:
 
+`https://ota.mycompany.com:8070/firmware/projectA/01.00.02?token=<JWT>`
+
+Use `/<url_firmware>/<project>/<version>` as the canonical request format.
+
 `https://ota.mycompany.com:8070/firmware/projectA/projectA-01.00.02.bin?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...`
 
 The server root directory is `www` by default, relative to the directory where OTA server is started. It can be changed in `config.toml` with the parameter `www_dir` or with the CLI option `--www-dir`.
@@ -244,7 +445,9 @@ The directory name in the file system can be changed by `firmware_dir` parameter
 
 Next element in the URL is the project name. If JWT is used it must be the same with the value of `project` field in JWT.
 
-After the project name real binary image file name follows.
+After the project name firmware version follows. The server resolves the
+version to the real binary image file name using firmware metadata in the
+database.
 
 An eventual JWT is at the end.
 
@@ -348,34 +551,55 @@ ProxyPassReverse "/" "balancer://flaskcluster/"
 JWT authentication is enabled by default. Clients can pass JWT in the header or as an URL parameter.
 
 ```
-GET /firmware/projectA/firmware_v1.bin?token=<JWT>
+GET /firmware/projectA/01.00.02?token=<JWT>
 ```
 
 ## JWT-Based Authentication for OTA Access
 
-The OTA server uses JSON Web Tokens (JWTs) instead of static tokens.
-Each device (ESP32, etc.) must present a valid JWT when requesting firmware files or version information.
+The OTA server supports JWT-based access control for firmware downloads and version lookups. JWT authentication is enabled by default; it can be disabled with `--no-jwt` or the configuration flag `no_jwt = true`.
 
-JWTs are short-lived, cryptographically signed tokens that the OTA server verifies using a secret key.
-This improves security, enables per-device authorization, and supports expiration and revocation.
+The current implementation enforces the token on the OTA endpoints that serve firmware and metadata:
 
-By default JWT tokens are used. The OTA server may be commanded to not use them with the command line option `--no-jwt`.
+- `/firmware/<project>/<version>`
+- `/firmware/<project>/latest`
+- `/firmware/<project>/versions`
 
-### Token Generation
+The security model is intentionally strict:
+
+- the token must be valid and unexpired
+- the token must match the requested project
+- the token must have the required roles (`device`, `fw_download`)
+- the audience and issuer must match the configured values
+- the token subject (`sub`) must match the client identity (`X-Device-ID` header or `?device_id=` query parameter)
+
+### Token format and trust model
+
+JWTs are created by the server on demand and signed with the configured secret and algorithm. The actual implementation verifies the token using the configured `jwt_secret`, `jwt_algorithm`, `jwt_issuer`, and `jwt_audience` values.
+
+The verification flow in the current code allows:
+
+- `Authorization: Bearer <token>`
+- `?token=<token>` for `GET` and `HEAD` requests only
+
+For non-safe HTTP methods, query-string tokens are rejected with `405`.
+
+### Token generation
 
 Tokens are issued dynamically via the admin endpoint:
 
-```html
+```http
 POST /admin/generate_token
 ```
-**Request headers**
 
-Header | Description
--------|------------
-| X-Admin-Secret | The administrator secret (must match the server’s ADMIN_SECRET environment variable). |
-| Content-Type | Must be application/json. |
+Required headers:
 
-**Request body**
+| Header | Required | Description |
+| --- | --- | --- |
+| `X-Admin-Secret` | Yes | Matches the configured server secret, usually stored in `OTA_ADMIN_SECRET` |
+| `Content-Type` | Yes | Must be `application/json` |
+
+Request body:
+
 ```json
 {
   "device_id": "e6f87d77-4216-4be1-ab83-b5fa6792b747",
@@ -385,13 +609,24 @@ Header | Description
   "download_vs": "2.0.0"
 }
 ```
-* `device_id` — The unique UUID of the device that will perform OTA.
-* `project` — The firmware project name (must match the folder name under /firmware/).
-* `expires_seconds` (optional) — Token lifetime in seconds (default: value of JWT_DEFAULT_EXPIRY_SECONDS).
-* `current_vs` — Current firmware version; stored in the token for auditing.
-* `download_vs` — The version that shall be served later.
 
-**Example curl command (Linux/macOS)**
+Fields in the request body:
+
+- `device_id` — UUID for the device that will use the token
+- `project` — Target project name, must match the OTA project
+- `expires_seconds` — Optional, token lifetime in seconds; the server caps it by `jwt_max_expiry`
+- `current_vs` — Optional current device firmware version; accepted by the API but not included in the token payload in the current implementation
+- `download_vs` — Required; this is the firmware version the token authorizes the device to download
+
+The server currently enforces a minimum validation set:
+
+- `device_id` must be a valid UUID
+- `project` must be provided
+- `download_vs` must be provided
+- `expires_seconds` is clamped to `jwt_max_expiry`
+
+Example:
+
 ```bash
 curl -X POST https://yourserver:8070/admin/generate_token \
   -H "X-Admin-Secret: $OTA_ADMIN_SECRET" \
@@ -404,126 +639,120 @@ curl -X POST https://yourserver:8070/admin/generate_token \
         "download_vs": "2.0.0"
       }'
 ```
-**Example curl command (Windows)**
-```bash
-curl -X POST https://yourserver:8070/admin/generate_token ^
-  -H "X-Admin-Secret: %OTA_ADMIN_SECRET%" ^
-  -H "Content-Type: application/json" ^
-  -d "{\"device_id\": \"e6f87d77-4216-4be1-ab83-b5fa6792b747\", \"project\": \"smart_fan\"}"
-```
 
-The response contains a signed JWT and metadata:
+The response is a JSON object containing the signed JWT and the payload used to generate it:
+
 ```json
 {
-    "expires_at": "2026-04-19T09:13:32+00:00",
-    "payload": {
-        "aud": "ota_api",
-        "exp": 1776590012,
-        "download_vs": "2.0.0",
-        "iat": 1776588212,
-        "iss": "ota_http_server",
-        "jti": "e6f87d77-4216-4be1-ab83-b5fa6792b747-1776588212",
-        "project": "smart_fan",
-        "roles": [
-            "device",
-            "ota_client"
-        ],
-        "sub": "e6f87d77-4216-4be1-ab83-b5fa6792b747"
-    },
-    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJlNmY4N2Q3Ny00MjE2LTRiZTEtYWI4My1iNWZhNjc5MmI3NDciLCJwcm9qZWN0Ijoic21hcnRfZmFuIiwicm9sZXMiOlsiZGV2aWNlIiwib3RhX2NsaWVudCJdLCJpc3MiOiJvdGFfaHR0cF9zZXJ2ZXIiLCJpYXQiOjE3NzY1ODgyMTIsImV4cCI6MTc3NjU5MDAxMiwianRpIjoiZTZmODdkNzctNDIxNi00YmUxLWFiODMtYjVmYTY3OTJiNzQ3LTE3NzY1ODgyMTIiLCJmd192ZXJzaW9uIjoiMDEuMDAuMDIifQ.pgybmqVDz2uAZ5zb6L90HrYJ1KPqIAq-CH8S597IyhU"
+  "token": "eyJ...",
+  "expires_at": "2026-08-19T14:00:00+00:00",
+  "payload": {
+    "aud": "ota_api",
+    "exp": 1755585600,
+    "current_vs": "1.0.0",
+    "download_vs": "2.0.0",
+    "iat": 1755585000,
+    "iss": "ota_http_server",
+    "jti": "e6f87d77-4216-4be1-ab83-b5fa6792b747-1755585000",
+    "project": "smart_fan",
+    "roles": [
+      "device",
+      "fw_download"
+    ],
+    "sub": "e6f87d77-4216-4be1-ab83-b5fa6792b747"
+  }
 }
 ```
 
-### JWT Payload Fields
+### JWT claims used by the current implementation
 
-Field | Description
-------|------------
-| `aud` | Audience (example: "ota_api") |
-| `iat` | Issued-At timestamp (UNIX time). |
-| `exp` | Expiration time — after this time the token becomes invalid. |
-| `fw_version` | Current firmware version reported when the token was generated. |
-| `iat` | Issued at time |
-| `iss` | Issuer of JWT |
-| `jti` | Unique token ID (JWT ID). Helps detect re-use or revoke individual tokens. |
-| `project` | Project name — firmware group or directory name. Used to verify access. |
-| `roles` | List of logical roles; currently includes "device" and "ota_client". |
-| `sub` | Device unique identifier (UUIDv4). Identifies which device the token belongs to. |
+The current code verifies and relies on these claims:
 
-### JWT Generation Logic
+| Claim | Meaning |
+| --- | --- |
+| `aud` | Target audience, must match `jwt_audience` (default: `ota_api`) |
+| `exp` | Expiration timestamp; token is rejected when expired |
+| `iat` | Issued-at timestamp |
+| `iss` | Issuer, must match `jwt_issuer` (default: `ota_http_server`) |
+| `jti` | Unique identifier of the generated token |
+| `project` | Project name the token is valid for |
+| `roles` | Must contain both `device` and `fw_download` |
+| `sub` | Device identity; must match the `X-Device-ID` header or `device_id` query parameter |
+| `current_vs` | Device firmware version at token creation time |
+| `download_vs` | Version the token authorizes the device to download |
 
-Internally, the server uses:
+The `current_vs` claim is now included in the token payload so the token carries both the device’s current firmware version and the authorized target version.
 
-```python
-    def generate_ota_jwt(device_id:str, project:str, current_fw:str="1.0.0", expires_seconds:int=jwt_expiry) -> tuple[str, Dict[str, Any]]:
-        """Generate a timezone-aware JWT for OTA clients (devices)."""
-        now = datetime.now(timezone.utc)
-        payload = {
-            "aud": "ota_api",
-            "exp": int((now + timedelta(seconds=expires_seconds)).timestamp()),
-            "fw_version": current_fw,
-            "iat": int(now.timestamp()),
-            "iss": app.config.get("jwt_issuer, "ota_http_server"),
-            "jti": f"{device_id}-{int(now.timestamp())}",
-            "project": project,
-            "roles": ["device", "fw_download"],
-            "sub": device_id
-        }
-        return jwt.encode(payload, jwt_secret, algorithm=jwt_algorithm), payload
+### Token verification rules
+
+When a request reaches an OTA endpoint, the server does the following:
+
+1. Reads the token from `Authorization: Bearer ...` or `?token=...`
+2. Verifies the signature and expiry using the configured secret and algorithm
+3. Checks the `aud` claim against `jwt_audience`
+4. Checks the `iss` claim against `jwt_issuer`
+5. Confirms the token is for the requested project
+6. Enforces required roles: `device`, `fw_download`
+7. Verifies the `sub` claim matches the device identifier supplied by the client
+8. Allows the request only if the device is registered for that project and active
+
+### Token usage by devices
+
+A device should send the token as a bearer token in the HTTP header when possible:
+
+```http
+GET /firmware/projectA/1.2.0
+Authorization: Bearer <jwt>
+X-Device-ID: e6f87d77-4216-4be1-ab83-b5fa6792b747
 ```
 
-### Token Usage (Devices)
+For `GET` and `HEAD` requests, a query-string token is also accepted:
 
-Each OTA-capable device must include its token in every request to the OTA server:
-
-**Authorization header**
-
-```html
-Authorization: Bearer <jwt_token_here>
-```
-or equivalently as a query parameter:
-```
-?token=<jwt_token_here>
+```http
+GET /firmware/projectA/1.2.0?token=<jwt>&device_id=e6f87d77-4216-4be1-ab83-b5fa6792b747
 ```
 
-**Example firmware download**
+The server does not permit query string tokens for non-safe methods.
 
-```html
-GET /firmware/projectA/projectA-01.00.02.bin
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-```
-or
-```html
-GET /firmware/projectA/projectA-01.00.02.bin?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-```
+### Version metadata endpoints
 
-### Audit Logging
+The server exposes project metadata endpoints that can also be protected by JWT verification:
 
-Each successful token generation is logged for traceability:
-
-```
-[2025-10-09T15:34:12Z] [AUDIT] Action=generate_token IP=203.0.113.7 device=e6f87d77-4216-4be1-ab83-b5fa6792b747 project=projectA exp=1739085000
+```http
+GET /firmware/projectA/latest
+GET /firmware/projectA/versions
 ```
 
-This allows tracking which admin generated which tokens and when.
+The `/versions` endpoint verifies the token with `verify_sub=False`, which means a valid token can be used to read the available versions, but the device identity is not required for that specific call.
 
-### Security Notes
+### Audit logging
 
-* The admin secret (X-Admin-Secret) must never be hardcoded.
-It is read from the environment variable `OTA_ADMIN_SECRET`.
-Set it securely before starting the server:
+Token generation is logged for traceability. On success the server records an audit event with the device ID, project, and expiration time.
 
-```bash
-Linux:
-export OTA_ADMIN_SECRET="your-very-long-secret-value"
+Example log entry:
+
+```text
+[2026-08-19T14:00:00+00:00] [AUDIT] device=e6f87d77-4216-4be1-ab83-b5fa6792b747 project=smart_fan exp=1755585600
 ```
-```bash
-Windows:
-setx OTA_ADMIN_SECRET "your-very-long-secret-value"
-```
-* Always use HTTPS when issuing or using tokens.
-* Tokens are short-lived by design; keep expiry short (5–60 minutes).
-* Devices should request a new token only when needed, not store them permanently.
 
+### Security notes
+
+- Keep `OTA_ADMIN_SECRET` out of source control; prefer environment variables or secret stores
+- Always use HTTPS in production when issuing and consuming tokens
+- Use short expirations (for example 5–60 minutes) and rotate secrets as part of operational hygiene
+- Do not reuse tokens across devices or projects
+- Prefer `Authorization: Bearer ...` over query parameters, because query parameters are less safe and are limited to `GET`/`HEAD`
+
+### Recommended additions and implementation notes
+
+The JWT flow is now aligned with the codebase:
+
+1. `download_vs` is the effective authorization version for the OTA transfer
+2. `current_vs` is recorded in the JWT payload when the token is issued, so the device state is preserved with the authorization grant
+3. `sub` must match the `X-Device-ID` header or `device_id` query parameter
+4. `?token=` is accepted only for safe methods (`GET` and `HEAD`)
+5. `expires_seconds` is capped by `jwt_max_expiry` before the token is signed
+6. Future revocation and rotation policies can still be added later, but the current token model is now explicit and auditable
 ## Favicon
 
 The server automatically serves ```/favicon.ico``` from the ```www/``` directory if present.
@@ -533,12 +762,12 @@ Browsers usually cache this file, so it will only be requested once. Devices ini
 
 With token
 ```bash
-https://mycompany.com/firmware/projectA/firmware_01.00.02.bin?token=<JWT>
+https://mycompany.com/firmware/projectA/01.00.02?token=<JWT>
 ```
 
 Without token
 ```bash
-https://mycompany.com/firmware/projectA/firmware_01.00.02.bin
+https://mycompany.com/firmware/projectA/01.00.02
 ```
 
 ## Code Quality and Static Analysis

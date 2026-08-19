@@ -47,8 +47,39 @@ class ParametersConfig(TypedDict, total=False):
     firmware_dir: str
     url_firmware: str
     ota_audit_log: str
-    ota_db: str
-    ota_db_cache_ttl: int
+    app_directory: str
+    init_db_migrate: bool
+    migrate_dry_run: bool
+    trace_sql: bool
+    rollback_all: bool
+    user_id: int
+    username: str
+    user_password: str
+    user_email: str
+    user_role: str
+    user_record: bool
+    user_status: str | None
+    project_id: int
+    project_name: str
+    project_display_name: str
+    project_description: str
+    project_created_by: int
+    device_id: int
+    device_uuid: str
+    device_pid: str
+    device_record: bool
+    device_status: str | None
+    device_model: str
+    device_serial_number: str
+    device_current_version: str
+    firmware_id: int
+    firmware_pid: int
+    firmware_version: str
+    firmware_file: str
+    firmware_release_notes: str
+    firmware_release_channel: str
+    firmware_record: bool
+    firmware_status: str | None
 
 class DatabaseMySQLConfig(TypedDict, total=False):
     dbhost: str
@@ -58,9 +89,11 @@ class DatabaseMySQLConfig(TypedDict, total=False):
     dbpassword: str
     dbpool_size: int
     dbecho: bool
+    migrations_dir: str
 
 class databaseSQLiteConfig(TypedDict, total=False):
-    dbfile: str
+    db_file: str
+    migrations_dir: str
 
 class DatabaseConfig(TypedDict, total=False):
     dbtype: str
@@ -72,6 +105,12 @@ class ConfigDict(TypedDict):
     logging: LoggingConfig
     parameters: ParametersConfig
     database: DatabaseConfig
+
+USER_ROLES = [
+    "admin",
+    "operator",
+    "viewer",
+]
 
 class Config:
     def __init__(self) -> None:
@@ -109,8 +148,39 @@ class Config:
             'firmware_dir': "firmware",
             'url_firmware': "firmware",
             'ota_audit_log': "ota_audit_log.csv",
-            'ota_db': "ota_db.toml",
-            'ota_db_cache_ttl': 300
+            'app_directory': "C:\\ProgramData\\ota_http_server",
+            'init_db_migrate': True,
+            'migrate_dry_run': False,
+            'trace_sql': False,
+            'rollback_all': False,
+            'user_id': None,
+            'username': None,
+            'user_password': None,
+            'user_email': None,
+            'user_role': None,
+            'user_record': False,
+            'user_status': None,
+            'project_id': None,
+            'project_name': None,
+            'project_display_name': None,
+            'project_description': None,
+            'project_created_by': None,
+            'device_id': None,
+            'device_uuid': None,
+            'device_pid': None,
+            'device_record': False,
+            'device_status': None,
+            'device_model': None,
+            'device_serial_number': None,
+            'device_current_version': None,
+            "firmware_id": None,
+            'firmware_pid': None,
+            'firmware_version': None,
+            'firmware_file': None,
+            'firmware_release_notes': None,
+            'firmware_release_channel': None,
+            'firmware_record': False,
+            'firmware_status': None
         },
         'database': {
             'dbtype': "sqlite",
@@ -121,10 +191,12 @@ class Config:
                 'dbuser': "ota_user",
                 'dbpassword': "ota_password",
                 'dbpool_size': 10,
-                'dbecho': False
+                'dbecho': False,
+                "migrations_dir": "src/ota_http_server/database/migrations/mysql"
             },
             "sqlite": {
-                "dbfile": "ota_db.sqlite"
+                "db_file": "ota_db.sqlite",
+                "migrations_dir": "src/ota_http_server/database/migrations/sqlite"
             },
         }
     }
@@ -214,11 +286,104 @@ class Config:
                     "ota_audit_log": {
                         "type": "string"
                     },
-                    "ota_db": {
+                    "app_directory": {
                         "type": "string"
                     },
-                    "ota_db_cache_ttl": {
+                    "init_db_migrate": {
+                        "type": "boolean"
+                    },
+                    "migrate_dry_run": {
+                        "type": "boolean"
+                    },
+                    "trace_sql": {
+                        "type": "boolean"
+                    },
+                    "rollback_all": {
+                        "type": "boolean"
+                    },
+                    "user_id": {
                         "type": "number"
+                    },
+                    "username": {
+                        "type": "string"
+                    },
+                    "user_password": {
+                        "type": "string"
+                    },
+                    "user_email": {
+                        "type": "string"
+                    },
+                    "user_role": {
+                        "type": "string"
+                    },
+                    "user_record": {
+                        "type": "boolean"
+                    },
+                    "user_status": {
+                        "type": "string"
+                    },
+                    "project_id": {
+                        "type": "number"
+                    },
+                    "project_name": {
+                        "type": "string"
+                    },
+                    "project_display_name" : {
+                        "type": "string"
+                    },
+                    "project_description": {
+                        "type": "string"
+                    },
+                    "project_created_by": {
+                        "type": "number"
+                    },
+                    "device_id": {
+                        "type": "number"
+                    },
+                    "device_uuid": {
+                        "type": "string"
+                    },
+                    "device_pid": {
+                        "type": "number"
+                    },
+                    "device_record": {
+                        "type": "boolean"
+                    },
+                    "device_status": {
+                        "type": "string"
+                    },
+                    "device_model": {
+                        "type": "string"
+                    },
+                    "device_serial_number": {
+                        "type": "string"
+                    },
+                    "device_current_version": {
+                        "type": "string"
+                    },
+                    "firmware_id": {
+                        "type": "number"
+                    },
+                    "firmware_pid": {
+                        "type": "number"
+                    },
+                    "firmware_version": {
+                        "type": "string"
+                    },
+                    "firmware_file": {
+                        "type": "string"
+                    },
+                    "firmware_release_notes": {
+                        "type": "string"
+                    },
+                    "firmware_release_channel": {
+                        "type": "string"
+                    },
+                    "firmware_record": {
+                        "type": "boolean"
+                    },
+                    "firmware_status": {
+                        "type": "string"
                     }
                 },
                 "additionalProperties": False
@@ -249,6 +414,9 @@ class Config:
                             },
                             "dbecho": {
                                 "type": "boolean"
+                            },
+                            "migrations_dir": {
+                                "type": "string"
                             }
                         },
                         "additionalProperties": False
@@ -256,7 +424,10 @@ class Config:
                     "sqlite": {
                         "type": "object",
                         "properties": {
-                            "dbfile": {
+                            "db_file": {
+                                "type": "string"
+                            },
+                            "migrations_dir": {
                                 "type": "string"
                             }
                         },
@@ -353,8 +524,7 @@ class Config:
                 "ota_audit_log": os.getenv("OTA_AUDIT_LOG"),
                 "jwt_issuer": os.getenv("OTA_JWT_ISSUER"),
                 "jwt_audience": os.getenv("OTA_JWT_AUDIENCE"),
-                "ota_db": os.getenv("OTA_DATABASE"),
-                "ota_db_cache_ttl": os.getenv("OTA_DB_CACHE_TTL")
+                "app_directory": os.getenv("OTA_APP_DIRECTORY")
             },
             "database": {
                 "dbtype": os.getenv("OTA_DB_TYPE"),
@@ -418,6 +588,8 @@ class Config:
             # SQLite database options
             if config_cli.dbfile is not None:
                 self.config['database']['sqlite']['dbfile'] = config_cli.dbfile
+            if config_cli.trace_sql is not None:
+                self.config["parameters"]["trace_sql"] = config_cli.trace_sql
 
             if config_cli.command == 'runserver':
                 if config_cli.cert is not None:
@@ -442,10 +614,8 @@ class Config:
                     self.config['parameters']['jwt_audience'] = config_cli.jwt_audience
                 if config_cli.admin_secret is not None:
                     self.config['parameters']['admin_secret'] = config_cli.admin_secret
-                if config_cli.ota_db is not None:
-                    self.config["parameters"]["ota_db"] = config_cli.ota_db
-                if config_cli.ota_db_cache_ttl is not None:
-                    self.config["parameters"]["ota_db_cache_ttl"] = config_cli.ota_db_cache_ttl
+                if config_cli.app_directory is not None:
+                    self.config["parameters"]["app_directory"] = config_cli.app_directory
                 # server parameters
                 if config_cli.host is not None:
                     self.config['parameters']['host'] = config_cli.host
@@ -465,6 +635,208 @@ class Config:
                 if config_cli.db_command is not None:
                     self.config['db_command'] = config_cli.db_command
                 # here db commands must be handled for parameters
+                if config_cli.db_command == "init-db":
+                    if config_cli.init_db_migrate is not None:
+                        self.config['parameters']['init_db_no_migrate'] = config_cli.init_db_migrate
+                if config_cli.db_command == "migrate":
+                    if config_cli.migrate_dry_run is not None:
+                        self.config["parameters"]["migrate_dry_run"] = config_cli.migrate_dry_run
+                if config_cli.db_command == "rollback":
+                    if config_cli.rollback_all is not None:
+                        self.config["parameters"]["rollback_all"] = config_cli.rollback_all
+
+            if config_cli.command == 'user':
+                if config_cli.user_command is not None:
+                    self.config['user_command'] = config_cli.user_command
+                # add
+                if config_cli.user_command == 'add':
+                    if config_cli.username is not None:
+                        self.config["parameters"]["username"] = config_cli.username
+                    if config_cli.user_password is not None:
+                        self.config["parameters"]["user_password"] = config_cli.user_password
+                    if config_cli.user_email is not None:
+                        self.config["parameters"]["user_email"] = config_cli.user_email
+                    if config_cli.user_role is not None:
+                        self.config["parameters"]["user_role"] = config_cli.user_role
+                # enable
+                if config_cli.user_command == 'enable':
+                    if config_cli.user_id is not None:
+                        self.config["parameters"]["user_id"] = config_cli.user_id
+                    if config_cli.username is not None:
+                        self.config["parameters"]["username"] = config_cli.username
+                # disable
+                if config_cli.user_command == 'disable':
+                    if config_cli.user_id is not None:
+                        self.config["parameters"]["user_id"] = config_cli.user_id
+                    if config_cli.username is not None:
+                        self.config["parameters"]["username"] = config_cli.username
+                # get
+                if config_cli.user_command == 'get':
+                    if config_cli.user_id is not None:
+                        self.config["parameters"]["user_id"] = config_cli.user_id
+                    if config_cli.username is not None:
+                        self.config["parameters"]["username"] = config_cli.username
+                # list
+                if config_cli.user_command == 'list':
+                    if getattr(config_cli, 'user_record', None) is not None:
+                        self.config["parameters"]["user_record"] = config_cli.user_record
+                    else:
+                        self.config["parameters"]["user_record"] = False
+                    if getattr(config_cli, 'user_status', None) is not None:
+                        self.config["parameters"]["user_status"] = config_cli.user_status
+                    else:
+                        self.config["parameters"]["user_status"] = None
+
+            if config_cli.command == 'project':
+                if config_cli.project_command is not None:
+                    self.config["project_command"] = config_cli.project_command
+                # add
+                if config_cli.project_command == 'add':
+                    if config_cli.project_name is not None:
+                        self.config["parameters"]["project_name"] = config_cli.project_name
+                    if config_cli.project_display_name is not None:
+                        self.config["parameters"]["project_display_name"] = config_cli.project_display_name
+                    if config_cli.project_description is not None:
+                        self.config["parameters"]["project_description"] = config_cli.project_description
+                    if config_cli.project_created_by is not None:
+                        self.config["parameters"]["project_created_by"] = config_cli.project_created_by
+                # enable
+                if config_cli.project_command == "enable":
+                    if config_cli.project_id is not None:
+                        self.config["parameters"]["project_id"] = config_cli.project_id
+                    if config_cli.project_name is not None:
+                        self.config["parameters"]["project_name"] = config_cli.project_name
+                # disable
+                if config_cli.project_command == "disable":
+                    if config_cli.project_id is not None:
+                        self.config["parameters"]["project_id"] = config_cli.project_id
+                    if config_cli.project_name is not None:
+                        self.config["parameters"]["project_name"] = config_cli.project_name
+                # get
+                if config_cli.project_command == "get":
+                    if config_cli.project_id is not None:
+                        self.config["parameters"]["project_id"] = config_cli.project_id
+                    if config_cli.project_name is not None:
+                        self.config["parameters"]["project_name"] = config_cli.project_name
+                # list
+                if config_cli.project_command == 'list':
+                    if config_cli.project_record is not None:
+                        self.config["parameters"]["project_record"] = True
+                    else:
+                        self.config["parameters"]["project_record"] = False
+
+            if config_cli.command == "device":
+                if config_cli.device_command is not None:
+                    self.config["device_command"] = config_cli.device_command
+                # add
+                if config_cli.device_command == "add":
+                    if config_cli.device_uuid is not None:
+                        self.config["parameters"]["device_uuid"] = config_cli.device_uuid
+                    if config_cli.device_pid is not None:
+                        self.config["parameters"]["device_pid"] = config_cli.device_pid
+                    if config_cli.device_model is not None:
+                        self.config["parameters"]["device_model"] = config_cli.device_model
+                    if config_cli.device_serial_number is not None:
+                        self.config["parameters"]["device_serial_number"] = config_cli.device_serial_number
+                    if config_cli.device_current_version is not None:
+                        self.config["parameters"]["device_current_version"] = config_cli.device_current_version
+                # enable
+                if config_cli.device_command == "enable":
+                    if config_cli.device_id is not None:
+                        self.config["parameters"]["device_id"] = config_cli.device_id
+                    if config_cli.device_uuid is not None:
+                        self.config["parameters"]["device_uuid"] = config_cli.device_uuid
+                # disable
+                if config_cli.device_command == "disable":
+                    if config_cli.device_id is not None:
+                        self.config["parameters"]["device_id"] = config_cli.device_id
+                    if config_cli.device_uuid is not None:
+                        self.config["parameters"]["device_uuid"] = config_cli.device_uuid
+                # get
+                if config_cli.device_command == "get":
+                    if config_cli.device_id is not None:
+                        self.config["parameters"]["device_id"] = config_cli.device_id
+                    if config_cli.device_uuid is not None:
+                        self.config["parameters"]["device_uuid"] = config_cli.device_uuid
+                # list
+                if config_cli.device_command == "list":
+                    if getattr(config_cli, "device_record", None) is not None:
+                        self.config["parameters"]["device_record"] = config_cli.device_record
+                    else:
+                        self.config["parameters"]["device_record"] = False
+                    if getattr(config_cli, "device_status", None) is not None:
+                        self.config["parameters"]["device_status"] = config_cli.device_status
+                    else:
+                        self.config["parameters"]["device_status"] = None
+                    if getattr(config_cli, "device_pid", None) is not None:
+                        self.config["parameters"]["device_pid"] = config_cli.device_pid
+                    else:
+                        self.config["parameters"]["device_pid"] = None
+
+            if config_cli.command == "firmware":
+                if config_cli.firmware_command is not None:
+                    self.config["firmware_command"] = config_cli.firmware_command
+                # add
+                if config_cli.firmware_command == "add":
+                    if config_cli.firmware_pid is not None:
+                        self.config["parameters"]["firmware_pid"] = config_cli.firmware_pid
+                    if config_cli.firmware_version is not None:
+                        self.config["parameters"]["firmware_version"] = config_cli.firmware_version
+                    if config_cli.firmware_file is not None:
+                        self.config["parameters"]["firmware_file"] = config_cli.firmware_file
+                    if config_cli.firmware_release_notes is not None:
+                        self.config["parameters"]["firmware_release_notes"] = config_cli.firmware_release_notes
+                    if config_cli.firmware_release_channel is not None:
+                        self.config["parameters"]["firmware_release_channel"] = config_cli.firmware_release_channel
+                # enable
+                if config_cli.firmware_command == "enable":
+                    if config_cli.firmware_id is not None:
+                        self.config["parameters"]["firmware_id"] = config_cli.firmware_id
+                    if config_cli.firmware_pid is not None:
+                        self.config["parameters"]["firmware_pid"] = config_cli.firmware_pid
+                    if config_cli.firmware_version is not None:
+                        self.config["parameters"]["firmware_version"] = config_cli.firmware_version
+                # disable
+                if config_cli.firmware_command == "disable":
+                    if config_cli.firmware_id is not None:
+                        self.config["parameters"]["firmware_id"] = config_cli.firmware_id
+                    if config_cli.firmware_pid is not None:
+                        self.config["parameters"]["firmware_pid"] = config_cli.firmware_pid
+                    if config_cli.firmware_version is not None:
+                        self.config["parameters"]["firmware_version"] = config_cli.firmware_version
+                # get
+                if config_cli.firmware_command == "get":
+                    if config_cli.firmware_id is not None:
+                        self.config["parameters"]["firmware_id"] = config_cli.firmware_id
+                    if config_cli.firmware_pid is not None:
+                        self.config["parameters"]["firmware_pid"] = config_cli.firmware_pid
+                    if config_cli.firmware_version is not None:
+                        self.config["parameters"]["firmware_version"] = config_cli.firmware_version
+                # replace
+                if config_cli.firmware_command == "replace":
+                    if config_cli.firmware_id is not None:
+                        self.config["parameters"]["firmware_id"] = config_cli.firmware_id
+                    if config_cli.firmware_pid is not None:
+                        self.config["parameters"]["firmware_pid"] = config_cli.firmware_pid
+                    if config_cli.firmware_version is not None:
+                        self.config["parameters"]["firmware_version"] = config_cli.firmware_version
+                    if config_cli.firmware_file is not None:
+                        self.config["parameters"]["firmware_file"] = config_cli.firmware_file
+                # list
+                if config_cli.firmware_command == "list":
+                    if config_cli.firmware_record is not None:
+                        self.config["parameters"]["firmware_record"] = True
+                    else:
+                        self.config["parameters"]["firmware_record"] = False
+                    if getattr(config_cli, "firmware_status", None) is not None:
+                        self.config["parameters"]["firmware_status"] = config_cli.firmware_status
+                    else:
+                        self.config["parameters"]["firmware_status"] = None
+                    if getattr(config_cli, "firmware_pid", None) is not None:
+                        self.config["parameters"]["firmware_pid"] = config_cli.firmware_pid
+                    else:
+                        self.config["parameters"]["firmware_pid"] = None
+
         return self.config
 
 def parse_args() -> argparse.Namespace:
@@ -497,6 +869,7 @@ Environment variables:
   OTA_DB_PASSWORD         Database password, can be overridden by --dbpassword CLI option
   OTA_DB_POOL_SIZE        Database connection pool size (default 10), can be overridden by --dbpool-size CLI option
   OTA_DB_ECHO             Enable database echo (default False), can be overridden by --dbecho CLI option
+  OTA_APP_DIRECTORY       Path to the application directory (default 'C:\\ProgramData\\ota_http_server'), can be overridden by --app-directory CLI option
 
 Examples:
 
@@ -524,99 +897,27 @@ For use in development environment without SSL certificates and JWT authenticati
     # General options
     # -------------------
     general_group = parser.add_argument_group("General Options")
-    general_group.add_argument(
-        '--config',
-        type=str,
-        dest='config',
-        default='config.toml',
-        help="Name of the configuration file, default is 'config.toml'"
-    )
-    general_group.add_argument(
-        '--no-config',
-        action='store_const',
-        const='',
-        dest='config',
-        help="Do not use a configuration file (only defaults & options)"
-    )
-    general_group.add_argument(
-        '-v',
-        dest='version_option',
-        action='store_true',
-        default=False,
-        help='Show version information of the module'
-    )
+    general_group.add_argument('--config', type=str, dest='config', default='config.toml', help="Name of the configuration file, default is 'config.toml'" )
+    general_group.add_argument('--no-config', action='store_const', const='', dest='config', help="Do not use a configuration file (only defaults & options)")
+    general_group.add_argument('-v', dest='version_option', action='store_true', default=False, help='Show version information of the module')
 
     # -------------------
     # Logging options
     # -------------------
     logging_group = parser.add_argument_group("Logging Options")
-    logging_group.add_argument(
-        '--verbose',
-        type=int,
-        choices=[0, 1, 2, 3, 4, 5, 6],
-        dest='verbose',
-        help="Verbosity level: 0=CRITICAL, 1=ERROR, 2=WARNING, 3=QUIET, 4=INFO, 5=VERBOSE, 6=DEBUG. Default hardcoded is 3 or taken from config file/environment variable."
-    )
+    logging_group.add_argument('--verbose', type=int, choices=[0, 1, 2, 3, 4, 5, 6], dest='verbose', help="Verbosity level: 0=CRITICAL, 1=ERROR, 2=WARNING, 3=QUIET, 4=INFO, 5=VERBOSE, 6=DEBUG. Default hardcoded is 3 or taken from config file/environment variable.")
     prefix_group = logging_group.add_mutually_exclusive_group()
-    prefix_group.add_argument(
-        "--log-prefix",
-        action="store_const",
-        const=True,
-        dest="log_prefix",
-        help="Enable log prefixes (timestamp, module, level)"
-    )
-    prefix_group.add_argument(
-        "--no-log-prefix",
-        action="store_const",
-        const=False,
-        dest="log_prefix",
-        help="Disable log prefixes (print only the message)"
-    )
+    prefix_group.add_argument("--log-prefix", action="store_const", const=True, dest="log_prefix", help="Enable log prefixes (timestamp, module, level)")
+    prefix_group.add_argument("--no-log-prefix", action="store_const", const=False, dest="log_prefix", help="Disable log prefixes (print only the message)")
     color_group = logging_group.add_mutually_exclusive_group()
-    color_group.add_argument(
-        "--use-color",
-        action="store_const",
-        const=True,
-        dest="use_color",
-        help="Enable colored log output"
-    )
-    color_group.add_argument(
-        "--no-use-color",
-        action="store_const",
-        const=False,
-        dest="use_color",
-        help="Disable colored log output"
-    )
+    color_group.add_argument("--use-color", action="store_const", const=True, dest="use_color", help="Enable colored log output")
+    color_group.add_argument("--no-use-color", action="store_const", const=False, dest="use_color", help="Disable colored log output")
     string_handler_group = logging_group.add_mutually_exclusive_group()
-    string_handler_group.add_argument(
-        "--use-string-handler",
-        action="store_const",
-        const=True,
-        dest="use_string_handler",
-        help="Enable string handler to store logs in an internal buffer"
-    )
-    string_handler_group.add_argument(
-        "--no-use-string-handler",
-        action="store_const",
-        const=False,
-        dest="use_string_handler",
-        help="Disable string handler to store logs in an internal buffer"
-    )
+    string_handler_group.add_argument("--use-string-handler", action="store_const", const=True, dest="use_string_handler", help="Enable string handler to store logs in an internal buffer")
+    string_handler_group.add_argument("--no-use-string-handler", action="store_const", const=False, dest="use_string_handler", help="Disable string handler to store logs in an internal buffer")
     exception_group = logging_group.add_mutually_exclusive_group()
-    exception_group.add_argument(
-        "--exc-full-stack",
-        action="store_const",
-        const=True,
-        dest='exc_full_stack',
-        help="Enable full stack logging for exceptions (useful for development and debugging)"
-    )
-    exception_group.add_argument(
-        "--no-exc-full-stack",
-        action="store_const",
-        const=False,
-        dest='exc_full_stack',
-        help="Disable full stack logging for exceptions (useful for production)"
-    )
+    exception_group.add_argument("--exc-full-stack", action="store_const", const=True, dest='exc_full_stack', help="Enable full stack logging for exceptions (useful for development and debugging)")
+    exception_group.add_argument("--no-exc-full-stack", action="store_const", const=False, dest='exc_full_stack', help="Disable full stack logging for exceptions (useful for production)")
 
     # database options
     db_group = parser.add_argument_group("Database")
@@ -633,6 +934,12 @@ For use in development environment without SSL certificates and JWT authenticati
     dbecho_group.add_argument("--no-dbecho", dest="dbecho", action="store_const", const=False, help="Disable database echo (default False), overrides OTA_DB_ECHO environment variable")
     # SQLite options
     db_group.add_argument("--dbfile", dest="dbfile", type=str, help="Path to the SQLite database file (default 'ota_db.sqlite'), overrides OTA_DB_FILE environment variable")
+    trace_sql_group = parser.add_mutually_exclusive_group()
+    trace_sql_group.add_argument("--trace-sql", dest="trace_sql", action="store_const", const=True, help="Activates SQL tracing")
+    trace_sql_group.add_argument("--no-trace-sql", dest="trace_sql", action="store_const", const=False, help="De-activates SQL tracing")
+
+    app_dir_group = parser.add_argument_group("Application Directory")
+    app_dir_group.add_argument("--app-directory", dest="app_directory", type=str, help="Path to the application directory (default 'C:\\ProgramData\\ota_http_server'), overrides OTA_APP_DIRECTORY environment variable.\nHere the configuration file, audit log and database files are stored.\nIf the directory does not exist, it will be created automatically.")
 
     # application options & parameters
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -658,12 +965,9 @@ For use in development environment without SSL certificates and JWT authenticati
     jwt_group.add_argument("--jwt-audience", dest="jwt_audience", type=str, help="JWT audience claim value, overrides OTA_JWT_AUDIENCE environment variable")
     jwt_group.add_argument("--admin-secret", dest="admin_secret", type=str, help="Admin secret key, overrides OTA_ADMIN_SECRET environment variable")
 
-    db_toml_group = run_parser.add_argument_group("TOML Database")
-    db_toml_group.add_argument("--ota-db", dest="ota_db", type=str, help="Path to the OTA database file (default 'ota_db.toml'), overrides OTA_DB environment variable")
-    db_toml_group.add_argument("--ota-db-cache-ttl", dest="ota_db_cache_ttl", type=int, help="Cache time-to-live for the OTA database in seconds (default 300), overrides OTA_DB_CACHE_TTL environment variable")
-
     server_group = run_parser.add_argument_group("Server", description="""Server configuration options
-  Firmware URL has format host:port/url_firmware/project/filename-prefix-version.bin.
+  Firmware URL has format host:port/url_firmware/project/version.
+  The version is resolved through firmware metadata in the database.
   'url_firmware' is usually 'firmware' and corresponds to 'firmware-dir' in the file system under 'www-dir'.
   'www-dir' is the root directory of the http server.""")
     server_group.add_argument("--host", dest="host", help="Listening host")
@@ -675,28 +979,142 @@ For use in development environment without SSL certificates and JWT authenticati
     logging_group = run_parser.add_argument_group("Logging")
     logging_group.add_argument("--ota-audit-log", dest="ota_audit_log", help="Path to the OTA audit log file (default 'ota_audit_log.csv'), overrides OTA_AUDIT_LOG environment variable")
 
-#############
-
-    db_parser = subparsers.add_parser("db", help="Database operations")
+    # db
+    db_parser = subparsers.add_parser(name="db", help="Database operations")
     db_subparsers = db_parser.add_subparsers(dest="db_command", required=True)
+    # db init-db
+    init_db_parser = db_subparsers.add_parser(name="init-db", help="Initialize the database")
+    init_db_migrate_group = init_db_parser.add_mutually_exclusive_group()
+    init_db_migrate_group.add_argument("--migrate", dest="init_db_migrate", action="store_const", const=True, help="Create database without executing migrations")
+    init_db_migrate_group.add_argument("--no-migrate", dest="init_db_migrate", action="store_const", const=False, help="Create database without executing migrations")
+    # db migrate
+    migration_parser = db_subparsers.add_parser(name="migrate", help="Execute all available and not yet executed migrations up")
+    migration_parser.add_argument("--dry-run",dest="migrate_dry_run", action="store_const", const=True, help="Shows what would do without doing it really")
+    # db rollback#
+    rollback_parser = db_subparsers.add_parser(name="rollback", help="Execute rollback of the last or all migrations")
+    rollback_parser.add_argument("--all", dest="rollback_all", action="store_const", const=True, help="Execute rollback of all migrations")
 
-    init_db_parser = db_subparsers.add_parser("init-db", help="Initialize the database")
+    # user
+    user_parser = subparsers.add_parser(name="user", help="Users manipulation operations")
+    user_subparsers = user_parser.add_subparsers(dest="user_command", required=True)
+    # user add
+    add_user_parser = user_subparsers.add_parser(name="add", help="Add new user")
+    add_user_parser.add_argument("--name", dest="username", type=str, required=True, help="Username of the new created user")
+    add_user_parser.add_argument("--password", dest="user_password", type=str, required=True, help="Password of the new created user")
+    add_user_parser.add_argument("--email", dest="user_email", type=str, required=True, help="Email of the new created user")
+    add_user_parser.add_argument("--role", dest="user_role", type=str, required=True, choices=USER_ROLES, help="Password of the new created user")
+    # user enable
+    enable_user_parser = user_subparsers.add_parser(name="enable", help="Enable user")
+    enable_user_parser.add_argument("--user-id", dest="user_id", type=int, required=False, help="ID of the user to be enabled")
+    enable_user_parser.add_argument("--username", dest="username", type=str, required=False, help="Username of the user to be enabled. Give --user-id or --username. --user-id takes precedence.")
+    # user disable
+    disable_user_parser = user_subparsers.add_parser(name="disable", help="Disable user")
+    disable_user_parser.add_argument("--user-id", dest="user_id", type=int, required=False, help="ID of the user to be disabled")
+    disable_user_parser.add_argument("--username", dest="username", type=str, required=False, help="Username of the user to be disabled. Give --user-id or --username. --user-id takes precedence.")
+    # user get
+    get_user_parser = user_subparsers.add_parser(name="get", help="Get user information")
+    get_user_parser.add_argument("--user-id", dest="user_id", type=int, required=False, help="ID of the user to be retrieved")
+    get_user_parser.add_argument("--username", dest="username", type=str, required=False, help="Username of the user to be retrieved. Give --user-id or --username. --user-id takes precedence.")
+    # list
+    list_user_parser = user_subparsers.add_parser(name="list", help="List all users")
+    list_user_parser.add_argument("--record", dest="user_record", action="store_const", const=True, help="List full records of users, including all fields. If not specified, only a summary of users will be listed.")
+    user_status_group = list_user_parser.add_mutually_exclusive_group()
+    user_status_group.add_argument("--enabled", dest="user_status", action="store_const", const="enabled", help="List enabled users only")
+    user_status_group.add_argument("--disabled", dest="user_status", action="store_const", const="disabled", help="List disabled users only")
 
-    create_user_parser = db_subparsers.add_parser("create-user", help="Create a user")
-    create_user_parser.add_argument("--email", required=True)
+    # project
+    project_parser = subparsers.add_parser(name="project", help="Projects manipulation operations")
+    project_subparsers = project_parser.add_subparsers(dest="project_command", required=True)
+    # project add
+    add_project_parser = project_subparsers.add_parser(name="add", help="Add new project")
+    add_project_parser.add_argument("--name", dest="project_name", type=str, required=True, help="Name of the new created project")
+    add_project_parser.add_argument("--display_name", dest="project_display_name", type=str, required=False, help="Display name of the new created project")
+    add_project_parser.add_argument("--description", dest="project_description", type=str, required=False, help="Description of the new created project")
+    add_project_parser.add_argument("--created-by", dest="project_created_by", type=int, required=True, help="ID of the user who created the project")
+    # project enable
+    enable_project_parser = project_subparsers.add_parser(name="enable", help="Enable project")
+    enable_project_parser.add_argument("--id", dest="project_id", type=int, required=False, help="ID of the project to be enabled")
+    enable_project_parser.add_argument("--name", dest="project_name", type=str, required=False, help="Name of the project to be enabled. Give --id or --name. --id takes precedence.")
+    # project disable
+    disable_project_parser = project_subparsers.add_parser(name="disable", help="Disable project")
+    disable_project_parser.add_argument("--id", dest="project_id", type=int, required=False, help="ID of the project to be disabled")
+    disable_project_parser.add_argument("--name", dest="project_name", type=str, required=False, help="Name of the project to be disabled. Give --id or --name. --id takes precedence.")
+    # project get
+    get_project_parser = project_subparsers.add_parser(name="get", help="Get project information")
+    get_project_parser.add_argument("--id", dest="project_id", type=int, required=False, help="ID of the project to be retrieved")
+    get_project_parser.add_argument("--name", dest="project_name", type=str, required=False, help="Name of the project to be retrieved. Give --id or --name. --id takes precedence.")
+    # project list
+    list_project_parser = project_subparsers.add_parser(name="list", help="List all projects")
+    list_project_parser.add_argument("--record", dest="project_record", action="store_const", const=True, help="List full records of projects, including all fields. If not specified, only a summary of projects will be listed.")
 
-    create_device_parser = db_subparsers.add_parser("create-device", help="Create a device")
-    create_device_parser.add_argument("--device-name", required=True)
-    create_device_parser.add_argument("--device-uuid", required=True)
+    # device
+    device_parser = subparsers.add_parser(name="device", help="Devices manipulation operations")
+    device_subparsers = device_parser.add_subparsers(dest="device_command", required=True)
+    # device add
+    add_device_parser = device_subparsers.add_parser(name="add", help="Add new device")
+    add_device_parser.add_argument("--uuid", dest="device_uuid", type=str, required=True, help="Device UUIDv4")
+    add_device_parser.add_argument("--pid", dest="device_pid", type=str, required=True, help="ID of the project the device is related to")
+    add_device_parser.add_argument("--model", dest="device_model", type=str, required=False, help="Optional model of the device, user added string")
+    add_device_parser.add_argument("--sn", dest="device_serial_number", type=str, required=False, help="Optional serial number of the device")
+    add_device_parser.add_argument("--version", dest="device_current_version", type=str, required=False, help="Optional version of the device's firmware")
+    # device enable
+    enable_device_parser = device_subparsers.add_parser(name="enable", help="Enable device")
+    enable_device_parser.add_argument("--id", dest="device_id", type=int, required=False, help="ID of the device to be enabled")
+    enable_device_parser.add_argument("--uuid", dest="device_uuid", type=str, required=False, help="UUIDv4 of the device to be enabled")
+    # device disable
+    disable_device_parser = device_subparsers.add_parser(name="disable", help="Disable device")
+    disable_device_parser.add_argument("--id", dest="device_id", type=int, required=False, help="ID of the device to be disabled")
+    disable_device_parser.add_argument("--uuid", dest="device_uuid", type=str, required=False, help="UUIDv4 of the device to be disabled")
+    # device get
+    get_device_parser = device_subparsers.add_parser(name="get", help="Retrieve device information")
+    get_device_parser.add_argument("--id", dest="device_id", type=int, required=False, help="ID of the device to be retrieved")
+    get_device_parser.add_argument("--uuid", dest="device_uuid", type=str, required=False, help="UUIDv4 of the device to be retrieved")
+    # device list
+    list_device_parser = device_subparsers.add_parser(name="list", help="List devices")
+    list_device_parser.add_argument("--record", dest="device_record", action="store_const", const=True, help="List full records of devices, including all fields. If not specified, only a summary of devices will be listed.")
+    device_status_group = list_device_parser.add_mutually_exclusive_group()
+    device_status_group.add_argument("--enabled", dest="device_status", action="store_const", const="enabled", help="List enabled devices only")
+    device_status_group.add_argument("--disabled", dest="device_status", action="store_const", const="disabled", help="List disabled devices only")
+    list_device_parser.add_argument("--pid", dest="device_pid", type=int, required=False, help="List devices for project ID only")
 
-    create_project_parser = db_subparsers.add_parser("create-project", help="Create a project")
-    create_project_parser.add_argument("--project-name", required=True)
-    create_project_parser.add_argument("--project-uuid", required=True)
-    create_project_parser.add_argument("--project-path", required=True, help="Path to the project directory containing firmware files")
-
-    assign_parser = db_subparsers.add_parser("assign-device", help="Assign device to user")
-    assign_parser.add_argument("--user-id", required=True)
-    assign_parser.add_argument("--device-id", required=True)
+    # firmware
+    firmware_parser = subparsers.add_parser(name="firmware", help="Firmware manipulation operations", )
+    firmware_subparsers = firmware_parser.add_subparsers(dest="firmware_command", required=True)
+    # firmware add
+    add_firmware_parser = firmware_subparsers.add_parser(name="add", help="Add new firmware")
+    add_firmware_parser.add_argument("--pid", dest="firmware_pid", type=int, required=True, help="ID of the project the firmware is related to")
+    add_firmware_parser.add_argument("--version", dest="firmware_version", type=str, required=True, help="Version of the firmware")
+    add_firmware_parser.add_argument("--file", dest="firmware_file", type=str, required=True, help="Firmware filename without path elements")
+    add_firmware_parser.add_argument("--notes", dest="firmware_release_notes", type=str, required=False, help="Release notes for the firmware")
+    add_firmware_parser.add_argument("--channel", dest="firmware_release_channel", type=str, choices=["stable", "dev", "beta"], default="stable", required=False, help="Release channel for the firmware (e.g., stable, dev, beta)")
+    # firmware enable
+    enable_firmware_parser = firmware_subparsers.add_parser("enable", help="Enable firmware to be downloaded for OTA")
+    enable_firmware_parser.add_argument("--id", dest="firmware_id", type=int, required=False, help="ID of the firmware to be enabled")
+    enable_firmware_parser.add_argument("--pid", dest="firmware_pid", type=int, required=False, help="ID of the project the firmware is related to")
+    enable_firmware_parser.add_argument("--version", dest="firmware_version", type=str, required=False, help="Version of the firmware")
+    # firmware disable
+    disable_firmware_parser = firmware_subparsers.add_parser("disable", help="Disable firmware to be downloaded for OTA")
+    disable_firmware_parser.add_argument("--id", dest="firmware_id", type=int, required=False, help="ID of the firmware to be disabled")
+    disable_firmware_parser.add_argument("--pid", dest="firmware_pid", type=int, required=False, help="ID of the project the firmware is related to")
+    disable_firmware_parser.add_argument("--version", dest="firmware_version", type=str, required=False, help="Version of the firmware")
+    # firmware get
+    get_firmware_parser = firmware_subparsers.add_parser("get", help="Retrieve data for firmware")
+    get_firmware_parser.add_argument("--id", dest="firmware_id", type=int, required=False, help="ID of the firmware to be retrieved")
+    get_firmware_parser.add_argument("--pid", dest="firmware_pid", type=int, required=False, help="ID of the project the firmware is related to")
+    get_firmware_parser.add_argument("--version", dest="firmware_version", type=str, required=False, help="Version of the firmware")
+    # firmware replace
+    replace_firmware_parser = firmware_subparsers.add_parser("replace", help="Replace an uploaded firmware file for a project version")
+    replace_firmware_parser.add_argument("--id", dest="firmware_id", type=int, required=False, help="ID of the firmware record to replace. --id takes precedence over --pid/--version.")
+    replace_firmware_parser.add_argument("--pid", dest="firmware_pid", type=int, required=False, help="ID of the project the firmware is related to")
+    replace_firmware_parser.add_argument("--version", dest="firmware_version", type=str, required=False, help="Version of the firmware to replace")
+    replace_firmware_parser.add_argument("--file", dest="firmware_file", type=str, required=True, help="Path to the new firmware file")
+    # firmware list
+    list_firmware_parser = firmware_subparsers.add_parser("list", help="List available firmware")
+    list_firmware_parser.add_argument("--record", dest="firmware_record", action="store_const", const=True, help="List full records of firmware, including all fields. If not specified, only a summary of firmware will be listed.")
+    firmware_status_group = list_firmware_parser.add_mutually_exclusive_group()
+    firmware_status_group.add_argument("--enabled", dest="firmware_status", action="store_const", const="enabled", help="List enabled firmware only")
+    firmware_status_group.add_argument("--disabled", dest="firmware_status", action="store_const", const="disabled", help="List disabled firmware only")
+    list_firmware_parser.add_argument("--pid", dest="firmware_pid", type=int, required=False, help="List firmware for project ID only")
 
     return parser.parse_args()
 
@@ -712,7 +1130,6 @@ def get_app_configuration() -> Config:
 
     # Step 1: Create config object with default configuration
     config_instance = Config()
-
     # Step 2: Parse command-line arguments
     args = parse_args()
     if args.version_option:

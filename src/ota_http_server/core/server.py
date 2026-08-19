@@ -1,25 +1,20 @@
 # core/server.py
 
-from typing import Any, Dict
 import csv
 import os
-import sys
 import re
 from pathlib import Path
-from datetime import datetime, timedelta, timezone
-from flask import Flask, Response, send_file, request, abort, jsonify, current_app
+from datetime import datetime, timezone, UTC
+from flask import Flask, Response, send_file, request, abort, jsonify
 from packaging import version
 import hmac
-from uuid import UUID
-# Check Python version at runtime
-if sys.version_info >= (3, 11):
-    import tomllib as toml # Use the built-in tomllib for Python 3.11+
-else:
-    import tomli as toml # Use the external tomli for Python 3.7 to 3.10
 
 from .data_models import TokenResult
 from .auth_service import AuthService
+from ota_http_server.database.database_service import DatabaseService
+from ota_http_server.firmware.filename_validation import validate_firmware_filename
 from ota_http_server.logger import get_app_logger
+from ota_http_server.core.config import Config
 
 logger = get_app_logger(__name__)
 
@@ -27,25 +22,25 @@ logger = get_app_logger(__name__)
 #                       APP FACTORY
 # -------------------------------------------------------------------
 
-def create_app(www_dir:str,                 # pylint: disable=too-many-positional-arguments,too-many-locals,too-many-statements
-               firmware_dir:str,
-               url_firmware:str,
-               use_jwt:bool,
-               jwt_algorithm:str,
-               jwt_expiry:int,
-               jwt_max_expiry:int,
-               jwt_secret:str|None,
-               jwt_issuer:str|None,
-               jwt_audience:str|None,
-               admin_secret:str|None,
-               ota_audit_log:str,
-               ota_db_file:str,
-               ota_db_cache_ttl:int) -> Flask:
+def create_app(cfg: Config) -> Flask:
 
     # Print argument names and values
     logger.info("create_app() called with:")
     for name, value in locals().items():
         logger.info(f" %s = %r", name, value)
+
+    www_dir=cfg.config['parameters']['www_dir']
+    firmware_dir=cfg.config['parameters']['firmware_dir']
+    url_firmware=cfg.config['parameters']['url_firmware']
+    use_jwt=not cfg.config['parameters']['no_jwt']
+    jwt_algorithm=cfg.config['parameters']['jwt_alg']
+    jwt_expiry=int(cfg.config['parameters']['jwt_expiry'])
+    jwt_max_expiry=int(cfg.config['parameters']['jwt_max_expiry'])
+    jwt_secret=cfg.config['parameters']['jwt_secret']
+    jwt_issuer=cfg.config['parameters']['jwt_issuer']
+    jwt_audience=cfg.config['parameters']['jwt_audience']
+    admin_secret=cfg.config['parameters']['admin_secret']
+    ota_audit_log=cfg.config['parameters']['ota_audit_log']
 
     if use_jwt and (not jwt_secret or not admin_secret):
         raise ValueError("JWT is enabled but jwt_secret or admin_secret is not set")
@@ -58,32 +53,12 @@ def create_app(www_dir:str,                 # pylint: disable=too-many-positiona
                               jwt_expiry=jwt_expiry,
                               jwt_max_expiry=jwt_max_expiry
                             )
-
-    def load_ota_db() -> Dict[str, Any]:
-        app = current_app
-        now = datetime.now()
-
-        if app.config["OTA_DB"] is None or (now - app.config["OTA_DB_LAST_LOAD"]) > app.config["OTA_DB_CACHE_TTL"]:
-            try:
-                with open(app.config["OTA_DB_FILE"], 'rb') as f:
-                    app.config["OTA_DB"] = toml.load(f)
-                    app.config["OTA_DB_LAST_LOAD"] = now
-            except (FileNotFoundError, toml.TOMLDecodeError) as e:
-                logger.info("Failed to load OTA database: %s", e)
-                return {}
-        return app.config["OTA_DB"]
+    dbservice = DatabaseService(cfg)  # Placeholder for future database service integration
 
     #
     # Flask app factory with JWT authentication and secure admin endpoint.
     #
     app = Flask(__name__.split('.', maxsplit=1)[0])
-
-    app.config["OTA_DB_FILE"] = ota_db_file
-    app.config["OTA_DB"] = None
-    app.config["OTA_DB_LAST_LOAD"] = 0
-    app.config["OTA_DB_CACHE_TTL"] = timedelta(seconds=ota_db_cache_ttl)  # seconds
-    with app.app_context():
-        load_ota_db()
 
     # ---------------------------------------------------------------
     #                       HELPER FUNCTIONS
@@ -117,8 +92,11 @@ def create_app(www_dir:str,                 # pylint: disable=too-many-positiona
 
     def log_audit_event(ip:str|None, action:str, details:str) -> None:
         """Append a token generation audit log entry."""
-        timestamp = datetime.now(timezone.utc).isoformat()
-        os.makedirs(os.path.dirname(ota_audit_log) or ".", exist_ok=True)
+        timestamp = datetime.now(UTC).isoformat()
+
+        app_paths = cfg.config['parameters']['app_paths']
+        ota_audit_log = (app_paths.logs_dir / Path(cfg.config['parameters']['ota_audit_log'])).resolve()
+
         new_file = not os.path.exists(ota_audit_log)
         with open(ota_audit_log, "a", newline="", encoding="utf-8") as csvfile:
             writer = csv.writer(csvfile)
@@ -127,48 +105,53 @@ def create_app(www_dir:str,                 # pylint: disable=too-many-positiona
             writer.writerow([timestamp, ip, action, details])
         logger.info(f"[AUDIT] %s | %s | %s | %s", timestamp, ip, action, details)
 
-    def is_device_in_project(db, project: str, device_id: str) -> bool:
-        devices = db.get("projects", {}).get(project, {}).get("devices", [])
-        return any(d["uuid"] == device_id for d in devices)
+    def get_firmware_file_path(project: str, filename: str) -> Path:
+        try:
+            validate_firmware_filename(filename)
+        except ValueError as exc:
+            logger.warning("Rejected unsafe firmware filename '%s' for project '%s': %s", filename, project, exc)
+            abort(404, "Firmware file not found")
 
-    def has_firmware_access(db, project: str, device_id: str) -> bool:
-        devices = db.get("projects", {}).get(project, {}).get("devices", [])
-
-        for d in devices:
-            if d["uuid"] == device_id:
-                return d.get("fw_access", False)
-
-        return False
+        app_paths = cfg.config['parameters']['app_paths']
+        project_dir = app_paths.project_dir(project).resolve()
+        return (project_dir / filename).resolve()
 
     # ---------------------------------------------------------------
     #                          ROUTES
     # ---------------------------------------------------------------
 
-    @app.route(f'/{url_firmware}/<project>/<path:filename>')
-    def firmware(project:str, filename:str) -> Response:
+    @app.route(f'/{url_firmware}/<project>/<version>')
+    def firmware(project:str, version:str) -> Response:
+        project_rec = dbservice.project_get_by_name(project)
+        if project_rec is None:
+            abort(404, "Project not found")
+        if not project_rec.is_active:
+            abort(403, "Project is disabled")
+
         if use_jwt:
             # 1. Decode JWT
             payload = authservice.verify_token(project, verify_sub=True)
             # 2. Extract identity
             device_id = payload["sub"]
-            project = payload["project"]
-            # 3. Load authorization DB
-            db = load_ota_db()
-            # 4. Check membership
-            if not is_device_in_project(db, project, device_id):
+
+            # 3. Check membership
+            device_rec = dbservice.device_get_by_name(device_id)
+            if device_rec is None or device_rec.project_id != project_rec.id:
                 abort(403, "Device not registered for project")
-            # 5. Check firmware permission
-            if not has_firmware_access(db, project, device_id):
+            # 4. Check device permission
+            if not device_rec.is_active:
                 abort(403, "Device not allowed to download firmware")
 
-        file_path = (
-            Path(www_dir) / Path(firmware_dir) / Path(project) / Path(filename)
-        ).resolve()
-        allowed_dir = (
-            Path(www_dir) / Path(firmware_dir) / Path(project)
-        ).resolve()
-        if not file_path.is_relative_to(allowed_dir):  # Python >= 3.9
-            abort(403, "Access to this path is forbidden")
+        firmware_rec = dbservice.firmware_get_by_project_version(
+            project_id=project_rec.id,
+            version=version,
+        )
+        if firmware_rec is None:
+            abort(404, "Firmware metadata not found")
+        if not firmware_rec.is_active:
+            abort(403, "Firmware is disabled")
+
+        file_path = get_firmware_file_path(project, firmware_rec.filename)
 
         logger.info("Serving firmware from: %s", file_path)
         if not file_path.is_file():
@@ -177,16 +160,64 @@ def create_app(www_dir:str,                 # pylint: disable=too-many-positiona
 
     @app.route(f'/{url_firmware}/<project>/latest')
     def latest_firmware(project:str) -> Response:
-        authservice.verify_token(project, verify_sub=False)  # Allow latest version check without device identity, but still require valid token for project
-        project_dir, _, version_files = get_sorted_versions(project)
-        latest_file, _ = version_files[-1]
-        file_path = (Path(project_dir) / latest_file).resolve()
+        project_rec = dbservice.project_get_by_name(project)
+        if project_rec is None:
+            abort(404, "Project not found")
+        if not project_rec.is_active:
+            abort(403, "Project is disabled")
+
+        if use_jwt:
+            # 1. Decode JWT
+            payload = authservice.verify_token(project, verify_sub=True)
+            # 2. Extract identity
+            device_id = payload["sub"]
+
+            # 3. Check membership
+            device_rec = dbservice.device_get_by_name(device_id)
+            if device_rec is None or device_rec.project_id != project_rec.id:
+                abort(403, "Device not registered for project")
+            # 4. Check device permission
+            if not device_rec.is_active:
+                abort(403, "Device not allowed to download firmware")
+
+        firmware_records = [
+            fw for fw in dbservice.firmware_get_record()
+            if fw.project_id == project_rec.id
+        ]
+        if not firmware_records:
+            abort(404, "No firmware metadata found for project")
+
+        latest_firmware_rec = max(firmware_records, key=lambda fw: fw.version)
+        if not latest_firmware_rec.is_active:
+            abort(403, "Latest firmware is disabled")
+
+        file_path = get_firmware_file_path(project, latest_firmware_rec.filename)
+
+        logger.info("Serving firmware from: %s", file_path)
+        if not file_path.is_file():
+            abort(404, "Firmware file not found")
+
         return send_file(file_path, conditional=True)
 
     @app.route(f'/{url_firmware}/<project>/versions')
     def list_versions(project:str) -> Response:
-        authservice.verify_token(project, verify_sub=False)  # Allow version listing without device identity, but still require valid token for project
-        _, versions, _ = get_sorted_versions(project)
+        project_rec = dbservice.project_get_by_name(project)
+        if project_rec is None:
+            abort(404, "Project not found")
+        if not project_rec.is_active:
+            abort(403, "Project is disabled")
+
+        if use_jwt:
+            authservice.verify_token(project, verify_sub=False)
+
+        firmware_records = [
+            fw for fw in dbservice.firmware_get_record()
+            if fw.project_id == project_rec.id
+        ]
+        if not firmware_records:
+            abort(404, "No firmware metadata found for project")
+
+        versions = sorted(fw.version for fw in firmware_records)
         return jsonify({
             "versions": versions,
             "count": len(versions),
@@ -197,7 +228,7 @@ def create_app(www_dir:str,                 # pylint: disable=too-many-positiona
     def status() -> Response:
         return jsonify({
             "status": "ok",
-            "time": datetime.now(timezone.utc).isoformat()
+            "time": datetime.now(UTC).isoformat()
         })
 
     # ---------------------------------------------------------------
