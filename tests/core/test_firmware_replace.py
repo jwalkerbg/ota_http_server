@@ -276,6 +276,58 @@ def test_parse_args_replace_command_by_id(monkeypatch):
     assert parsed.firmware_file == "/tmp/new.bin"
 
 
+def test_parse_args_delete_command(monkeypatch):
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "ota_http_server",
+            "--dbtype",
+            "sqlite",
+            "firmware",
+            "delete",
+            "--pid",
+            "12",
+            "--version",
+            "1.2.3",
+        ],
+    )
+
+    parsed = parse_args()
+
+    assert parsed.firmware_command == "delete"
+    assert parsed.firmware_pid == 12
+    assert parsed.firmware_version == "1.2.3"
+    assert parsed.firmware_id is None
+
+
+def test_parse_args_delete_command_with_id_precedence(monkeypatch):
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "ota_http_server",
+            "--dbtype",
+            "sqlite",
+            "firmware",
+            "delete",
+            "--id",
+            "7",
+            "--pid",
+            "12",
+            "--version",
+            "1.2.3",
+        ],
+    )
+
+    parsed = parse_args()
+
+    assert parsed.firmware_command == "delete"
+    assert parsed.firmware_id == 7
+    assert parsed.firmware_pid == 12
+    assert parsed.firmware_version == "1.2.3"
+
+
 def test_replace_firmware_updates_existing_record(tmp_path):
     project_dir = tmp_path / "proj"
     project_dir.mkdir()
@@ -440,6 +492,68 @@ def test_replace_firmware_skips_if_no_existing_version(tmp_path):
 
     assert not any(project_dir.iterdir())
     cfg.config["db_service"].firmware_replace.assert_not_called()
+
+
+def test_delete_firmware_deletes_file_and_database_record(tmp_path):
+    project_dir = tmp_path / "proj"
+    project_dir.mkdir()
+    stored_file = project_dir / "old.bin"
+    stored_file.write_bytes(b"old-content")
+
+    cfg = SimpleNamespace()
+    cfg.config = {
+        "parameters": {
+            "firmware_pid": 12,
+            "firmware_version": "1.2.3",
+            "app_paths": SimpleNamespace(project_dir=lambda project_name: project_dir),
+        },
+        "db_service": MagicMock(),
+    }
+    cfg.config["db_service"].firmware_delete_by_project_version.return_value = SimpleNamespace(
+        id=7,
+        project_name="proj",
+        filename="old.bin",
+    )
+
+    service = FirmwareService(cfg)
+    service._delete_firmware()
+
+    assert not stored_file.exists()
+    cfg.config["db_service"].firmware_delete_by_project_version.assert_called_once_with(project_id=12, version="1.2.3")
+    cfg.config["db_service"].firmware_get_by_project_version.assert_not_called()
+    cfg.config["db_service"].firmware_delete_by_id.assert_not_called()
+
+
+def test_delete_firmware_prefers_id_over_pid_and_version(tmp_path):
+    project_dir = tmp_path / "proj"
+    project_dir.mkdir()
+    stored_file = project_dir / "old.bin"
+    stored_file.write_bytes(b"old-content")
+
+    cfg = SimpleNamespace()
+    cfg.config = {
+        "parameters": {
+            "firmware_id": 7,
+            "firmware_pid": 12,
+            "firmware_version": "1.2.3",
+            "app_paths": SimpleNamespace(project_dir=lambda project_name: project_dir),
+        },
+        "db_service": MagicMock(),
+    }
+    cfg.config["db_service"].firmware_delete_by_id.return_value = SimpleNamespace(
+        id=7,
+        project_name="proj",
+        filename="old.bin",
+    )
+
+    service = FirmwareService(cfg)
+    service._delete_firmware()
+
+    assert not stored_file.exists()
+    cfg.config["db_service"].firmware_delete_by_id.assert_called_once_with(7)
+    cfg.config["db_service"].firmware_get_by_id.assert_not_called()
+    cfg.config["db_service"].firmware_get_by_project_version.assert_not_called()
+    cfg.config["db_service"].firmware_delete_by_project_version.assert_not_called()
 
 
 def test_parse_args_user_list_status_filters(monkeypatch):

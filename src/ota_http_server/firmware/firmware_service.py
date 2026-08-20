@@ -7,6 +7,8 @@ from pathlib import Path
 from ota_http_server.core.config import Config
 from ota_http_server.core.data_models import Firmware, AppPaths
 from ota_http_server.database.database_service import DatabaseService
+from ota_http_server.database.db_mysql_service import FirmwareNotFoundError as MySQLFirmwareNotFoundError
+from ota_http_server.database.db_sqlite_service import FirmwareNotFoundError as SqliteFirmwareNotFoundError
 from ota_http_server.core.formatters import FirmwareFormatter, FirmwareListItemFormatter
 from ota_http_server.firmware.filename_validation import validate_firmware_filename
 from ota_http_server.logger import get_app_logger
@@ -34,6 +36,7 @@ class FirmwareService:
         handlers= {
             "add": self._add_firmware,
             "replace": self._replace_firmware,
+            "delete": self._delete_firmware,
             "enable": self._enable_firmware,
             "disable": self._disable_firmware,
             "get": self._get_firmware,
@@ -170,6 +173,49 @@ class FirmwareService:
             checksum=self._sha256_file(destination_path),
         )
         logger.info("Updated firmware record %s", replacement)
+
+    def _delete_firmware(self) -> None:
+        firmware_id = self.cfg.config["parameters"].get("firmware_id")
+        pid = self.cfg.config["parameters"].get("firmware_pid")
+        version = self.cfg.config["parameters"].get("firmware_version")
+
+        db_service: DatabaseService = self.cfg.config["db_service"]
+        app_paths: AppPaths = self.cfg.config["parameters"]["app_paths"]
+
+        try:
+            if firmware_id is not None:
+                deleted = db_service.firmware_delete_by_id(firmware_id)
+            elif pid is not None and version is not None:
+                deleted = db_service.firmware_delete_by_project_version(
+                    project_id=pid,
+                    version=version,
+                )
+            else:
+                raise ValueError("Firmware id or project id plus version must be provided")
+        except (SqliteFirmwareNotFoundError, MySQLFirmwareNotFoundError):
+            if firmware_id is not None:
+                logger.info("No uploaded firmware found for firmware_id=%s. Nothing to delete.", firmware_id)
+            else:
+                logger.info("No uploaded firmware found for project_id=%s and version=%s. Nothing to delete.", pid, version)
+            return
+
+        validate_firmware_filename(deleted.filename)
+        project_dir = app_paths.project_dir(deleted.project_name).resolve(strict=False)
+        firmware_file_path = (project_dir / deleted.filename).resolve(strict=False)
+        if firmware_file_path.parent != project_dir:
+            raise ValueError(
+                f"Refusing to delete firmware file outside project directory: {firmware_file_path}"
+            )
+
+        if firmware_file_path.exists():
+            firmware_file_path.unlink()
+            logger.info("Deleted firmware file '%s'", firmware_file_path)
+        else:
+            logger.info(
+                "Firmware file '%s' does not exist on disk; database record has been deleted.",
+                firmware_file_path,
+            )
+        logger.info("Deleted firmware record id=%s", deleted.id)
 
     def _enable_firmware(self) -> None:
         id = self.cfg.config["parameters"]["firmware_id"]

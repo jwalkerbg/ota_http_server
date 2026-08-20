@@ -6,7 +6,7 @@ from datetime import datetime, UTC
 
 from ota_http_server.core.config import Config
 from ota_http_server.database.migration_sqlite3_runner import MigrationRunner
-from ota_http_server.core.data_models import ProjectListItem, User, Project, Device, DeviceListItem, Firmware, FirmwareListItem
+from ota_http_server.core.data_models import ProjectListItem, User, Project, Device, DeviceListItem, Firmware, FirmwareListItem, FirmwareDeleteInfo
 from ota_http_server.core.data_models import AppPaths
 from ota_http_server.logger import get_app_logger
 
@@ -1124,6 +1124,76 @@ class DatabaseSqliteService:
         except sqlite3.Error as e:
             raise DatabaseError(
                 f"Database error updating firmware '{firmware_id}'"
+            ) from e
+
+    def _row_to_firmware_delete_info(self, row: sqlite3.Row) -> FirmwareDeleteInfo:
+        return FirmwareDeleteInfo(
+            id=row["id"],
+            project_name=row["project_name"],
+            filename=row["filename"],
+        )
+
+    def firmware_delete_by_id(self, firmware_id: int) -> FirmwareDeleteInfo:
+        try:
+            with self._connect() as conn:
+                cursor = conn.execute(
+                    """
+                    DELETE FROM firmware
+                    WHERE id = ?
+                    RETURNING
+                        id,
+                        filename,
+                        (
+                            SELECT name
+                            FROM projects
+                            WHERE projects.id = firmware.project_id
+                        ) AS project_name
+                    """,
+                    (firmware_id,),
+                )
+                row = cursor.fetchone()
+                if row is None:
+                    raise FirmwareNotFoundError(f"Firmware id={firmware_id} not found")
+                conn.commit()
+                return self._row_to_firmware_delete_info(row)
+        except sqlite3.Error as e:
+            raise DatabaseError(
+                f"Database error deleting firmware '{firmware_id}'"
+            ) from e
+
+    def firmware_delete_by_project_version(
+        self,
+        project_id: int,
+        version: str,
+    ) -> FirmwareDeleteInfo:
+        try:
+            with self._connect() as conn:
+                cursor = conn.execute(
+                    """
+                    DELETE FROM firmware
+                    WHERE project_id = ?
+                    AND version = ?
+                    RETURNING
+                        id,
+                        filename,
+                        (
+                            SELECT name
+                            FROM projects
+                            WHERE projects.id = firmware.project_id
+                        ) AS project_name
+                    """,
+                    (project_id, version),
+                )
+                row = cursor.fetchone()
+                if row is None:
+                    raise FirmwareNotFoundError(
+                        f"Firmware project_id={project_id}, version={version} not found"
+                    )
+                conn.commit()
+                return self._row_to_firmware_delete_info(row)
+        except sqlite3.Error as e:
+            raise DatabaseError(
+                f"Database error deleting firmware project_id={project_id}, version={version}"
             ) from e
 
     def _firmware_enable_disable(

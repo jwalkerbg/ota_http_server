@@ -2,7 +2,7 @@
 
 from ota_http_server.core.config import Config
 from ota_http_server.database.database_interface import DatabaseInterface
-from ota_http_server.core.data_models import User, Project, ProjectListItem, Device, DeviceListItem, Firmware, FirmwareListItem
+from ota_http_server.core.data_models import User, Project, ProjectListItem, Device, DeviceListItem, Firmware, FirmwareListItem, FirmwareDeleteInfo
 from ota_http_server.logger import get_app_logger
 
 logger = get_app_logger(__name__)
@@ -148,6 +148,19 @@ class DatabaseService:
 
     def firmware_replace(self, firmware_id: int, filename: str, file_size: int, checksum: str) -> Firmware:
         return self._database.firmware_replace(firmware_id=firmware_id, filename=filename, file_size=file_size, checksum=checksum)
+
+    def firmware_delete_by_id(self, firmware_id: int) -> FirmwareDeleteInfo:
+        return self._database.firmware_delete_by_id(firmware_id=firmware_id)
+
+    def firmware_delete_by_project_version(
+        self,
+        project_id: int,
+        version: str,
+    ) -> FirmwareDeleteInfo:
+        return self._database.firmware_delete_by_project_version(
+            project_id=project_id,
+            version=version,
+        )
 
     def firmware_enable_by_id(self, id: int) -> None:
         return self._database.firmware_enable_by_id(id=id)

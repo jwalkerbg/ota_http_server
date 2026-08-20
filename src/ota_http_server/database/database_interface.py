@@ -2,7 +2,7 @@
 
 from typing import Protocol
 
-from ota_http_server.core.data_models import User, Project, ProjectListItem, Device, DeviceListItem, Firmware, FirmwareListItem
+from ota_http_server.core.data_models import User, Project, ProjectListItem, Device, DeviceListItem, Firmware, FirmwareListItem, FirmwareDeleteInfo
 
 class DatabaseInterface(Protocol):
 
@@ -117,6 +117,16 @@ class DatabaseInterface(Protocol):
         ...
 
     def firmware_replace(self, firmware_id: int, filename: str, file_size: int, checksum: str) -> Firmware:
+        ...
+
+    def firmware_delete_by_id(self, firmware_id: int) -> FirmwareDeleteInfo:
+        ...
+
+    def firmware_delete_by_project_version(
+        self,
+        project_id: int,
+        version: str,
+    ) -> FirmwareDeleteInfo:
         ...
 
     def firmware_enable_by_id(self, id: int) -> None:

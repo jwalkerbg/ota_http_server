@@ -314,6 +314,7 @@ ota_http_server firmware get --pid 1 --version 1.2.0
 ota_http_server firmware enable --pid 1 --version 1.2.0
 ota_http_server firmware disable --id 2
 ota_http_server firmware replace --id 2 --file firmware_v1_2_1.bin
+ota_http_server firmware delete --pid 1 --version 1.2.0
 ```
 
 Firmware records include release metadata, binary checksum information, and active/inactive status for OTA distribution.
