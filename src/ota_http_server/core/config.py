@@ -403,6 +403,9 @@ class Config:
                             "dbport": {
                                 "type": "number"
                             },
+                            "database": {
+                                "type": "string"
+                            },
                             "dbuser": {
                                 "type": "string"
                             },
