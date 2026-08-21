@@ -358,8 +358,6 @@ class DeviceListItemFormatter:
             status
         ]
 
-        print(values)
-
         return TableFormatter.format_row(values, cls.COLUMNS)
 
     @classmethod

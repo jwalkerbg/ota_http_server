@@ -30,7 +30,7 @@ class FirmwareService:
 
     def command_handler(self) -> None:
         command = self.cfg.config.get('firmware_command')
-        logger.info("Handling firmware command: %s", command)
+        logger.verbose("Handling firmware command: %s", command)
 
         # these handlers expect their parameters in self.cfg.config
         handlers= {
@@ -47,7 +47,7 @@ class FirmwareService:
         if handler is not None:
             handler()
         else:
-            logger.debug("Invalid firmware command received: %s", command)
+            logger.error("Invalid firmware command received: %s", command)
 
     def _add_firmware(self) -> None:
         pid = self.cfg.config["parameters"]["firmware_pid"]
@@ -266,17 +266,17 @@ class FirmwareService:
         if id is not None:
             firmware = db_service.firmware_get_by_id(id)
             if firmware:
-                logger.verbose("Firmware found: %s", firmware)
+                logger.info("Firmware found: %s", firmware)
             else:
-                logger.verbose("Firmware with ID = %d not found", id)
+                logger.info("Firmware with ID = %d not found", id)
             return
 
         if pid is not None and version is not None:
             firmware = db_service.firmware_get_by_project_version(project_id=pid, version=version)
             if firmware:
-                logger.verbose("Firmware found: %s", firmware)
+                logger.info("Firmware found: %s", firmware)
             else:
-                logger.verbose("Firmware with pid = %d and version = %s not found", pid, version)
+                logger.info("Firmware with pid = %d and version = %s not found", pid, version)
             return
 
         raise ValueError(
@@ -293,13 +293,13 @@ class FirmwareService:
         if self.cfg.config["parameters"]["firmware_record"] == True:
             firmware = db_service.firmware_get_record(is_active=is_active, project_id=project_id)
             if firmware:
-                logger.verbose("\n%s",FirmwareFormatter.format_list(firmware))
+                logger.info("\n%s",FirmwareFormatter.format_list(firmware))
             else:
                 logger.info("No firmware found.")
 
         else:
             firmware = db_service.firmware_get_list(is_active=is_active, project_id=project_id)
             if firmware:
-                logger.verbose("\n%s\n",FirmwareListItemFormatter.format_list(firmware))
+                logger.info("\n%s\n",FirmwareListItemFormatter.format_list(firmware))
             else:
                 logger.info("No firmware found.")

@@ -17,7 +17,7 @@ class UserService:
 
     def command_handler(self) -> None:
         command = self.cfg.config.get('user_command')
-        logger.info("Handling user command: %s", command)
+        logger.verbose("Handling user command: %s", command)
 
         # these handlers expect their parameters in self.cfg.config
         handlers= {
@@ -32,7 +32,7 @@ class UserService:
         if handler is not None:
             handler()
         else:
-            logger.debug("Invalid user command received: %s", command)
+            logger.error("Invalid user command received: %s", command)
 
     def _add_user(self) -> None:
         username = self.cfg.config["parameters"]["username"]
@@ -90,9 +90,9 @@ class UserService:
                 "User id or username must be provided"
             )
         if user is not None:
-            logger.verbose("User found: %s", user)
+            logger.info("User found: %s", user)
         else:
-            logger.verbose("User not found")
+            logger.info("User not found")
 
     def _list_users(self) -> None:
         db_service: DatabaseService = self.cfg.config["db_service"]
@@ -106,9 +106,9 @@ class UserService:
             users = db_service.user_get_list(is_active=is_active)
 
         if users:
-            logger.verbose("\n%s", UserFormatter.format_list(users))
+            logger.info("\n%s", UserFormatter.format_list(users))
         else:
-            logger.verbose("No users found")
+            logger.info("No users found")
 
     # REST API methods for user operations can be added here, e.g., create_user, get_user, update_user, delete_user, etc.
 

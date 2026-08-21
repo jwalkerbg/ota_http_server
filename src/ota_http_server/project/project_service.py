@@ -16,7 +16,7 @@ class ProjectService:
 
     def command_handler(self) -> None:
         command = self.cfg.config.get('project_command')
-        logger.info("Handling project command: %s", command)
+        logger.verbose("Handling project command: %s", command)
 
         # these handlers expect their parameters in self.cfg.config
         handlers= {
@@ -31,7 +31,7 @@ class ProjectService:
         if handler is not None:
             handler()
         else:
-            logger.debug("Invalid project command received: %s", command)
+            logger.error("Invalid project command received: %s", command)
 
     def _add_project(self) -> None:
         name = self.cfg.config["parameters"]["project_name"]
@@ -83,16 +83,16 @@ class ProjectService:
         if project_id is not None:
             project = db_service.project_get_by_id(project_id)
             if project:
-                logger.verbose("Project found: %s", project)
+                logger.info("Project found: %s", project)
             else:
-                logger.verbose("Project with ID %d not found.", project_id)
+                logger.info("Project with ID %d not found.", project_id)
             return
         if project_name is not None:
             project = db_service.project_get_by_name(project_name)
             if project:
-                logger.verbose("Project found: %s", project)
+                logger.info("Project found: %s", project)
             else:
-                logger.verbose("Project with name '%s' not found.", project_name)
+                logger.info("Project with name '%s' not found.", project_name)
             return
 
         raise ValueError(
@@ -105,12 +105,12 @@ class ProjectService:
         if project_record:
             projects = db_service.project_get_record()
             if projects:
-                logger.verbose("\n%s", ProjectFormatter.format_list(projects))
+                logger.info("\n%s", ProjectFormatter.format_list(projects))
             else:
                 logger.info("No projects found.")
         else:
             projects = db_service.project_get_list()
             if projects:
-                logger.verbose("\n%s", ProjectListItemFormatter.format_list(projects))
+                logger.info("\n%s", ProjectListItemFormatter.format_list(projects))
             else:
                 logger.info("No projects found.")

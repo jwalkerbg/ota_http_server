@@ -16,7 +16,7 @@ class DeviceService:
 
     def command_handler(self) -> None:
         command = self.cfg.config.get('device_command')
-        logger.info("Handling device command: %s", command)
+        logger.verbose("Handling device command: %s", command)
 
         # these handlers expect their parameters in self.cfg.config
         handlers= {
@@ -31,7 +31,7 @@ class DeviceService:
         if handler is not None:
             handler()
         else:
-            logger.debug("Invalid device command received: %s", command)
+            logger.error("Invalid device command received: %s", command)
 
     def _add_device(self) -> None:
         uuid = self.cfg.config["parameters"]["device_uuid"]
@@ -103,17 +103,17 @@ class DeviceService:
         if id is not None:
             device = db_service.device_get_by_id(id)
             if device:
-                logger.verbose("Device found: %s", device)
+                logger.info("Device found: %s", device)
             else:
-                logger.verbose("Device with ID %d not found.", id)
+                logger.info("Device with ID %d not found.", id)
             return
 
         if uuid is not None:
             device = db_service.device_get_by_name(uuid)
             if device:
-                logger.verbose("Device found: %s", device)
+                logger.info("Device found: %s", device)
             else:
-                logger.verbose("Device with UUID %s not found", uuid)
+                logger.info("Device with UUID %s not found", uuid)
             return
 
         raise ValueError(
@@ -132,7 +132,7 @@ class DeviceService:
                 project_id=project_id,
             )
             if devices:
-                logger.verbose("\n%s",DeviceFormatter.format_list(devices))
+                logger.info("\n%s",DeviceFormatter.format_list(devices))
             else:
                 logger.info("No devices found.")
         else:
@@ -141,6 +141,6 @@ class DeviceService:
                 project_id=project_id,
             )
             if devices:
-                logger.verbose("\n%s",DeviceListItemFormatter.format_list(devices))
+                logger.info("\n%s",DeviceListItemFormatter.format_list(devices))
             else:
                 logger.info("No devices found.")
