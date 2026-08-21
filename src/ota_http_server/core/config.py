@@ -932,7 +932,7 @@ For use in development environment without SSL certificates and JWT authenticati
 
     # database options
     db_group = parser.add_argument_group("Database")
-    db_group.add_argument("--dbtype", dest="dbtype", type=str, choices=["mysql", "sqlite"], required=True, help="Database type (mysql or sqlite), overrides OTA_DB_TYPE environment variable")
+    db_group.add_argument("--dbtype", dest="dbtype", type=str, choices=["mysql", "sqlite"], required=False, help="Database type (mysql or sqlite), overrides OTA_DB_TYPE environment variable")
     # MySQL options
     db_group.add_argument("--dbhost", dest="dbhost", type=str, help="Database host (default 'localhost'), overrides OTA_DB_HOST environment variable")
     db_group.add_argument("--dbport", dest="dbport", type=int, help="Database port (default 3306), overrides OTA_DB_PORT environment variable")
@@ -953,7 +953,7 @@ For use in development environment without SSL certificates and JWT authenticati
     app_dir_group.add_argument("--app-directory", dest="app_directory", type=str, help="Path to the application directory (default 'C:\\ProgramData\\ota_http_server'), overrides OTA_APP_DIRECTORY environment variable.\nHere the configuration file, audit log and database files are stored.\nIf the directory does not exist, it will be created automatically.")
 
     # application options & parameters
-    subparsers = parser.add_subparsers(dest="command", required=True)
+    subparsers = parser.add_subparsers(dest="command", required=False, help="Sub-command to run. If not specified, no action will be taken.")
 
     run_parser = subparsers.add_parser("runserver", help="Start OTA HTTP server")
 
