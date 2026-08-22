@@ -47,7 +47,7 @@ def run_app(cfg:Config) -> None:
             print("\n=== OTA Server Configuration ===")
             print(f"Listening on {cfg.config['parameters']['host']}:{cfg.config['parameters']['port']}")
             print(f"JWT: {'ENABLED' if not cfg.config['parameters']['no_jwt'] else 'DISABLED'}")
-            print(f"Audit log file: {cfg.config['parameters']['ota_audit_log']}")
+            print(f"Admin activity log file: {cfg.config['parameters']['admin_activity_log']}")
             print("Admin token endpoint: ENABLED (/admin/generate_token)")
             print("===========================================\n")
 

@@ -321,7 +321,7 @@ Firmware records include release metadata, binary checksum information, and acti
 
 ### Administrative activity logging
 
-Administrative CLI activities on data entities are logged to `AppPaths.logs/admin_activity.log` in JSON-lines format.
+Administrative CLI activities on data entities and admin token generation via HTTP are logged to `AppPaths.logs/admin_activity.log` in JSON-lines format.
 Logged actions are:
 
 - `add`
@@ -758,12 +758,13 @@ The `/versions` endpoint verifies the token with `verify_sub=False`, which means
 
 ### Audit logging
 
-Token generation is logged for traceability. On success the server records an audit event with the device ID, project, and expiration time.
+Token generation is logged for traceability through the same admin activity logger used by CLI admin commands.
+On success the server records an event with `interface=http`, `entity=token`, `action=generate`, and target details (IP, device, project, expiration).
 
 Example log entry:
 
-```text
-[2026-08-19T14:00:00+00:00] [AUDIT] device=e6f87d77-4216-4be1-ab83-b5fa6792b747 project=smart_fan exp=1755585600
+```json
+{"action":"generate","entity":"token","interface":"http","outcome":"success","target":{"device_id":"e6f87d77-4216-4be1-ab83-b5fa6792b747","expires_at":1755585600,"ip":"127.0.0.1","project":"smart_fan"},"timestamp":"2026-08-19T14:00:00+00:00"}
 ```
 
 ### Security notes
