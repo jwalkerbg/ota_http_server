@@ -12,12 +12,14 @@ from ota_http_server.database.db_sqlite_service import FirmwareNotFoundError as 
 from ota_http_server.core.formatters import FirmwareFormatter, FirmwareListItemFormatter
 from ota_http_server.firmware.filename_validation import validate_firmware_filename
 from ota_http_server.logger import get_app_logger
+from ota_http_server.logger.admin_activity_logger import normalize_admin_activity_action
 
 logger = get_app_logger(__name__)
 
 class FirmwareService:
     def __init__(self, cfg: Config):
         self.cfg = cfg
+        self.admin_activity_logger = self.cfg.config.get("admin_activity_logger")
 
     def _sha256_file(self, file_path: Path) -> str:
         digest = hashlib.sha256()
@@ -45,9 +47,31 @@ class FirmwareService:
 
         handler = handlers.get(command)
         if handler is not None:
-            handler()
+            action = normalize_admin_activity_action(command)
+            try:
+                handler()
+                self._log_admin_activity(command=action, outcome="success")
+            except Exception as exc:
+                self._log_admin_activity(command=action, outcome="failed", error=str(exc))
+                raise
         else:
             logger.error("Invalid firmware command received: %s", command)
+
+    def _log_admin_activity(self, command: str | None, outcome: str, error: str | None = None) -> None:
+        if command is None or self.admin_activity_logger is None:
+            return
+        self.admin_activity_logger.log_activity(
+            interface="cli",
+            entity="firmware",
+            action=command,
+            outcome=outcome,
+            target={
+                "firmware_id": self.cfg.config["parameters"].get("firmware_id"),
+                "project_id": self.cfg.config["parameters"].get("firmware_pid"),
+                "version": self.cfg.config["parameters"].get("firmware_version"),
+            },
+            error=error,
+        )
 
     def _add_firmware(self) -> None:
         pid = self.cfg.config["parameters"]["firmware_pid"]

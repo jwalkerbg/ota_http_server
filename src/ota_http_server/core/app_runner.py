@@ -11,6 +11,7 @@ from ota_http_server.project.project_service import ProjectService
 from ota_http_server.device.device_service import DeviceService
 from ota_http_server.firmware.firmware_service import FirmwareService
 from ota_http_server.logger import get_app_logger
+from ota_http_server.logger.admin_activity_logger import build_admin_activity_logger
 from ota_http_server.core.data_models import AppPaths
 
 logger = get_app_logger(__name__)
@@ -23,6 +24,7 @@ def run_app(cfg:Config) -> None:
     app_paths = AppPaths(cfg)
     # store app_paths in the configuration so as to access it elsewhere
     cfg.config['parameters']['app_paths'] = app_paths
+    cfg.config["admin_activity_logger"] = build_admin_activity_logger(cfg)
     db_service = DatabaseService(cfg)
     cfg.config["db_service"] = db_service
     user_service = UserService(cfg)
@@ -104,4 +106,3 @@ def run_app(cfg:Config) -> None:
             logger.info("Exiting firmware CLI")
     else:
         logger.warning("Unknown command '%s' specified, no action taken", cfg.config['command'])
-

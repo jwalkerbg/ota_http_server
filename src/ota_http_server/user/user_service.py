@@ -6,12 +6,14 @@ from ota_http_server.core.data_models import User
 from ota_http_server.core.formatters import UserFormatter
 from ota_http_server.database.database_service import DatabaseService
 from ota_http_server.logger import get_app_logger
+from ota_http_server.logger.admin_activity_logger import normalize_admin_activity_action
 
 logger = get_app_logger(__name__)
 
 class UserService:
     def __init__(self, cfg: Config):
         self.cfg = cfg
+        self.admin_activity_logger = self.cfg.config.get("admin_activity_logger")
 
     # CLI command handler for user operations
 
@@ -30,9 +32,30 @@ class UserService:
 
         handler = handlers.get(command)
         if handler is not None:
-            handler()
+            action = normalize_admin_activity_action(command)
+            try:
+                handler()
+                self._log_admin_activity(command=action, outcome="success")
+            except Exception as exc:
+                self._log_admin_activity(command=action, outcome="failed", error=str(exc))
+                raise
         else:
             logger.error("Invalid user command received: %s", command)
+
+    def _log_admin_activity(self, command: str | None, outcome: str, error: str | None = None) -> None:
+        if command is None or self.admin_activity_logger is None:
+            return
+        self.admin_activity_logger.log_activity(
+            interface="cli",
+            entity="user",
+            action=command,
+            outcome=outcome,
+            target={
+                "user_id": self.cfg.config["parameters"].get("user_id"),
+                "username": self.cfg.config["parameters"].get("username"),
+            },
+            error=error,
+        )
 
     def _add_user(self) -> None:
         username = self.cfg.config["parameters"]["username"]

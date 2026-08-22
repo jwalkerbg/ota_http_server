@@ -47,6 +47,12 @@ class ParametersConfig(TypedDict, total=False):
     firmware_dir: str
     url_firmware: str
     ota_audit_log: str
+    admin_activity_log: str
+    log_rotation_strategy: str
+    log_rotation_max_bytes: int
+    log_rotation_backup_count: int
+    log_rotation_when: str
+    log_rotation_interval: int
     app_directory: str
     init_db_migrate: bool
     migrate_dry_run: bool
@@ -148,6 +154,12 @@ class Config:
             'firmware_dir': "firmware",
             'url_firmware': "firmware",
             'ota_audit_log': "ota_audit_log.csv",
+            "admin_activity_log": "admin_activity.log",
+            "log_rotation_strategy": "hybrid",
+            "log_rotation_max_bytes": 10 * 1024 * 1024,
+            "log_rotation_backup_count": 14,
+            "log_rotation_when": "midnight",
+            "log_rotation_interval": 1,
             'app_directory': "C:\\ProgramData\\ota_http_server",
             'init_db_migrate': True,
             'migrate_dry_run': False,
@@ -285,6 +297,25 @@ class Config:
                     },
                     "ota_audit_log": {
                         "type": "string"
+                    },
+                    "admin_activity_log": {
+                        "type": "string"
+                    },
+                    "log_rotation_strategy": {
+                        "type": "string",
+                        "enum": ["size", "time", "hybrid"]
+                    },
+                    "log_rotation_max_bytes": {
+                        "type": "number"
+                    },
+                    "log_rotation_backup_count": {
+                        "type": "number"
+                    },
+                    "log_rotation_when": {
+                        "type": "string"
+                    },
+                    "log_rotation_interval": {
+                        "type": "number"
                     },
                     "app_directory": {
                         "type": "string"
@@ -525,6 +556,12 @@ class Config:
                 "jwt_secret": os.getenv("OTA_JWT_SECRET"),
                 "admin_secret": os.getenv("OTA_ADMIN_SECRET"),
                 "ota_audit_log": os.getenv("OTA_AUDIT_LOG"),
+                "admin_activity_log": os.getenv("OTA_ADMIN_ACTIVITY_LOG"),
+                "log_rotation_strategy": os.getenv("OTA_LOG_ROTATION_STRATEGY"),
+                "log_rotation_max_bytes": os.getenv("OTA_LOG_ROTATION_MAX_BYTES"),
+                "log_rotation_backup_count": os.getenv("OTA_LOG_ROTATION_BACKUP_COUNT"),
+                "log_rotation_when": os.getenv("OTA_LOG_ROTATION_WHEN"),
+                "log_rotation_interval": os.getenv("OTA_LOG_ROTATION_INTERVAL"),
                 "jwt_issuer": os.getenv("OTA_JWT_ISSUER"),
                 "jwt_audience": os.getenv("OTA_JWT_AUDIENCE"),
                 "app_directory": os.getenv("OTA_APP_DIRECTORY")
@@ -569,6 +606,18 @@ class Config:
                 self.config['logging']['use_color'] = config_cli.use_color
             if config_cli.use_string_handler is not None:
                 self.config['logging']['use_string_handler'] = config_cli.use_string_handler
+            if getattr(config_cli, "admin_activity_log", None) is not None:
+                self.config["parameters"]["admin_activity_log"] = config_cli.admin_activity_log
+            if getattr(config_cli, "log_rotation_strategy", None) is not None:
+                self.config["parameters"]["log_rotation_strategy"] = config_cli.log_rotation_strategy
+            if getattr(config_cli, "log_rotation_max_bytes", None) is not None:
+                self.config["parameters"]["log_rotation_max_bytes"] = config_cli.log_rotation_max_bytes
+            if getattr(config_cli, "log_rotation_backup_count", None) is not None:
+                self.config["parameters"]["log_rotation_backup_count"] = config_cli.log_rotation_backup_count
+            if getattr(config_cli, "log_rotation_when", None) is not None:
+                self.config["parameters"]["log_rotation_when"] = config_cli.log_rotation_when
+            if getattr(config_cli, "log_rotation_interval", None) is not None:
+                self.config["parameters"]["log_rotation_interval"] = config_cli.log_rotation_interval
 
             # Handle database options
             if config_cli.dbtype is not None:
@@ -871,6 +920,12 @@ Environment variables:
   OTA_JWT_ISSUER          JWT issuer claim value, can be overridden by --jwt-issuer CLI option
   OTA_JWT_AUDIENCE        JWT audience claim value, can be overridden by --jwt-audience CLI option
   OTA_AUDIT_LOG           Path to the OTA audit log file (default 'ota_audit_log.csv'), can be overridden by --ota-audit-log CLI option
+  OTA_ADMIN_ACTIVITY_LOG  Path to the admin activity log file in AppPaths.logs (default 'admin_activity.log')
+  OTA_LOG_ROTATION_STRATEGY Rotation strategy for rotating logs: size, time, hybrid (default 'hybrid')
+  OTA_LOG_ROTATION_MAX_BYTES Size threshold in bytes for size/hybrid rotation (default 10485760)
+  OTA_LOG_ROTATION_BACKUP_COUNT Number of rotated files to keep (default 14)
+  OTA_LOG_ROTATION_WHEN   Time-based rotation schedule (default 'midnight')
+  OTA_LOG_ROTATION_INTERVAL Interval for time-based rotation (default 1)
   OTA_DB                  Path to the OTA database file (default 'ota_db.toml'), can be overridden by --ota-db CLI option
   OTA_DB_CACHE_TTL        Cache time-to-live for the OTA database in seconds (default 300), can be overridden by --ota-db-cache-ttl CLI option
   OTA_DB_HOST             Database host (default 'localhost'), can be overridden by --dbhost CLI option
@@ -926,6 +981,12 @@ For use in development environment without SSL certificates and JWT authenticati
     string_handler_group = logging_group.add_mutually_exclusive_group()
     string_handler_group.add_argument("--use-string-handler", action="store_const", const=True, dest="use_string_handler", help="Enable string handler to store logs in an internal buffer")
     string_handler_group.add_argument("--no-use-string-handler", action="store_const", const=False, dest="use_string_handler", help="Disable string handler to store logs in an internal buffer")
+    logging_group.add_argument("--admin-activity-log", dest="admin_activity_log", help="Admin activity log file name in AppPaths.logs (default 'admin_activity.log')")
+    logging_group.add_argument("--log-rotation-strategy", dest="log_rotation_strategy", choices=["size", "time", "hybrid"], help="Rotation strategy for rotating logs: size, time, hybrid")
+    logging_group.add_argument("--log-rotation-max-bytes", dest="log_rotation_max_bytes", type=int, help="Maximum size in bytes before rotating for size/hybrid strategies")
+    logging_group.add_argument("--log-rotation-backup-count", dest="log_rotation_backup_count", type=int, help="Number of rotated files to keep")
+    logging_group.add_argument("--log-rotation-when", dest="log_rotation_when", help="Timed rotation schedule, e.g. midnight, D, H")
+    logging_group.add_argument("--log-rotation-interval", dest="log_rotation_interval", type=int, help="Timed rotation interval")
     exception_group = logging_group.add_mutually_exclusive_group()
     exception_group.add_argument("--exc-full-stack", action="store_const", const=True, dest='exc_full_stack', help="Enable full stack logging for exceptions (useful for development and debugging)")
     exception_group.add_argument("--no-exc-full-stack", action="store_const", const=False, dest='exc_full_stack', help="Disable full stack logging for exceptions (useful for production)")

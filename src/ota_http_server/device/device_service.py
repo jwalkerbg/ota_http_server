@@ -5,12 +5,14 @@ from ota_http_server.core.data_models import User, Project, Device
 from ota_http_server.database.database_service import DatabaseService
 from ota_http_server.core.formatters import DeviceFormatter, DeviceListItemFormatter
 from ota_http_server.logger import get_app_logger
+from ota_http_server.logger.admin_activity_logger import normalize_admin_activity_action
 
 logger = get_app_logger(__name__)
 
 class DeviceService:
     def __init__(self, cfg: Config):
         self.cfg = cfg
+        self.admin_activity_logger = self.cfg.config.get("admin_activity_logger")
 
     # CLI command handler for user operations
 
@@ -29,9 +31,31 @@ class DeviceService:
 
         handler = handlers.get(command)
         if handler is not None:
-            handler()
+            action = normalize_admin_activity_action(command)
+            try:
+                handler()
+                self._log_admin_activity(command=action, outcome="success")
+            except Exception as exc:
+                self._log_admin_activity(command=action, outcome="failed", error=str(exc))
+                raise
         else:
             logger.error("Invalid device command received: %s", command)
+
+    def _log_admin_activity(self, command: str | None, outcome: str, error: str | None = None) -> None:
+        if command is None or self.admin_activity_logger is None:
+            return
+        self.admin_activity_logger.log_activity(
+            interface="cli",
+            entity="device",
+            action=command,
+            outcome=outcome,
+            target={
+                "device_id": self.cfg.config["parameters"].get("device_id"),
+                "device_uuid": self.cfg.config["parameters"].get("device_uuid"),
+                "project_id": self.cfg.config["parameters"].get("device_pid"),
+            },
+            error=error,
+        )
 
     def _add_device(self) -> None:
         uuid = self.cfg.config["parameters"]["device_uuid"]
@@ -62,7 +86,7 @@ class DeviceService:
 
     def _enable_device(self) -> None:
         id = self.cfg.config["parameters"]["device_id"]
-        uuid = self.cfg.config["parameters"]["device_pid"]
+        uuid = self.cfg.config["parameters"]["device_uuid"]
 
         db_service: DatabaseService = self.cfg.config["db_service"]
 
@@ -79,7 +103,7 @@ class DeviceService:
 
     def _disable_device(self) -> None:
         id = self.cfg.config["parameters"]["device_id"]
-        uuid = self.cfg.config["parameters"]["device_pid"]
+        uuid = self.cfg.config["parameters"]["device_uuid"]
 
         db_service: DatabaseService = self.cfg.config["db_service"]
 
@@ -96,7 +120,7 @@ class DeviceService:
 
     def _get_device(self) -> None:
         id = self.cfg.config["parameters"]["device_id"]
-        uuid = self.cfg.config["parameters"]["device_pid"]
+        uuid = self.cfg.config["parameters"]["device_uuid"]
 
         db_service: DatabaseService = self.cfg.config["db_service"]
 

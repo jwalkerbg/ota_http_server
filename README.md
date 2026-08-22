@@ -319,6 +319,28 @@ ota_http_server firmware delete --pid 1 --version 1.2.0
 
 Firmware records include release metadata, binary checksum information, and active/inactive status for OTA distribution.
 
+### Administrative activity logging
+
+Administrative CLI activities on data entities are logged to `AppPaths.logs/admin_activity.log` in JSON-lines format.
+Logged actions are:
+
+- `add`
+- `enable`
+- `disable`
+- `remove` (mapped from firmware `delete`)
+- `list`
+- `get`
+
+Firmware download requests are intentionally not written to this file.
+
+Supported rotation criteria for this log (and reusable for other logs) are:
+
+- `size` (rotate when file reaches a max size)
+- `time` (rotate on schedule, e.g. daily at midnight UTC)
+- `hybrid` (rotate on size or schedule, whichever comes first)
+
+Current default: `hybrid` with daily midnight UTC + size cap.
+
 ## Editable project - directory Structure
 
 ```
@@ -362,6 +384,8 @@ Example defaults include:
 * JWT algorithm: "HS256"
 * JWT expiry: 30 minutes
 * Audit log file: "ota_audit.log"
+* Admin activity log file: "admin_activity.log"
+* Rotation strategy: "hybrid" (daily midnight UTC or max size, whichever comes first)
 * Firmware directories: "firmware", "www"
 
 ### Configuration File (`config.toml`)
@@ -396,6 +420,12 @@ For `dynamic runtime overrides`, the server can read environment variables. Thes
 * "jwt_secret": os.getenv("OTA_JWT_SECRET"),
 * "admin_secret": os.getenv("OTA_ADMIN_SECRET"),
 * "ota_audit_log": os.getenv("OTA_AUDIT_LOG")
+* "admin_activity_log": os.getenv("OTA_ADMIN_ACTIVITY_LOG")
+* "log_rotation_strategy": os.getenv("OTA_LOG_ROTATION_STRATEGY")
+* "log_rotation_max_bytes": os.getenv("OTA_LOG_ROTATION_MAX_BYTES")
+* "log_rotation_backup_count": os.getenv("OTA_LOG_ROTATION_BACKUP_COUNT")
+* "log_rotation_when": os.getenv("OTA_LOG_ROTATION_WHEN")
+* "log_rotation_interval": os.getenv("OTA_LOG_ROTATION_INTERVAL")
 * "jwt_issuer": os.getenv("OTA_JWT_ISSUER"),
 * "jwt_audience": os.getenv("OTA_JWT_AUDIENCE"),
 * "ota_db": os.getenv("OTA_DATABASE"),

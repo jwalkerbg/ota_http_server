@@ -5,12 +5,14 @@ from ota_http_server.core.data_models import User, Project
 from ota_http_server.core.formatters import ProjectFormatter,ProjectListItemFormatter
 from ota_http_server.database.database_service import DatabaseService
 from ota_http_server.logger import get_app_logger
+from ota_http_server.logger.admin_activity_logger import normalize_admin_activity_action
 
 logger = get_app_logger(__name__)
 
 class ProjectService:
     def __init__(self, cfg: Config):
         self.cfg = cfg
+        self.admin_activity_logger = self.cfg.config.get("admin_activity_logger")
 
     # CLI command handler for user operations
 
@@ -29,9 +31,30 @@ class ProjectService:
 
         handler = handlers.get(command)
         if handler is not None:
-            handler()
+            action = normalize_admin_activity_action(command)
+            try:
+                handler()
+                self._log_admin_activity(command=action, outcome="success")
+            except Exception as exc:
+                self._log_admin_activity(command=action, outcome="failed", error=str(exc))
+                raise
         else:
             logger.error("Invalid project command received: %s", command)
+
+    def _log_admin_activity(self, command: str | None, outcome: str, error: str | None = None) -> None:
+        if command is None or self.admin_activity_logger is None:
+            return
+        self.admin_activity_logger.log_activity(
+            interface="cli",
+            entity="project",
+            action=command,
+            outcome=outcome,
+            target={
+                "project_id": self.cfg.config["parameters"].get("project_id"),
+                "project_name": self.cfg.config["parameters"].get("project_name"),
+            },
+            error=error,
+        )
 
     def _add_project(self) -> None:
         name = self.cfg.config["parameters"]["project_name"]
