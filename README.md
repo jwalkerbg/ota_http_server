@@ -406,7 +406,6 @@ admin_secret = "adminsecret"
 www_dir = "www"
 firmware_dir = "firmware"
 url_firmware = "firmware"
-ota_audit_log = "ota_audit.log"
 ```
 Note: In the configuration file, keys use `underscores` (`_`), while the corresponding CLI options use `hyphens` (`-`).
 
@@ -419,7 +418,6 @@ For `dynamic runtime overrides`, the server can read environment variables. Thes
 * "jwt_max_expiry": os.getenv("OTA_JWT_MAX_EXPIRY_SECONDS"),
 * "jwt_secret": os.getenv("OTA_JWT_SECRET"),
 * "admin_secret": os.getenv("OTA_ADMIN_SECRET"),
-* "ota_audit_log": os.getenv("OTA_AUDIT_LOG")
 * "admin_activity_log": os.getenv("OTA_ADMIN_ACTIVITY_LOG")
 * "log_rotation_strategy": os.getenv("OTA_LOG_ROTATION_STRATEGY")
 * "log_rotation_max_bytes": os.getenv("OTA_LOG_ROTATION_MAX_BYTES")

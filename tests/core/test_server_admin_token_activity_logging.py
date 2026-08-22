@@ -21,7 +21,6 @@ def _make_server_config(tmp_path, admin_activity_logger):
                 "jwt_issuer": "issuer",
                 "jwt_audience": "audience",
                 "admin_secret": "super-admin-secret",
-                "ota_audit_log": "audit.csv",
                 "app_paths": SimpleNamespace(
                     project_dir=lambda project_name: tmp_path / project_name,
                     logs_dir=tmp_path,

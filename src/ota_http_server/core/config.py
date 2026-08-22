@@ -46,7 +46,6 @@ class ParametersConfig(TypedDict, total=False):
     www_dir: str
     firmware_dir: str
     url_firmware: str
-    ota_audit_log: str
     admin_activity_log: str
     log_rotation_strategy: str
     log_rotation_max_bytes: int
@@ -153,7 +152,6 @@ class Config:
             'www_dir': "www",
             'firmware_dir': "firmware",
             'url_firmware': "firmware",
-            'ota_audit_log': "ota_audit_log.csv",
             "admin_activity_log": "admin_activity.log",
             "log_rotation_strategy": "hybrid",
             "log_rotation_max_bytes": 10 * 1024 * 1024,
@@ -293,9 +291,6 @@ class Config:
                         "type": "string"
                     },
                     "url_firmware": {
-                        "type": "string"
-                    },
-                    "ota_audit_log": {
                         "type": "string"
                     },
                     "admin_activity_log": {
@@ -555,7 +550,6 @@ class Config:
                 "jwt_max_expiry": os.getenv("OTA_JWT_MAX_EXPIRY_SECONDS"),
                 "jwt_secret": os.getenv("OTA_JWT_SECRET"),
                 "admin_secret": os.getenv("OTA_ADMIN_SECRET"),
-                "ota_audit_log": os.getenv("OTA_AUDIT_LOG"),
                 "admin_activity_log": os.getenv("OTA_ADMIN_ACTIVITY_LOG"),
                 "log_rotation_strategy": os.getenv("OTA_LOG_ROTATION_STRATEGY"),
                 "log_rotation_max_bytes": os.getenv("OTA_LOG_ROTATION_MAX_BYTES"),
@@ -679,9 +673,6 @@ class Config:
                     self.config['parameters']['firmware_dir'] = config_cli.firmware_dir
                 if config_cli.url_firmware is not None:
                     self.config['parameters']['url_firmware'] = config_cli.url_firmware
-                # logging parameters
-                if config_cli.ota_audit_log is not None:
-                    self.config['parameters']['ota_audit_log'] = config_cli.ota_audit_log
 
             if config_cli.command == 'db':
                 if config_cli.db_command is not None:
@@ -919,7 +910,6 @@ Environment variables:
   OTA_ADMIN_SECRET        Admin secret key, can be overridden by --admin-secret CLI option
   OTA_JWT_ISSUER          JWT issuer claim value, can be overridden by --jwt-issuer CLI option
   OTA_JWT_AUDIENCE        JWT audience claim value, can be overridden by --jwt-audience CLI option
-  OTA_AUDIT_LOG           Path to the OTA audit log file (default 'ota_audit_log.csv'), can be overridden by --ota-audit-log CLI option
   OTA_ADMIN_ACTIVITY_LOG  Path to the admin activity log file in AppPaths.logs (default 'admin_activity.log')
   OTA_LOG_ROTATION_STRATEGY Rotation strategy for rotating logs: size, time, hybrid (default 'hybrid')
   OTA_LOG_ROTATION_MAX_BYTES Size threshold in bytes for size/hybrid rotation (default 10485760)
@@ -1047,9 +1037,6 @@ For use in development environment without SSL certificates and JWT authenticati
     server_group.add_argument("--www-dir", dest="www_dir", help="Root directory for files (default 'www')")
     server_group.add_argument("--firmware-dir", dest="firmware_dir", help="Subdirectory for firmware files (default 'firmware')")
     server_group.add_argument("--url-firmware", dest="url_firmware", help="The URL path segment for firmware (default 'firmware', corresponds with `firmware-dir`)")
-
-    logging_group = run_parser.add_argument_group("Logging")
-    logging_group.add_argument("--ota-audit-log", dest="ota_audit_log", help="Path to the OTA audit log file (default 'ota_audit_log.csv'), overrides OTA_AUDIT_LOG environment variable")
 
     # db
     db_parser = subparsers.add_parser(name="db", help="Database operations")
