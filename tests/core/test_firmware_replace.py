@@ -151,7 +151,6 @@ def test_firmware_route_rejects_unsafe_stored_filename(tmp_path, monkeypatch):
             "jwt_issuer": "issuer",
             "jwt_audience": "audience",
             "admin_secret": None,
-            "ota_audit_log": "audit.csv",
             "app_paths": SimpleNamespace(project_dir=lambda project_name: project_dir, logs_dir=tmp_path),
         }
     }
@@ -214,7 +213,6 @@ def test_latest_firmware_route_rejects_unsafe_stored_filename(tmp_path, monkeypa
             "jwt_issuer": "issuer",
             "jwt_audience": "audience",
             "admin_secret": None,
-            "ota_audit_log": "audit.csv",
             "app_paths": SimpleNamespace(project_dir=lambda project_name: project_dir, logs_dir=tmp_path),
         }
     }
