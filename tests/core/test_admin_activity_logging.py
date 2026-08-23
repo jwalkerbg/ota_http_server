@@ -1,4 +1,5 @@
 import json
+from datetime import datetime, timezone
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
@@ -55,6 +56,27 @@ def test_create_rotating_file_handler_hybrid_strategy(tmp_path):
 
     handler = create_rotating_file_handler(log_path, policy)
     assert isinstance(handler, SizeAndTimeRotatingFileHandler)
+
+
+def test_time_rotation_names_date_before_extension(tmp_path):
+    log_path = tmp_path / "admin_activity.log"
+    policy = RotationPolicy(
+        strategy="time",
+        max_bytes=0,
+        backup_count=3,
+        when="midnight",
+        interval=1,
+        utc=True,
+    )
+
+    handler = create_rotating_file_handler(log_path, policy)
+    handler.rolloverAt = int(datetime(2026, 8, 23, 0, 0, tzinfo=timezone.utc).timestamp())
+    handler.stream = handler._open()
+    handler.doRollover()
+
+    rotated_path = tmp_path / "admin_activity-2026-08-22.log"
+    assert rotated_path.exists()
+    assert not (tmp_path / "admin_activity.log.2026-08-22").exists()
 
 
 def test_user_service_logs_admin_activity_for_cli_list():

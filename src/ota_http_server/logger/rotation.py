@@ -1,4 +1,6 @@
 import logging
+import os
+import re
 from dataclasses import dataclass
 from logging.handlers import RotatingFileHandler, TimedRotatingFileHandler
 from pathlib import Path
@@ -14,7 +16,54 @@ class RotationPolicy:
     utc: bool
 
 
-class SizeAndTimeRotatingFileHandler(TimedRotatingFileHandler):
+class DateAwareTimedRotatingFileHandler(TimedRotatingFileHandler):
+    """Rotate logs to names like "app-2026-08-22.log" instead of "app.log.2026-08-22"."""
+
+    _DATE_SUFFIX_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+    def __init__(
+        self,
+        filename: str,
+        when: str = "midnight",
+        interval: int = 1,
+        backupCount: int = 0,
+        encoding: str | None = None,
+        delay: bool = False,
+        utc: bool = False,
+        atTime=None,
+        errors: str | None = None,
+    ):
+        super().__init__(
+            filename=filename,
+            when=when,
+            interval=interval,
+            backupCount=backupCount,
+            encoding=encoding,
+            delay=delay,
+            utc=utc,
+            atTime=atTime,
+            errors=errors,
+        )
+        self.namer = self._date_namer
+
+    def _date_namer(self, default_name: str) -> str:
+        directory, file_name = os.path.split(default_name)
+        if "." not in file_name:
+            return default_name
+
+        rotated_name, date_suffix = file_name.rsplit(".", 1)
+        if not self._DATE_SUFFIX_RE.fullmatch(date_suffix):
+            return default_name
+
+        stem, extension = os.path.splitext(rotated_name)
+        if not extension:
+            return default_name
+
+        new_file_name = f"{stem}-{date_suffix}{extension}"
+        return os.path.join(directory, new_file_name) if directory else new_file_name
+
+
+class SizeAndTimeRotatingFileHandler(DateAwareTimedRotatingFileHandler):
     """Rotate when either time or size limits are reached."""
 
     def __init__(
@@ -74,7 +123,7 @@ def create_rotating_file_handler(log_file_path: Path, policy: RotationPolicy) ->
         )
 
     if strategy == "time":
-        return TimedRotatingFileHandler(
+        return DateAwareTimedRotatingFileHandler(
             filename=log_file,
             when=policy.when,
             interval=max(1, int(policy.interval)),
