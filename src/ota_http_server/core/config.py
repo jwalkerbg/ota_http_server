@@ -47,6 +47,8 @@ class ParametersConfig(TypedDict, total=False):
     firmware_dir: str
     url_firmware: str
     admin_activity_log: str
+    ota_download_log: str
+    ota_audit_log: str
     log_rotation_strategy: str
     log_rotation_max_bytes: int
     log_rotation_backup_count: int
@@ -153,6 +155,8 @@ class Config:
             'firmware_dir': "firmware",
             'url_firmware': "firmware",
             "admin_activity_log": "admin_activity.log",
+            "ota_download_log": "ota_download.log",
+            "ota_audit_log": "ota_download.log",
             "log_rotation_strategy": "hybrid",
             "log_rotation_max_bytes": 10 * 1024 * 1024,
             "log_rotation_backup_count": 14,
@@ -294,6 +298,12 @@ class Config:
                         "type": "string"
                     },
                     "admin_activity_log": {
+                        "type": "string"
+                    },
+                    "ota_download_log": {
+                        "type": "string"
+                    },
+                    "ota_audit_log": {
                         "type": "string"
                     },
                     "log_rotation_strategy": {
@@ -551,6 +561,8 @@ class Config:
                 "jwt_secret": os.getenv("OTA_JWT_SECRET"),
                 "admin_secret": os.getenv("OTA_ADMIN_SECRET"),
                 "admin_activity_log": os.getenv("OTA_ADMIN_ACTIVITY_LOG"),
+                "ota_download_log": os.getenv("OTA_OTA_DOWNLOAD_LOG") or os.getenv("OTA_OTA_AUDIT_LOG") or os.getenv("OTA_SERVER_OTA_LOG"),
+                "ota_audit_log": os.getenv("OTA_OTA_AUDIT_LOG") or os.getenv("OTA_OTA_DOWNLOAD_LOG") or os.getenv("OTA_SERVER_OTA_LOG"),
                 "log_rotation_strategy": os.getenv("OTA_LOG_ROTATION_STRATEGY"),
                 "log_rotation_max_bytes": os.getenv("OTA_LOG_ROTATION_MAX_BYTES"),
                 "log_rotation_backup_count": os.getenv("OTA_LOG_ROTATION_BACKUP_COUNT"),
@@ -602,6 +614,12 @@ class Config:
                 self.config['logging']['use_string_handler'] = config_cli.use_string_handler
             if getattr(config_cli, "admin_activity_log", None) is not None:
                 self.config["parameters"]["admin_activity_log"] = config_cli.admin_activity_log
+            if getattr(config_cli, "ota_download_log", None) is not None:
+                self.config["parameters"]["ota_download_log"] = config_cli.ota_download_log
+                self.config["parameters"]["ota_audit_log"] = config_cli.ota_download_log
+            if getattr(config_cli, "ota_audit_log", None) is not None:
+                self.config["parameters"]["ota_audit_log"] = config_cli.ota_audit_log
+                self.config["parameters"]["ota_download_log"] = config_cli.ota_audit_log
             if getattr(config_cli, "log_rotation_strategy", None) is not None:
                 self.config["parameters"]["log_rotation_strategy"] = config_cli.log_rotation_strategy
             if getattr(config_cli, "log_rotation_max_bytes", None) is not None:
@@ -911,6 +929,8 @@ Environment variables:
   OTA_JWT_ISSUER          JWT issuer claim value, can be overridden by --jwt-issuer CLI option
   OTA_JWT_AUDIENCE        JWT audience claim value, can be overridden by --jwt-audience CLI option
   OTA_ADMIN_ACTIVITY_LOG  Path to the admin activity log file in AppPaths.logs (default 'admin_activity.log')
+  OTA_OTA_DOWNLOAD_LOG    Path to the OTA download request log file in AppPaths.logs (default 'ota_download.log')
+  OTA_OTA_AUDIT_LOG       Alias for OTA_OTA_DOWNLOAD_LOG
   OTA_LOG_ROTATION_STRATEGY Rotation strategy for rotating logs: size, time, hybrid (default 'hybrid')
   OTA_LOG_ROTATION_MAX_BYTES Size threshold in bytes for size/hybrid rotation (default 10485760)
   OTA_LOG_ROTATION_BACKUP_COUNT Number of rotated files to keep (default 14)
@@ -972,6 +992,8 @@ For use in development environment without SSL certificates and JWT authenticati
     string_handler_group.add_argument("--use-string-handler", action="store_const", const=True, dest="use_string_handler", help="Enable string handler to store logs in an internal buffer")
     string_handler_group.add_argument("--no-use-string-handler", action="store_const", const=False, dest="use_string_handler", help="Disable string handler to store logs in an internal buffer")
     logging_group.add_argument("--admin-activity-log", dest="admin_activity_log", help="Admin activity log file name in AppPaths.logs (default 'admin_activity.log')")
+    logging_group.add_argument("--ota-download-log", dest="ota_download_log", help="OTA download request log file name in AppPaths.logs (default 'ota_download.log')")
+    logging_group.add_argument("--ota-audit-log", dest="ota_audit_log", help="Alias for --ota-download-log")
     logging_group.add_argument("--log-rotation-strategy", dest="log_rotation_strategy", choices=["size", "time", "hybrid"], help="Rotation strategy for rotating logs: size, time, hybrid")
     logging_group.add_argument("--log-rotation-max-bytes", dest="log_rotation_max_bytes", type=int, help="Maximum size in bytes before rotating for size/hybrid strategies")
     logging_group.add_argument("--log-rotation-backup-count", dest="log_rotation_backup_count", type=int, help="Number of rotated files to keep")

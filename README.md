@@ -759,10 +759,12 @@ The `/versions` endpoint verifies the token with `verify_sub=False`, which means
 Token generation is logged for traceability through the same admin activity logger used by CLI admin commands.
 On success the server records an event with `interface=http`, `entity=token`, `action=generate`, and target details (IP, device, project, expiration).
 
+Firmware download requests are logged to a separate rotatable log file, `ota_download.log`, using the same JSON event format and rotation policy as the admin activity log. The OTA request logger records the project, version, route, IP address, HTTP status code, and outcome for `/firmware/<project>/<version>`, `/firmware/<project>/latest`, and `/firmware/<project>/versions` requests.
+
 Example log entry:
 
 ```json
-{"action":"generate","entity":"token","interface":"http","outcome":"success","target":{"device_id":"e6f87d77-4216-4be1-ab83-b5fa6792b747","expires_at":1755585600,"ip":"127.0.0.1","project":"smart_fan"},"timestamp":"2026-08-19T14:00:00+00:00"}
+{"action":"download","entity":"firmware","interface":"http","outcome":"success","target":{"ip":"127.0.0.1","path":"/firmware/smart_fan/2.0.0","project":"smart_fan","status_code":200,"version":"2.0.0"},"timestamp":"2026-08-19T14:00:00+00:00"}
 ```
 
 ### Security notes

@@ -21,11 +21,11 @@ def normalize_admin_activity_action(action: str | None) -> str | None:
     return None
 
 
-class AdminActivityLogger:
-    def __init__(self, log_file_path: Path, rotation_policy: RotationPolicy):
+class JsonFileLogger:
+    def __init__(self, log_file_path: Path, rotation_policy: RotationPolicy, *, logger_name: str):
         self.log_file_path = log_file_path
         self.rotation_policy = rotation_policy
-        self._logger_name = f"ota_http_server.admin_activity.{self.log_file_path}"
+        self._logger_name = logger_name
         self._logger = logging.getLogger(self._logger_name)
         self._configure_logger()
 
@@ -40,7 +40,7 @@ class AdminActivityLogger:
         handler.setFormatter(logging.Formatter("%(message)s"))
         self._logger.addHandler(handler)
 
-    def log_activity(
+    def log_event(
         self,
         *,
         interface: str,
@@ -64,18 +64,96 @@ class AdminActivityLogger:
         self._logger.info(json.dumps(event, separators=(",", ":"), sort_keys=True))
 
 
-def build_admin_activity_logger(cfg: Any) -> AdminActivityLogger:
-    app_paths = cfg.config["parameters"]["app_paths"]
+class AdminActivityLogger(JsonFileLogger):
+    def __init__(self, log_file_path: Path, rotation_policy: RotationPolicy):
+        super().__init__(
+            log_file_path,
+            rotation_policy,
+            logger_name=f"ota_http_server.admin_activity.{log_file_path.name}",
+        )
 
-    log_name = cfg.config["parameters"]["admin_activity_log"]
+    def log_activity(
+        self,
+        *,
+        interface: str,
+        entity: str,
+        action: str,
+        outcome: str,
+        target: dict[str, Any] | None = None,
+        error: str | None = None,
+    ) -> None:
+        self.log_event(
+            interface=interface,
+            entity=entity,
+            action=action,
+            outcome=outcome,
+            target=target,
+            error=error,
+        )
+
+
+class ServerOtaLogger(JsonFileLogger):
+    def __init__(self, log_file_path: Path, rotation_policy: RotationPolicy):
+        super().__init__(
+            log_file_path,
+            rotation_policy,
+            logger_name=f"ota_http_server.ota_download.{log_file_path.name}",
+        )
+
+    def log_activity(
+        self,
+        *,
+        interface: str,
+        action: str,
+        outcome: str,
+        target: dict[str, Any] | None = None,
+        error: str | None = None,
+    ) -> None:
+        self.log_download(
+            interface=interface,
+            action=action,
+            outcome=outcome,
+            target=target,
+            error=error,
+        )
+
+    def log_download(
+        self,
+        *,
+        interface: str,
+        action: str,
+        outcome: str,
+        target: dict[str, Any] | None = None,
+        error: str | None = None,
+    ) -> None:
+        self.log_event(
+            interface=interface,
+            entity="firmware",
+            action=action,
+            outcome=outcome,
+            target=target,
+            error=error,
+        )
+
+
+def _resolve_log_path(cfg: Any, *, log_key: str, default_log_name: str) -> Path:
+    app_paths = cfg.config["parameters"]["app_paths"]
+    settings = cfg.config["parameters"]
+    log_name = settings.get(log_key)
+    if log_name is None and log_key == "ota_download_log":
+        log_name = settings.get("ota_audit_log") or default_log_name
+    if log_name is None:
+        log_name = default_log_name
     log_name_path = Path(log_name)
     if log_name_path.name != log_name:
         raise ValueError(
-            f"Admin activity log must be a file name inside logs directory. Received: {log_name}"
+            f"Log file must be a file name inside logs directory. Received: {log_name}"
         )
+    return (app_paths.logs_dir / log_name_path).resolve()
 
-    log_file_path = (app_paths.logs_dir / log_name_path).resolve()
-    rotation_policy = RotationPolicy(
+
+def _rotation_policy_from_cfg(cfg: Any) -> RotationPolicy:
+    return RotationPolicy(
         strategy=str(cfg.config["parameters"]["log_rotation_strategy"]),
         max_bytes=int(cfg.config["parameters"]["log_rotation_max_bytes"]),
         backup_count=int(cfg.config["parameters"]["log_rotation_backup_count"]),
@@ -83,4 +161,13 @@ def build_admin_activity_logger(cfg: Any) -> AdminActivityLogger:
         interval=int(cfg.config["parameters"]["log_rotation_interval"]),
         utc=True,
     )
-    return AdminActivityLogger(log_file_path=log_file_path, rotation_policy=rotation_policy)
+
+
+def build_admin_activity_logger(cfg: Any) -> AdminActivityLogger:
+    log_file_path = _resolve_log_path(cfg, log_key="admin_activity_log", default_log_name="admin_activity.log")
+    return AdminActivityLogger(log_file_path=log_file_path, rotation_policy=_rotation_policy_from_cfg(cfg))
+
+
+def build_ota_download_logger(cfg: Any) -> ServerOtaLogger:
+    log_file_path = _resolve_log_path(cfg, log_key="ota_download_log", default_log_name="ota_download.log")
+    return ServerOtaLogger(log_file_path=log_file_path, rotation_policy=_rotation_policy_from_cfg(cfg))

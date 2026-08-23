@@ -11,7 +11,7 @@ from ota_http_server.project.project_service import ProjectService
 from ota_http_server.device.device_service import DeviceService
 from ota_http_server.firmware.firmware_service import FirmwareService
 from ota_http_server.logger import get_app_logger
-from ota_http_server.logger.admin_activity_logger import build_admin_activity_logger
+from ota_http_server.logger.admin_activity_logger import build_admin_activity_logger, build_ota_download_logger
 from ota_http_server.core.data_models import AppPaths
 
 logger = get_app_logger(__name__)
@@ -25,6 +25,7 @@ def run_app(cfg:Config) -> None:
     # store app_paths in the configuration so as to access it elsewhere
     cfg.config['parameters']['app_paths'] = app_paths
     cfg.config["admin_activity_logger"] = build_admin_activity_logger(cfg)
+    cfg.config["ota_download_logger"] = build_ota_download_logger(cfg)
     db_service = DatabaseService(cfg)
     cfg.config["db_service"] = db_service
     user_service = UserService(cfg)
@@ -48,6 +49,7 @@ def run_app(cfg:Config) -> None:
             print(f"Listening on {cfg.config['parameters']['host']}:{cfg.config['parameters']['port']}")
             print(f"JWT: {'ENABLED' if not cfg.config['parameters']['no_jwt'] else 'DISABLED'}")
             print(f"Admin activity log file: {cfg.config['parameters']['admin_activity_log']}")
+            print(f"OTA download log file: {cfg.config['parameters'].get('ota_download_log', 'ota_download.log')}")
             print("Admin token endpoint: ENABLED (/admin/generate_token)")
             print("===========================================\n")
 
