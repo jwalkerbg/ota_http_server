@@ -293,17 +293,28 @@ ota_http_server project disable --name smart_home
 
 Projects group firmware and devices, and each project can be enabled or disabled independently.
 
+### Target operations
+
+```bash
+ota_http_server target add --name ESP32
+ota_http_server target list
+ota_http_server target get --name ESP32
+```
+
+Targets provide a shared classification for devices and firmware. A default `Not defined` target is created by database migration and assigned to existing records.
+
 ### Device operations
 
 ```bash
 ota_http_server device add --uuid 11111111-2222-3333-4444-555555666666 --pid 1 --model ESP32 --sn ABC123 --version 1.2.0
 ota_http_server device list --pid 1
 ota_http_server device get --uuid 11111111-2222-3333-4444-555555666666
+ota_http_server device change-target --uuid 11111111-2222-3333-4444-555555666666 --target-name ESP32
 ota_http_server device enable --id 1
 ota_http_server device disable --uuid 11111111-2222-3333-4444-555555666666
 ```
 
-Devices are associated with a project and maintain their current firmware version and last-seen status.
+Devices are associated with a project and target and maintain their current firmware version and last-seen status.
 
 ### Firmware operations
 
@@ -311,13 +322,14 @@ Devices are associated with a project and maintain their current firmware versio
 ota_http_server firmware add --pid 1 --version 1.2.0 --file firmware_v1_2_0.bin --notes "Bug fixes" --channel stable
 ota_http_server firmware list --pid 1
 ota_http_server firmware get --pid 1 --version 1.2.0
+ota_http_server firmware change-target --pid 1 --version 1.2.0 --target-name ESP32
 ota_http_server firmware enable --pid 1 --version 1.2.0
 ota_http_server firmware disable --id 2
 ota_http_server firmware replace --id 2 --file firmware_v1_2_1.bin
 ota_http_server firmware delete --pid 1 --version 1.2.0
 ```
 
-Firmware records include release metadata, binary checksum information, and active/inactive status for OTA distribution.
+Firmware records include release metadata, target assignment, binary checksum information, and active/inactive status for OTA distribution.
 
 ### Administrative activity logging
 
@@ -328,6 +340,7 @@ Logged actions are:
 - `enable`
 - `disable`
 - `remove` (mapped from firmware `delete`)
+- `change` (mapped from device/firmware `change-target`)
 - `list`
 - `get`
 

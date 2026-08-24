@@ -239,6 +239,7 @@ class DeviceFormatter:
     ID_WIDTH =  5
     DEVICE_UUID_WIDTH = 36
     PROJECT_NAME_WIDTH = 10
+    TARGET_NAME_WIDTH = 16
     MODEL_WIDTH = 16
     SERIALN_WIDTH = 32
     CURRENT_VERSION_WIDTH = 32
@@ -249,6 +250,7 @@ class DeviceFormatter:
         Column('ID', ID_WIDTH, "^"),
         Column('UUID', DEVICE_UUID_WIDTH, "^"),
         Column('Project', PROJECT_NAME_WIDTH, "^"),
+        Column('Target', TARGET_NAME_WIDTH, "^"),
         Column('Model', MODEL_WIDTH, "^"),
         Column('Serial #', SERIALN_WIDTH, "^"),
         Column('Current version', CURRENT_VERSION_WIDTH, "^"),
@@ -288,6 +290,7 @@ class DeviceFormatter:
             str(device.id),
             device.uuid,
             str(device.project_id),
+            str(device.target_id),
             model,
             serial_number,
             current_version,
@@ -316,6 +319,7 @@ class DeviceListItemFormatter:
     ID_WIDTH =  5
     DEVICE_UUID_WIDTH = 36
     PROJECT_NAME_WIDTH = 10
+    TARGET_NAME_WIDTH = 16
     MODEL_WIDTH = 16
     SERIALN_WIDTH = 32
     CURRENT_VERSION_WIDTH = 32
@@ -326,6 +330,7 @@ class DeviceListItemFormatter:
         Column('ID', ID_WIDTH, "^"),
         Column('UUID', DEVICE_UUID_WIDTH, "^"),
         Column('Project', PROJECT_NAME_WIDTH, "^"),
+        Column('Target', TARGET_NAME_WIDTH, "^"),
         Column('Model', MODEL_WIDTH, "^"),
         Column('Serial #', SERIALN_WIDTH, "^"),
         Column('Current version', CURRENT_VERSION_WIDTH, "^"),
@@ -351,6 +356,7 @@ class DeviceListItemFormatter:
             str(device.id),
             device.uuid,
             device.project_name,
+            device.target_name,
             model,
             serial_number,
             current_version,
@@ -376,6 +382,7 @@ class DeviceListItemFormatter:
 class FirmwareFormatter:
     ID_WIDTH =  5
     PROJECT_NAME_WIDTH = 10
+    TARGET_NAME_WIDTH = 16
     VERSION_WIDTH = 32
     FILENAME_WIDTH = 32
     FILESIZE_WIDTH = 10
@@ -388,6 +395,7 @@ class FirmwareFormatter:
     COLUMNS = [
         Column('ID', ID_WIDTH, ">"),
         Column('Project', PROJECT_NAME_WIDTH, "^"),
+        Column('Target', TARGET_NAME_WIDTH, "^"),
         Column('Version', VERSION_WIDTH, "^"),
         Column('FileName', FILENAME_WIDTH, "^"),
         Column('FileSize', FILESIZE_WIDTH, "^"),
@@ -423,6 +431,7 @@ class FirmwareFormatter:
         values = [
             str(firmware.id),
             str(firmware.project_id),
+            str(firmware.target_id),
             version,
             filename,
             file_size,
@@ -452,6 +461,7 @@ class FirmwareFormatter:
 class FirmwareListItemFormatter:
     ID_WIDTH =  5
     PROJECT_NAME_WIDTH = 10
+    TARGET_NAME_WIDTH = 16
     VERSION_WIDTH = 32
     FILENAME_WIDTH = 32
     FILESIZE_WIDTH = 10
@@ -460,6 +470,7 @@ class FirmwareListItemFormatter:
     COLUMNS = [
         Column('ID', ID_WIDTH, ">"),
         Column('Project', PROJECT_NAME_WIDTH, "^"),
+        Column('Target', TARGET_NAME_WIDTH, "^"),
         Column('Version', VERSION_WIDTH, "^"),
         Column('FileName', FILENAME_WIDTH, "^"),
         Column('FileSize', FILESIZE_WIDTH, "^"),
@@ -477,6 +488,7 @@ class FirmwareListItemFormatter:
         values = [
             str(firmware.id),
             firmware.project_name,
+            firmware.target_name,
             version,
             filename,
             file_size,

@@ -26,7 +26,7 @@ class MigrationRunner:
         conn.execute("PRAGMA foreign_keys = ON;")
         if  self.cfg.config["parameters"]["trace_sql"]:
             conn.set_trace_callback(lambda sql: logger.debug("SQL: %s", sql))
-            return conn
+        return conn
 
     def _init_schema_table(self, conn):
         conn.execute("""

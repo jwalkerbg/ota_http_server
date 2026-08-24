@@ -113,10 +113,24 @@ class ProjectListItem:
     is_active: bool
 
 @dataclass
+class Target:
+    id: Optional[int]
+    name: str
+
+    def __str__(self) -> str:
+        return (
+            f"Target("
+            f"ID:{self.id}, "
+            f"name:{self.name}"
+            f")"
+        )
+
+@dataclass
 class Device:
     id: Optional[int]   # the database primary key. It is None before the object is inserted into SQLite.
     uuid: str           # Unique hardware identifier (UUIDv4)
     project_id: int     # FK → Projects: Which project this device belongs to
+    target_id: int      # FK → Targets: Which target this device belongs to
     model: str          # Hardware model, e.g. ESP32S3
     serial_number: str  # Optional manufacturing serial
     current_version: str    # Current firmware version
@@ -151,6 +165,7 @@ class Device:
             f"ID:{self.id}, "
             f"uuid:{self.uuid}, "
             f"project_id:{self.project_id}, "
+            f"target_id:{self.target_id}, "
             f"model:{self.model}, "
             f"serial_number:{self.serial_number}, "
             f"current_version:{self.current_version}, "
@@ -166,6 +181,7 @@ class DeviceListItem:
     id: int
     uuid: str
     project_name: str
+    target_name: str
     model: str
     serial_number: str
     current_version: str
@@ -176,6 +192,7 @@ class DeviceListItem:
 class Firmware:
     id: Optional[int]   # the database primary key. It is None before the object is inserted into SQLite.
     project_id: int     # FK → Projects: Which project owns this firmware
+    target_id: int      # FK → Targets: Which target this firmware belongs to
     version: str        # e.g. 02.00.01
     filename: str       # Stored binary filename
     file_size: int      # Bytes
@@ -202,6 +219,8 @@ class Firmware:
         return(
             f"Firmware("
             f"ID:{self.id}, "
+            f"project_id:{self.project_id}, "
+            f"target_id:{self.target_id}, "
             f"version:{self.version}, "
             f"filename:{self.filename}, "
             f"file_size:{self.file_size}, "
@@ -218,6 +237,7 @@ class Firmware:
 class FirmwareListItem:
     id: int
     project_name: str
+    target_name: str
     version: str
     filename: str
     file_size: int

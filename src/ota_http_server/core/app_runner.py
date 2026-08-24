@@ -8,6 +8,7 @@ from ota_http_server.core.server import create_app
 from ota_http_server.database.database_service import DatabaseService
 from ota_http_server.user.user_service import UserService
 from ota_http_server.project.project_service import ProjectService
+from ota_http_server.target.target_service import TargetService
 from ota_http_server.device.device_service import DeviceService
 from ota_http_server.firmware.firmware_service import FirmwareService
 from ota_http_server.logger import get_app_logger
@@ -32,6 +33,8 @@ def run_app(cfg:Config) -> None:
     cfg.config["user_service"] = user_service
     project_service = ProjectService(cfg)
     cfg.config["project_service"] = project_service
+    target_service = TargetService(cfg)
+    cfg.config["target_service"] = target_service
     device_service = DeviceService(cfg)
     cfg.config["device_service"] = device_service
     firmware_service = FirmwareService(cfg)
@@ -92,6 +95,13 @@ def run_app(cfg:Config) -> None:
             logger.error("%s", str(e), exc_info=cfg.config['logging']['exc_full_stack'])
         finally:
             logger.info("Exiting project CLI")
+    elif cfg.config['command'] == 'target':
+        try:
+            target_service.command_handler()
+        except Exception as e:
+            logger.error("%s", str(e), exc_info=cfg.config['logging']['exc_full_stack'])
+        finally:
+            logger.info("Exiting target CLI")
     elif cfg.config['command'] == 'device':
         try:
             device_service.command_handler()
