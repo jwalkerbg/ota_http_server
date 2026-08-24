@@ -193,12 +193,13 @@ The schema enforces a unique `device_id`, and the `serial_number` column also ha
 
 ### Firmware
 
-The `firmware` table stores binary metadata for each project version. Each row represents a specific version and channel combination.
+The `firmware` table stores binary metadata for each project version. Each row represents a firmware variant bound to a target. The combination `(project_id, version, target_id)` is unique.
 
 | Column | Type | Notes |
 | --- | --- | --- |
 | `id` | INTEGER PRIMARY KEY AUTOINCREMENT | Internal row identifier |
 | `project_id` | INTEGER | Foreign key to `projects.id` |
+| `target_id` | INTEGER | Foreign key to `targets.id` |
 | `version` | TEXT | Firmware version label |
 | `filename` | TEXT | File name stored on disk |
 | `file_size` | INTEGER | File size in bytes |
@@ -489,7 +490,8 @@ Next element in the URL is the project name. If JWT is used it must be the same 
 
 After the project name firmware version follows. The server resolves the
 version to the real binary image file name using firmware metadata in the
-database.
+database. With JWT enabled, selection uses the authenticated device target
+and matches firmware by `(project, version, target)`.
 
 An eventual JWT is at the end.
 

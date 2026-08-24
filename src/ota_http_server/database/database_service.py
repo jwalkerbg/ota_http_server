@@ -208,6 +208,18 @@ class DatabaseService:
         ) -> Firmware | None:
         return self._database.firmware_get_by_project_version(project_id=project_id, version=version)
 
+    def firmware_get_by_project_version_target(
+        self,
+        project_id: int,
+        version: str,
+        target_id: int,
+    ) -> Firmware | None:
+        return self._database.firmware_get_by_project_version_target(
+            project_id=project_id,
+            version=version,
+            target_id=target_id,
+        )
+
     def firmware_is_active(self, firmware_id: int) -> bool:
         return self._database.firmware_is_active(firmware_id)
 

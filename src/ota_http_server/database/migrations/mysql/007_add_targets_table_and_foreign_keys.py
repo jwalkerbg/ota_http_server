@@ -72,8 +72,28 @@ class Migration_007(Migration):
             ON firmware(target_id)
             """
         )
+        conn.execute(
+            """
+            ALTER TABLE firmware DROP INDEX uq_firmware_project_version_channel
+            """
+        )
+        conn.execute(
+            """
+            ALTER TABLE firmware
+            ADD CONSTRAINT uq_firmware_project_version_target
+                UNIQUE (project_id, version, target_id)
+            """
+        )
 
     def down(self, conn: typing.Any) -> None:
+        conn.execute("ALTER TABLE firmware DROP INDEX uq_firmware_project_version_target")
+        conn.execute(
+            """
+            ALTER TABLE firmware
+            ADD CONSTRAINT uq_firmware_project_version_channel
+                UNIQUE (project_id, version, channel)
+            """
+        )
         conn.execute("ALTER TABLE firmware DROP FOREIGN KEY fk_firmware_target_id")
         conn.execute("DROP INDEX idx_firmware_target_id ON firmware")
         conn.execute("ALTER TABLE firmware DROP COLUMN target_id")

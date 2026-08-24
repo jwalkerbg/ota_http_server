@@ -1069,7 +1069,7 @@ class DatabaseMySQLService:
                 return firmware
         except mysql.connector.IntegrityError as e:
             message = str(e)
-            if "uq_firmware_project_version_channel" in message or "Duplicate entry" in message:
+            if "uq_firmware_project_version_target" in message or "Duplicate entry" in message:
                 raise FirmwareAlreadyExistsError(
                     f"Firmware '{firmware.version}' already exists"
                 ) from e
@@ -1392,6 +1392,17 @@ class DatabaseMySQLService:
         version: str,
     ) -> Firmware | None:
         return self._firmware_get(("project_id", "version"), (project_id, version))
+
+    def firmware_get_by_project_version_target(
+        self,
+        project_id: int,
+        version: str,
+        target_id: int,
+    ) -> Firmware | None:
+        return self._firmware_get(
+            ("project_id", "version", "target_id"),
+            (project_id, version, target_id),
+        )
 
     def firmware_is_active(self, firmware_id: int) -> bool:
         try:

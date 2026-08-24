@@ -83,13 +83,14 @@ class FirmwareService:
         source_file = self.cfg.config["parameters"]["firmware_file"]
         release_notes = self.cfg.config["parameters"]["firmware_release_notes"]
         release_channel = self.cfg.config["parameters"]["firmware_release_channel"]
+        target_id = self._resolve_target_id()
 
         validate_firmware_filename(source_file)
 
         firmware = Firmware(
             id=None,
             project_id=pid,
-            target_id=self._resolve_target_id(),
+            target_id=target_id,
             version=version,
             filename="",
             file_size=0,
@@ -117,13 +118,13 @@ class FirmwareService:
                 record for record in db_service.firmware_get_record()
                 if record.project_id == pid
                 and record.version == version
-                and record.channel == release_channel
+                and record.target_id == target_id
             ),
             None,
         )
         if duplicate is not None:
             raise ValueError(
-                f"Firmware already exists for project_id={pid}, version={version}, channel={release_channel}"
+                f"Firmware already exists for project_id={pid}, version={version}, target_id={target_id}"
             )
 
         project_dir = app_paths.ensure_project_dir(project.name)

@@ -1586,6 +1586,17 @@ class DatabaseSqliteService:
             (project_id, version),
         )
 
+    def firmware_get_by_project_version_target(
+        self,
+        project_id: int,
+        version: str,
+        target_id: int,
+    ) -> Firmware | None:
+        return self._firmware_get(
+            ("project_id", "version", "target_id"),
+            (project_id, version, target_id),
+        )
+
     def firmware_is_active(self, firmware_id: int) -> bool:
         try:
             with self._connect() as conn:

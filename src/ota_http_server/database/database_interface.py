@@ -171,6 +171,14 @@ class DatabaseInterface(Protocol):
     def firmware_get_by_project_version(self, project_id: int, version: str,) -> Firmware | None:
         ...
 
+    def firmware_get_by_project_version_target(
+        self,
+        project_id: int,
+        version: str,
+        target_id: int,
+    ) -> Firmware | None:
+        ...
+
     def firmware_is_active(self, firmware_id: int) -> bool:
         ...
 

@@ -114,7 +114,7 @@ class Migration_007(Migration):
                     REFERENCES targets(id)
                     ON DELETE RESTRICT
                     ON UPDATE CASCADE,
-                UNIQUE (project_id, version, channel)
+                UNIQUE (project_id, version, target_id)
             );
             """
         )
