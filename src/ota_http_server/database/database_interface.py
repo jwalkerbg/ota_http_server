@@ -2,7 +2,7 @@
 
 from typing import Protocol
 
-from ota_http_server.core.data_models import User, Project, ProjectListItem, Device, DeviceListItem, Firmware, FirmwareListItem, FirmwareDeleteInfo
+from ota_http_server.core.data_models import User, Project, ProjectListItem, Target, Device, DeviceListItem, Firmware, FirmwareListItem, FirmwareDeleteInfo
 
 class DatabaseInterface(Protocol):
 
@@ -75,7 +75,25 @@ class DatabaseInterface(Protocol):
     def project_get_list(self) -> list[ProjectListItem]:
         ...
 
+    def target_add(self, target: Target) -> Target:
+        ...
+
+    def target_get_by_id(self, id: int) -> Target | None:
+        ...
+
+    def target_get_by_name(self, name: str) -> Target | None:
+        ...
+
+    def target_get_list(self) -> list[Target]:
+        ...
+
     def device_add(self, device: Device) -> Device:
+        ...
+
+    def device_change_target_by_id(self, id: int, target_id: int) -> None:
+        ...
+
+    def device_change_target_by_name(self, name: str, target_id: int) -> None:
         ...
 
     def device_enable_by_id(self, id: int) -> None:
@@ -116,6 +134,12 @@ class DatabaseInterface(Protocol):
     def firmware_add(self, firmware: Firmware) -> Firmware:
         ...
 
+    def firmware_change_target_by_id(self, id: int, target_id: int) -> None:
+        ...
+
+    def firmware_change_target_by_project_version(self, project_id: int, version: str, target_id: int) -> None:
+        ...
+
     def firmware_replace(self, firmware_id: int, filename: str, file_size: int, checksum: str) -> Firmware:
         ...
 
@@ -145,6 +169,14 @@ class DatabaseInterface(Protocol):
         ...
 
     def firmware_get_by_project_version(self, project_id: int, version: str,) -> Firmware | None:
+        ...
+
+    def firmware_get_by_project_version_target(
+        self,
+        project_id: int,
+        version: str,
+        target_id: int,
+    ) -> Firmware | None:
         ...
 
     def firmware_is_active(self, firmware_id: int) -> bool:

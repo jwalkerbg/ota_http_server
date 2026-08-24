@@ -71,9 +71,11 @@ class ParametersConfig(TypedDict, total=False):
     project_display_name: str
     project_description: str
     project_created_by: int
+    target_id: int
+    target_name: str
     device_id: int
     device_uuid: str
-    device_pid: str
+    device_pid: int
     device_record: bool
     device_status: str | None
     device_model: str
@@ -179,6 +181,8 @@ class Config:
             'project_display_name': None,
             'project_description': None,
             'project_created_by': None,
+            'target_id': None,
+            'target_name': None,
             'device_id': None,
             'device_uuid': None,
             'device_pid': None,
@@ -372,6 +376,12 @@ class Config:
                     },
                     "project_created_by": {
                         "type": "number"
+                    },
+                    "target_id": {
+                        "type": "number"
+                    },
+                    "target_name": {
+                        "type": "string"
                     },
                     "device_id": {
                         "type": "number"
@@ -786,6 +796,18 @@ class Config:
                     else:
                         self.config["parameters"]["project_record"] = False
 
+            if config_cli.command == "target":
+                if config_cli.target_command is not None:
+                    self.config["target_command"] = config_cli.target_command
+                if config_cli.target_command == "add":
+                    if config_cli.target_name is not None:
+                        self.config["parameters"]["target_name"] = config_cli.target_name
+                if config_cli.target_command == "get":
+                    if config_cli.target_id is not None:
+                        self.config["parameters"]["target_id"] = config_cli.target_id
+                    if config_cli.target_name is not None:
+                        self.config["parameters"]["target_name"] = config_cli.target_name
+
             if config_cli.command == "device":
                 if config_cli.device_command is not None:
                     self.config["device_command"] = config_cli.device_command
@@ -801,6 +823,20 @@ class Config:
                         self.config["parameters"]["device_serial_number"] = config_cli.device_serial_number
                     if config_cli.device_current_version is not None:
                         self.config["parameters"]["device_current_version"] = config_cli.device_current_version
+                    if getattr(config_cli, "target_id", None) is not None:
+                        self.config["parameters"]["target_id"] = config_cli.target_id
+                    if getattr(config_cli, "target_name", None) is not None:
+                        self.config["parameters"]["target_name"] = config_cli.target_name
+                # change target
+                if config_cli.device_command == "change-target":
+                    if config_cli.device_id is not None:
+                        self.config["parameters"]["device_id"] = config_cli.device_id
+                    if config_cli.device_uuid is not None:
+                        self.config["parameters"]["device_uuid"] = config_cli.device_uuid
+                    if getattr(config_cli, "target_id", None) is not None:
+                        self.config["parameters"]["target_id"] = config_cli.target_id
+                    if getattr(config_cli, "target_name", None) is not None:
+                        self.config["parameters"]["target_name"] = config_cli.target_name
                 # enable
                 if config_cli.device_command == "enable":
                     if config_cli.device_id is not None:
@@ -849,6 +885,22 @@ class Config:
                         self.config["parameters"]["firmware_release_notes"] = config_cli.firmware_release_notes
                     if config_cli.firmware_release_channel is not None:
                         self.config["parameters"]["firmware_release_channel"] = config_cli.firmware_release_channel
+                    if getattr(config_cli, "target_id", None) is not None:
+                        self.config["parameters"]["target_id"] = config_cli.target_id
+                    if getattr(config_cli, "target_name", None) is not None:
+                        self.config["parameters"]["target_name"] = config_cli.target_name
+                # change target
+                if config_cli.firmware_command == "change-target":
+                    if config_cli.firmware_id is not None:
+                        self.config["parameters"]["firmware_id"] = config_cli.firmware_id
+                    if config_cli.firmware_pid is not None:
+                        self.config["parameters"]["firmware_pid"] = config_cli.firmware_pid
+                    if config_cli.firmware_version is not None:
+                        self.config["parameters"]["firmware_version"] = config_cli.firmware_version
+                    if getattr(config_cli, "target_id", None) is not None:
+                        self.config["parameters"]["target_id"] = config_cli.target_id
+                    if getattr(config_cli, "target_name", None) is not None:
+                        self.config["parameters"]["target_name"] = config_cli.target_name
                 # enable
                 if config_cli.firmware_command == "enable":
                     if config_cli.firmware_id is not None:
@@ -1128,16 +1180,33 @@ For use in development environment without SSL certificates and JWT authenticati
     list_project_parser = project_subparsers.add_parser(name="list", help="List all projects")
     list_project_parser.add_argument("--record", dest="project_record", action="store_const", const=True, help="List full records of projects, including all fields. If not specified, only a summary of projects will be listed.")
 
+    # target
+    target_parser = subparsers.add_parser(name="target", help="Targets manipulation operations")
+    target_subparsers = target_parser.add_subparsers(dest="target_command", required=True)
+    add_target_parser = target_subparsers.add_parser(name="add", help="Add new target")
+    add_target_parser.add_argument("--name", dest="target_name", type=str, required=True, help="Name of the new created target")
+    get_target_parser = target_subparsers.add_parser(name="get", help="Get target information")
+    get_target_parser.add_argument("--id", dest="target_id", type=int, required=False, help="ID of the target to be retrieved")
+    get_target_parser.add_argument("--name", dest="target_name", type=str, required=False, help="Name of the target to be retrieved. Give --id or --name. --id takes precedence.")
+    target_subparsers.add_parser(name="list", help="List all targets")
+
     # device
     device_parser = subparsers.add_parser(name="device", help="Devices manipulation operations")
     device_subparsers = device_parser.add_subparsers(dest="device_command", required=True)
     # device add
     add_device_parser = device_subparsers.add_parser(name="add", help="Add new device")
     add_device_parser.add_argument("--uuid", dest="device_uuid", type=str, required=True, help="Device UUIDv4")
-    add_device_parser.add_argument("--pid", dest="device_pid", type=str, required=True, help="ID of the project the device is related to")
+    add_device_parser.add_argument("--pid", dest="device_pid", type=int, required=True, help="ID of the project the device is related to")
     add_device_parser.add_argument("--model", dest="device_model", type=str, required=False, help="Optional model of the device, user added string")
     add_device_parser.add_argument("--sn", dest="device_serial_number", type=str, required=False, help="Optional serial number of the device")
     add_device_parser.add_argument("--version", dest="device_current_version", type=str, required=False, help="Optional version of the device's firmware")
+    add_device_parser.add_argument("--target-id", dest="target_id", type=int, required=False, help="ID of the target the device is related to")
+    add_device_parser.add_argument("--target-name", dest="target_name", type=str, required=False, help="Name of the target the device is related to. --target-id takes precedence.")
+    change_target_device_parser = device_subparsers.add_parser(name="change-target", help="Change device target")
+    change_target_device_parser.add_argument("--id", dest="device_id", type=int, required=False, help="ID of the device whose target will be changed")
+    change_target_device_parser.add_argument("--uuid", dest="device_uuid", type=str, required=False, help="UUIDv4 of the device whose target will be changed")
+    change_target_device_parser.add_argument("--target-id", dest="target_id", type=int, required=False, help="ID of the target to assign")
+    change_target_device_parser.add_argument("--target-name", dest="target_name", type=str, required=False, help="Name of the target to assign. --target-id takes precedence.")
     # device enable
     enable_device_parser = device_subparsers.add_parser(name="enable", help="Enable device")
     enable_device_parser.add_argument("--id", dest="device_id", type=int, required=False, help="ID of the device to be enabled")
@@ -1168,6 +1237,14 @@ For use in development environment without SSL certificates and JWT authenticati
     add_firmware_parser.add_argument("--file", dest="firmware_file", type=str, required=True, help="Firmware filename without path elements")
     add_firmware_parser.add_argument("--notes", dest="firmware_release_notes", type=str, required=False, help="Release notes for the firmware")
     add_firmware_parser.add_argument("--channel", dest="firmware_release_channel", type=str, choices=["stable", "dev", "beta"], default="stable", required=False, help="Release channel for the firmware (e.g., stable, dev, beta)")
+    add_firmware_parser.add_argument("--target-id", dest="target_id", type=int, required=False, help="ID of the target the firmware is related to")
+    add_firmware_parser.add_argument("--target-name", dest="target_name", type=str, required=False, help="Name of the target the firmware is related to. --target-id takes precedence.")
+    change_target_firmware_parser = firmware_subparsers.add_parser("change-target", help="Change firmware target")
+    change_target_firmware_parser.add_argument("--id", dest="firmware_id", type=int, required=False, help="ID of the firmware whose target will be changed")
+    change_target_firmware_parser.add_argument("--pid", dest="firmware_pid", type=int, required=False, help="ID of the project the firmware is related to")
+    change_target_firmware_parser.add_argument("--version", dest="firmware_version", type=str, required=False, help="Version of the firmware whose target will be changed")
+    change_target_firmware_parser.add_argument("--target-id", dest="target_id", type=int, required=False, help="ID of the target to assign")
+    change_target_firmware_parser.add_argument("--target-name", dest="target_name", type=str, required=False, help="Name of the target to assign. --target-id takes precedence.")
     # firmware enable
     enable_firmware_parser = firmware_subparsers.add_parser("enable", help="Enable firmware to be downloaded for OTA")
     enable_firmware_parser.add_argument("--id", dest="firmware_id", type=int, required=False, help="ID of the firmware to be enabled")

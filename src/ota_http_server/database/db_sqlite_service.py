@@ -6,7 +6,7 @@ from datetime import datetime, UTC
 
 from ota_http_server.core.config import Config
 from ota_http_server.database.migration_sqlite3_runner import MigrationRunner
-from ota_http_server.core.data_models import ProjectListItem, User, Project, Device, DeviceListItem, Firmware, FirmwareListItem, FirmwareDeleteInfo
+from ota_http_server.core.data_models import ProjectListItem, User, Project, Target, Device, DeviceListItem, Firmware, FirmwareListItem, FirmwareDeleteInfo
 from ota_http_server.core.data_models import AppPaths
 from ota_http_server.logger import get_app_logger
 
@@ -37,6 +37,12 @@ class ProjectAlreadyEnabledError(Exception):
     pass
 
 class ProjectAlreadyDisabledError(Exception):
+    pass
+
+class TargetAlreadyExistsError(Exception):
+    pass
+
+class TargetNotFoundError(Exception):
     pass
 
 class DeviceAlreadyExistsError(Exception):
@@ -635,12 +641,87 @@ class DatabaseSqliteService:
                 "Database error retrieving project list"
             ) from e
 
+    def _row_to_target(self, row: sqlite3.Row) -> Target:
+        return Target(
+            id=row["id"],
+            name=row["name"],
+        )
+
+    def target_add(self, target: Target) -> Target:
+        try:
+            with self._connect() as conn:
+                cursor = conn.execute(
+                    """
+                    INSERT INTO targets (name)
+                    VALUES (?)
+                    """,
+                    (target.name,),
+                )
+                conn.commit()
+                target.id = cursor.lastrowid
+                return target
+        except sqlite3.IntegrityError as e:
+            if e.sqlite_errorname == "SQLITE_CONSTRAINT_UNIQUE":
+                raise TargetAlreadyExistsError(
+                    f"Target '{target.name}' already exists"
+                ) from e
+            raise DatabaseError(
+                f"Database integrity error creating target '{target.name}': {str(e)}"
+            ) from e
+        except sqlite3.Error as e:
+            raise DatabaseError(
+                f"Database error creating target '{target.name}'"
+            ) from e
+
+    def _target_get(self, column: str, parameter: int | str) -> Target | None:
+        if column not in ("id", "name"):
+            raise ValueError(f"Invalid column '{column}'")
+
+        try:
+            with self._connect() as conn:
+                row = conn.execute(
+                    f"""
+                    SELECT id, name
+                    FROM targets
+                    WHERE {column} = ?
+                    """,
+                    (parameter,),
+                ).fetchone()
+                if row is None:
+                    return None
+                return self._row_to_target(row)
+        except sqlite3.Error as e:
+            raise DatabaseError(
+                f"Database error retrieving target {column}={parameter}"
+            ) from e
+
+    def target_get_by_id(self, id: int) -> Target | None:
+        return self._target_get("id", id)
+
+    def target_get_by_name(self, name: str) -> Target | None:
+        return self._target_get("name", name)
+
+    def target_get_list(self) -> list[Target]:
+        try:
+            with self._connect() as conn:
+                rows = conn.execute(
+                    """
+                    SELECT id, name
+                    FROM targets
+                    ORDER BY name, id
+                    """
+                ).fetchall()
+                return [self._row_to_target(row) for row in rows]
+        except sqlite3.Error as e:
+            raise DatabaseError("Database error retrieving targets") from e
+
     def _row_to_device(self, row: sqlite3.Row) -> Device:
 
             return Device(
                 id=row["id"],
                 uuid=row["uuid"],
                 project_id=row["project_id"],
+                target_id=row["target_id"],
                 model=row["model"],
                 serial_number=row["serial_number"],
                 current_version=row["current_version"],
@@ -667,6 +748,7 @@ class DatabaseSqliteService:
                         id,
                         uuid,
                         project_id,
+                        target_id,
                         model,
                         serial_number,
                         current_version,
@@ -675,12 +757,13 @@ class DatabaseSqliteService:
                         created_at,
                         updated_at
                     )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         device.id,
                         device.uuid,
                         device.project_id,
+                        device.target_id,
                         device.model,
                         device.serial_number,
                         device.current_version,
@@ -704,11 +787,11 @@ class DatabaseSqliteService:
 
                 case "SQLITE_CONSTRAINT_UNIQUE":
                     raise DeviceAlreadyExistsError(
-                        f"Device '{device.name}' already exists"
+                        f"Device '{device.uuid}' already exists"
                     ) from e
                 case "SQLITE_CONSTRAINT_FOREIGNKEY":
-                    raise UserNotFoundError(
-                        f"Database Integrity violation: Project with id={device.project_id} does not exist"
+                    raise TargetNotFoundError(
+                        f"Database integrity violation: Project id={device.project_id} or target id={device.target_id} does not exist"
                     ) from e
 
                 case _:
@@ -796,6 +879,52 @@ class DatabaseSqliteService:
     def device_disable_by_name(self, name: str) -> None:
         return self._device_enable_disable("uuid", name, False)
 
+    def _device_change_target(self, column: str, parameter: int | str, target_id: int) -> None:
+        if column not in ("id", "uuid"):
+            raise ValueError(f"Invalid column '{column}'")
+
+        now = datetime.now(UTC)
+
+        try:
+            with self._connect() as conn:
+                target_row = conn.execute(
+                    "SELECT id FROM targets WHERE id = ?",
+                    (target_id,),
+                ).fetchone()
+                if target_row is None:
+                    raise TargetNotFoundError(f"Target id={target_id} not found")
+
+                cursor = conn.execute(
+                    f"""
+                    UPDATE devices
+                    SET
+                        target_id = ?,
+                        updated_at = ?
+                    WHERE {column} = ?
+                    """,
+                    (
+                        target_id,
+                        now.isoformat(),
+                        parameter,
+                    ),
+                )
+
+                if cursor.rowcount == 1:
+                    conn.commit()
+                    return
+
+                raise DeviceNotFoundError(f"Device {column}={parameter} not found")
+        except sqlite3.Error as e:
+            raise DatabaseError(
+                f"Database error changing target for device {column}={parameter}"
+            ) from e
+
+    def device_change_target_by_id(self, id: int, target_id: int) -> None:
+        self._device_change_target("id", id, target_id)
+
+    def device_change_target_by_name(self, name: str, target_id: int) -> None:
+        self._device_change_target("uuid", name, target_id)
+
     def _device_get(self, column: str, parameter: int | str) -> Device | None:
 
         if column not in ("id", "uuid"):
@@ -810,6 +939,7 @@ class DatabaseSqliteService:
                         id,
                         uuid,
                         project_id,
+                        target_id,
                         model,
                         serial_number,
                         current_version,
@@ -891,6 +1021,7 @@ class DatabaseSqliteService:
                         id,
                         uuid,
                         project_id,
+                        target_id,
                         model,
                         serial_number,
                         current_version,
@@ -936,6 +1067,7 @@ class DatabaseSqliteService:
                         devices.id,
                         devices.uuid AS uuid,
                         projects.name AS project_name,
+                        targets.name AS target_name,
                         devices.model,
                         devices.serial_number,
                         devices.current_version,
@@ -944,6 +1076,8 @@ class DatabaseSqliteService:
                     FROM devices
                     JOIN projects
                         ON projects.id = devices.project_id
+                    JOIN targets
+                        ON targets.id = devices.target_id
                     {where_clause}
                     ORDER BY projects.name, devices.id
                     """,
@@ -957,6 +1091,7 @@ class DatabaseSqliteService:
                         id=row["id"],
                         uuid=row["uuid"],
                         project_name=row["project_name"],
+                        target_name=row["target_name"],
                         model=row["model"],
                         serial_number=row["serial_number"],
                         current_version=row["current_version"],
@@ -977,6 +1112,7 @@ class DatabaseSqliteService:
             return Firmware(
                 id=row["id"],
                 project_id=row["project_id"],
+                target_id=row["target_id"],
                 version=row["version"],
                 filename=row["filename"],
                 file_size=row["file_size"],
@@ -994,6 +1130,7 @@ class DatabaseSqliteService:
         return FirmwareListItem(
             id=row["id"],
             project_name=row["project_name"],
+            target_name=row["target_name"],
             version=row["version"],
             filename=row["filename"],
             file_size=row["file_size"],
@@ -1013,6 +1150,7 @@ class DatabaseSqliteService:
                     (
                         id,
                         project_id,
+                        target_id,
                         version,
                         filename,
                         file_size,
@@ -1023,11 +1161,12 @@ class DatabaseSqliteService:
                         created_at,
                         updated_at
                     )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         firmware.id,
                         firmware.project_id,
+                        firmware.target_id,
                         firmware.version,
                         firmware.filename,
                         firmware.file_size,
@@ -1053,11 +1192,11 @@ class DatabaseSqliteService:
 
                 case "SQLITE_CONSTRAINT_UNIQUE":
                     raise FirmwareAlreadyExistsError(
-                        f"Firmware '{firmware.id}' already exists"
+                        f"Firmware '{firmware.version}' already exists"
                     ) from e
                 case "SQLITE_CONSTRAINT_FOREIGNKEY":
-                    raise ProjectNotFoundError(
-                        f"Database Integrity violation: Project with id={firmware.project_id} does not exist"
+                    raise TargetNotFoundError(
+                        f"Database integrity violation: Project id={firmware.project_id} or target id={firmware.target_id} does not exist"
                     ) from e
 
                 case _:
@@ -1066,7 +1205,7 @@ class DatabaseSqliteService:
                     ) from e
         except sqlite3.Error as e:
             raise DatabaseError(
-                f"Database error creating firmware '{firmware.uuid}'"
+                f"Database error creating firmware '{firmware.version}'"
             ) from e
 
     def firmware_replace(self, firmware_id: int, filename: str, file_size: int, checksum: str) -> Firmware:
@@ -1077,6 +1216,7 @@ class DatabaseSqliteService:
                     SELECT
                         id,
                         project_id,
+                        target_id,
                         version,
                         filename,
                         file_size,
@@ -1303,6 +1443,68 @@ class DatabaseSqliteService:
     def firmware_disable_by_project_version(self, project_id: int, version: str) -> None:
         self._firmware_enable_disable(("project_id", "version"), (project_id, version), False)
 
+    def _firmware_change_target(
+            self,
+            columns: tuple[str, ...],
+            parameters: tuple[int | str, ...],
+            target_id: int,
+        ) -> None:
+
+        if not columns:
+            raise ValueError("At least one column is required")
+
+        if len(columns) != len(parameters):
+            raise ValueError("Number of columns must match number of parameters")
+
+        where_clause = " AND ".join(
+            f"{column} = ?" for column in columns
+        )
+        lookup = ", ".join(
+            f"{column}={parameter}"
+            for column, parameter in zip(columns, parameters)
+        )
+        now = datetime.now(UTC)
+
+        try:
+            with self._connect() as conn:
+                target_row = conn.execute(
+                    "SELECT id FROM targets WHERE id = ?",
+                    (target_id,),
+                ).fetchone()
+                if target_row is None:
+                    raise TargetNotFoundError(f"Target id={target_id} not found")
+
+                cursor = conn.execute(
+                    f"""
+                    UPDATE firmware
+                    SET
+                        target_id = ?,
+                        updated_at = ?
+                    WHERE {where_clause}
+                    """,
+                    (
+                        target_id,
+                        now.isoformat(),
+                        *parameters,
+                    ),
+                )
+
+                if cursor.rowcount == 1:
+                    conn.commit()
+                    return
+
+                raise FirmwareNotFoundError(f"Firmware {lookup} not found")
+        except sqlite3.Error as e:
+            raise DatabaseError(
+                f"Database error changing target for firmware {lookup}"
+            ) from e
+
+    def firmware_change_target_by_id(self, id: int, target_id: int) -> None:
+        self._firmware_change_target(("id",), (id,), target_id)
+
+    def firmware_change_target_by_project_version(self, project_id: int, version: str, target_id: int) -> None:
+        self._firmware_change_target(("project_id", "version"), (project_id, version), target_id)
+
     def _firmware_get(
             self,
             columns: tuple[str, ...],
@@ -1335,6 +1537,7 @@ class DatabaseSqliteService:
                     SELECT
                         id,
                         project_id,
+                        target_id,
                         version,
                         filename,
                         file_size,
@@ -1359,7 +1562,7 @@ class DatabaseSqliteService:
 
         except sqlite3.Error as e:
             raise DatabaseError(
-                f"Database error retrieving firmware {column}={parameter}"
+                f"Database error retrieving firmware {columns}={parameters}"
             ) from e
 
     def firmware_get_by_id(
@@ -1381,6 +1584,17 @@ class DatabaseSqliteService:
         return self._firmware_get(
             ("project_id", "version"),
             (project_id, version),
+        )
+
+    def firmware_get_by_project_version_target(
+        self,
+        project_id: int,
+        version: str,
+        target_id: int,
+    ) -> Firmware | None:
+        return self._firmware_get(
+            ("project_id", "version", "target_id"),
+            (project_id, version, target_id),
         )
 
     def firmware_is_active(self, firmware_id: int) -> bool:
@@ -1432,6 +1646,7 @@ class DatabaseSqliteService:
                     SELECT
                         id,
                         project_id,
+                        target_id,
                         version,
                         filename,
                         file_size,
@@ -1478,6 +1693,7 @@ class DatabaseSqliteService:
                     SELECT
                         firmware.id,
                         projects.name AS project_name,
+                        targets.name AS target_name,
                         firmware.version,
                         firmware.filename,
                         firmware.file_size,
@@ -1485,6 +1701,8 @@ class DatabaseSqliteService:
                     FROM firmware
                     JOIN projects
                         ON projects.id = firmware.project_id
+                    JOIN targets
+                        ON targets.id = firmware.target_id
                     {where_clause}
                     ORDER BY projects.name, firmware.version;
                     """,

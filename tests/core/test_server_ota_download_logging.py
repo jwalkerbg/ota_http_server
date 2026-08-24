@@ -53,6 +53,7 @@ def test_server_download_routes_log_ota_download_requests(tmp_path, monkeypatch)
 
     class FakeDeviceRecord:
         project_id = 1
+        target_id = 99
         is_active = True
 
     class FakeFirmwareRecord:
@@ -69,7 +70,8 @@ def test_server_download_routes_log_ota_download_requests(tmp_path, monkeypatch)
         def device_get_by_name(self, device_id):
             return FakeDeviceRecord()
 
-        def firmware_get_by_project_version(self, project_id, version):
+        def firmware_get_by_project_version_target(self, project_id, version, target_id):
+            assert target_id == 99
             return FakeFirmwareRecord()
 
     class FakeAuthService:

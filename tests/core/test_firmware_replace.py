@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from ota_http_server.core.config import parse_args
-from ota_http_server.core.data_models import Firmware, Project, User
+from ota_http_server.core.data_models import Firmware, Project, Target, User
 from ota_http_server.device.device_service import DeviceService
 from ota_http_server.firmware.filename_validation import validate_firmware_filename
 from ota_http_server.firmware.firmware_service import FirmwareService
@@ -41,6 +41,10 @@ def test_add_firmware_accepts_plain_filename(tmp_path, monkeypatch):
         is_active=True,
         created_at=None,
         updated_at=None,
+    )
+    cfg.config["db_service"].target_get_by_name.return_value = Target(
+        id=1,
+        name="Not defined",
     )
     cfg.config["db_service"].firmware_get_record.return_value = []
 
@@ -85,6 +89,10 @@ def test_add_firmware_rejects_path_traversal_filename(tmp_path, monkeypatch):
         created_at=None,
         updated_at=None,
     )
+    cfg.config["db_service"].target_get_by_name.return_value = Target(
+        id=1,
+        name="Not defined",
+    )
     cfg.config["db_service"].firmware_get_record.return_value = []
 
     service = FirmwareService(cfg)
@@ -124,6 +132,7 @@ def test_firmware_route_rejects_unsafe_stored_filename(tmp_path, monkeypatch):
     db_service.firmware_get_by_project_version.return_value = Firmware(
         id=7,
         project_id=12,
+        target_id=1,
         version="1.2.3",
         filename="../outside.bin",
         file_size=11,
@@ -185,6 +194,7 @@ def test_latest_firmware_route_rejects_unsafe_stored_filename(tmp_path, monkeypa
         Firmware(
             id=7,
             project_id=12,
+            target_id=1,
             version="1.2.3",
             filename="..\\outside.bin",
             file_size=11,
@@ -358,6 +368,7 @@ def test_replace_firmware_updates_existing_record(tmp_path):
     cfg.config["db_service"].firmware_get_by_project_version.return_value = Firmware(
         id=7,
         project_id=12,
+        target_id=1,
         version="1.2.3",
         filename="old.bin",
         file_size=11,
@@ -371,6 +382,7 @@ def test_replace_firmware_updates_existing_record(tmp_path):
     cfg.config["db_service"].firmware_replace.return_value = Firmware(
         id=7,
         project_id=12,
+        target_id=1,
         version="1.2.3",
         filename="fresh.bin",
         file_size=11,
@@ -414,6 +426,7 @@ def test_replace_firmware_updates_existing_record_by_id(tmp_path):
     cfg.config["db_service"].firmware_get_by_id.return_value = Firmware(
         id=7,
         project_id=12,
+        target_id=1,
         version="1.2.3",
         filename="old.bin",
         file_size=11,
@@ -437,6 +450,7 @@ def test_replace_firmware_updates_existing_record_by_id(tmp_path):
     cfg.config["db_service"].firmware_replace.return_value = Firmware(
         id=7,
         project_id=12,
+        target_id=1,
         version="1.2.3",
         filename="fresh.bin",
         file_size=11,

@@ -2,7 +2,7 @@
 
 from ota_http_server.core.config import Config
 from ota_http_server.database.database_interface import DatabaseInterface
-from ota_http_server.core.data_models import User, Project, ProjectListItem, Device, DeviceListItem, Firmware, FirmwareListItem, FirmwareDeleteInfo
+from ota_http_server.core.data_models import User, Project, ProjectListItem, Target, Device, DeviceListItem, Firmware, FirmwareListItem, FirmwareDeleteInfo
 from ota_http_server.logger import get_app_logger
 
 logger = get_app_logger(__name__)
@@ -99,8 +99,26 @@ class DatabaseService:
     def project_get_list(self) -> list[ProjectListItem]:
         return self._database.project_get_list()
 
+    def target_add(self, target: Target) -> Target:
+        return self._database.target_add(target)
+
+    def target_get_by_id(self, id: int) -> Target | None:
+        return self._database.target_get_by_id(id)
+
+    def target_get_by_name(self, name: str) -> Target | None:
+        return self._database.target_get_by_name(name)
+
+    def target_get_list(self) -> list[Target]:
+        return self._database.target_get_list()
+
     def device_add(self, device: Device) -> Device:
         return self._database.device_add(device=device)
+
+    def device_change_target_by_id(self, id: int, target_id: int) -> None:
+        return self._database.device_change_target_by_id(id=id, target_id=target_id)
+
+    def device_change_target_by_name(self, name: str, target_id: int) -> None:
+        return self._database.device_change_target_by_name(name=name, target_id=target_id)
 
     def device_enable_by_id(self, id: int) -> None:
         return self._database.device_enable_by_id(id=id)
@@ -146,6 +164,12 @@ class DatabaseService:
     def firmware_add(self, firmware: Firmware) -> Firmware:
         return self._database.firmware_add(firmware=firmware)
 
+    def firmware_change_target_by_id(self, id: int, target_id: int) -> None:
+        return self._database.firmware_change_target_by_id(id=id, target_id=target_id)
+
+    def firmware_change_target_by_project_version(self, project_id: int, version: str, target_id: int) -> None:
+        return self._database.firmware_change_target_by_project_version(project_id=project_id, version=version, target_id=target_id)
+
     def firmware_replace(self, firmware_id: int, filename: str, file_size: int, checksum: str) -> Firmware:
         return self._database.firmware_replace(firmware_id=firmware_id, filename=filename, file_size=file_size, checksum=checksum)
 
@@ -183,6 +207,18 @@ class DatabaseService:
             version: str,
         ) -> Firmware | None:
         return self._database.firmware_get_by_project_version(project_id=project_id, version=version)
+
+    def firmware_get_by_project_version_target(
+        self,
+        project_id: int,
+        version: str,
+        target_id: int,
+    ) -> Firmware | None:
+        return self._database.firmware_get_by_project_version_target(
+            project_id=project_id,
+            version=version,
+            target_id=target_id,
+        )
 
     def firmware_is_active(self, firmware_id: int) -> bool:
         return self._database.firmware_is_active(firmware_id)

@@ -3,11 +3,15 @@
 import importlib.util
 import time
 from pathlib import Path
+from typing import Any
 
 import mysql.connector
-from mysql.connector import MySQLConnection
 
 from ota_http_server.core.config import Config
+from ota_http_server.database.mysql_sql_tracing import (
+    is_sql_tracing_enabled,
+    with_mysql_sql_tracing,
+)
 from ota_http_server.logger import get_app_logger
 
 logger = get_app_logger(__name__)
@@ -18,7 +22,7 @@ class MigrationError(Exception):
 
 
 class MySQLMigrationConnection:
-    def __init__(self, conn: MySQLConnection):
+    def __init__(self, conn: Any):
         self._conn = conn
 
     def execute(self, sql: str, params: tuple | None = None) -> None:
@@ -35,17 +39,22 @@ class MigrationMySQLRunner:
         migrations_dir: str = self.cfg.config["database"]["mysql"]["migrations_dir"]
         self.migrations_dir = Path(migrations_dir).expanduser().resolve()
 
-    def _connect(self) -> MySQLConnection:
+    def _connect(self) -> Any:
         db_config = self.cfg.config["database"]["mysql"]
-        return mysql.connector.connect(
+        conn = mysql.connector.connect(
             host=db_config["dbhost"],
             port=db_config["dbport"],
             database=db_config["database"],
             user=db_config["dbuser"],
             password=db_config["dbpassword"],
         )
+        sql_trace_enabled = is_sql_tracing_enabled(
+            self.cfg.config["parameters"]["trace_sql"],
+            db_config["dbecho"],
+        )
+        return with_mysql_sql_tracing(conn, logger, sql_trace_enabled)
 
-    def _init_schema_table(self, conn: MySQLConnection) -> None:
+    def _init_schema_table(self, conn: Any) -> None:
         cursor = conn.cursor()
         try:
             cursor.execute(
@@ -59,7 +68,7 @@ class MigrationMySQLRunner:
         finally:
             cursor.close()
 
-    def _get_current_version(self, conn: MySQLConnection) -> int:
+    def _get_current_version(self, conn: Any) -> int:
         cursor = conn.cursor()
         try:
             cursor.execute("SELECT COALESCE(MAX(version), 0) FROM schema_version")

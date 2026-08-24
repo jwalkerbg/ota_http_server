@@ -6,9 +6,10 @@ from typing import Any
 
 from ota_http_server.logger.rotation import RotationPolicy, create_rotating_file_handler
 
-SUPPORTED_ADMIN_ACTIVITY_ACTIONS = {"add", "enable", "disable", "remove", "list", "get"}
+SUPPORTED_ADMIN_ACTIVITY_ACTIONS = {"add", "enable", "disable", "remove", "list", "get", "change"}
 ADMIN_ACTIVITY_ACTION_ALIASES = {
     "delete": "remove",
+    "change-target": "change",
 }
 
 

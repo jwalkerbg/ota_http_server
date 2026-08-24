@@ -7,7 +7,7 @@ from flask import Flask, Response, send_file, request, abort, jsonify
 from packaging import version
 import hmac
 
-from .data_models import TokenResult
+from .data_models import Device, Firmware, TokenResult
 from .auth_service import AuthService
 from ota_http_server.database.database_service import DatabaseService
 from ota_http_server.firmware.filename_validation import validate_firmware_filename
@@ -164,6 +164,18 @@ def create_app(cfg: Config) -> Flask:
     #                          ROUTES
     # ---------------------------------------------------------------
 
+    def get_firmware_metadata(project_id: int, fw_version: str, device: Device | None) -> Firmware | None:
+        if device is None:
+            return dbservice.firmware_get_by_project_version(
+                project_id=project_id,
+                version=fw_version,
+            )
+        return dbservice.firmware_get_by_project_version_target(
+            project_id=project_id,
+            version=fw_version,
+            target_id=device.target_id,
+        )
+
     @app.route(f'/{url_firmware}/<project>/<version>')
     def firmware(project:str, version:str) -> Response:
         project_rec = dbservice.project_get_by_name(project)
@@ -172,6 +184,7 @@ def create_app(cfg: Config) -> Flask:
         if not project_rec.is_active:
             abort(403, "Project is disabled")
 
+        device_rec: Device | None = None
         if use_jwt:
             # 1. Decode JWT
             payload = authservice.verify_token(project, verify_sub=True)
@@ -186,9 +199,10 @@ def create_app(cfg: Config) -> Flask:
             if not device_rec.is_active:
                 abort(403, "Device not allowed to download firmware")
 
-        firmware_rec = dbservice.firmware_get_by_project_version(
+        firmware_rec = get_firmware_metadata(
             project_id=project_rec.id,
-            version=version,
+            fw_version=version,
+            device=device_rec,
         )
         if firmware_rec is None:
             abort(404, "Firmware metadata not found")

@@ -13,6 +13,7 @@ from ota_http_server.core.formatters import FirmwareFormatter, FirmwareListItemF
 from ota_http_server.firmware.filename_validation import validate_firmware_filename
 from ota_http_server.logger import get_app_logger
 from ota_http_server.logger.admin_activity_logger import normalize_admin_activity_action
+from ota_http_server.target.target_service import DEFAULT_TARGET_NAME
 
 logger = get_app_logger(__name__)
 
@@ -37,6 +38,7 @@ class FirmwareService:
         # these handlers expect their parameters in self.cfg.config
         handlers= {
             "add": self._add_firmware,
+            "change-target": self._change_target,
             "replace": self._replace_firmware,
             "delete": self._delete_firmware,
             "enable": self._enable_firmware,
@@ -69,6 +71,8 @@ class FirmwareService:
                 "firmware_id": self.cfg.config["parameters"].get("firmware_id"),
                 "project_id": self.cfg.config["parameters"].get("firmware_pid"),
                 "version": self.cfg.config["parameters"].get("firmware_version"),
+                "target_id": self.cfg.config["parameters"].get("target_id"),
+                "target_name": self.cfg.config["parameters"].get("target_name"),
             },
             error=error,
         )
@@ -79,12 +83,14 @@ class FirmwareService:
         source_file = self.cfg.config["parameters"]["firmware_file"]
         release_notes = self.cfg.config["parameters"]["firmware_release_notes"]
         release_channel = self.cfg.config["parameters"]["firmware_release_channel"]
+        target_id = self._resolve_target_id()
 
         validate_firmware_filename(source_file)
 
         firmware = Firmware(
             id=None,
             project_id=pid,
+            target_id=target_id,
             version=version,
             filename="",
             file_size=0,
@@ -112,13 +118,13 @@ class FirmwareService:
                 record for record in db_service.firmware_get_record()
                 if record.project_id == pid
                 and record.version == version
-                and record.channel == release_channel
+                and record.target_id == target_id
             ),
             None,
         )
         if duplicate is not None:
             raise ValueError(
-                f"Firmware already exists for project_id={pid}, version={version}, channel={release_channel}"
+                f"Firmware already exists for project_id={pid}, version={version}, target_id={target_id}"
             )
 
         project_dir = app_paths.ensure_project_dir(project.name)
@@ -140,6 +146,52 @@ class FirmwareService:
         firmware.checksum = self._sha256_file(destination_path)
 
         db_service.firmware_add(firmware)
+
+    def _resolve_target_id(self) -> int:
+        db_service: DatabaseService = self.cfg.config["db_service"]
+        target_id = self.cfg.config["parameters"].get("target_id")
+        target_name = self.cfg.config["parameters"].get("target_name")
+
+        if target_id is not None:
+            target = db_service.target_get_by_id(target_id)
+            if target is None:
+                raise ValueError(f"Target with ID {target_id} does not exist")
+            if target.id is None:
+                raise ValueError(f"Target with ID {target_id} is missing its database identifier")
+            return target.id
+
+        if target_name is not None:
+            target = db_service.target_get_by_name(target_name)
+            if target is None:
+                raise ValueError(f"Target with name '{target_name}' does not exist")
+            if target.id is None:
+                raise ValueError(f"Target with name '{target_name}' is missing its database identifier")
+            return target.id
+
+        target = db_service.target_get_by_name(DEFAULT_TARGET_NAME)
+        if target is None:
+            raise ValueError(f"Target with name '{DEFAULT_TARGET_NAME}' does not exist")
+        if target.id is None:
+            raise ValueError(f"Target with name '{DEFAULT_TARGET_NAME}' is missing its database identifier")
+        return target.id
+
+    def _change_target(self) -> None:
+        id = self.cfg.config["parameters"]["firmware_id"]
+        pid = self.cfg.config["parameters"]["firmware_pid"]
+        version = self.cfg.config["parameters"]["firmware_version"]
+        target_id = self._resolve_target_id()
+
+        db_service: DatabaseService = self.cfg.config["db_service"]
+
+        if id is not None:
+            db_service.firmware_change_target_by_id(id, target_id)
+            return
+
+        if pid is not None and version is not None:
+            db_service.firmware_change_target_by_project_version(pid, version, target_id)
+            return
+
+        raise ValueError("Firmware id or project id plus version must be provided")
 
     def _replace_firmware(self) -> None:
         firmware_id = self.cfg.config["parameters"].get("firmware_id")
