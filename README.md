@@ -314,9 +314,32 @@ ota_http_server firmware get --pid 1 --version 1.2.0
 ota_http_server firmware enable --pid 1 --version 1.2.0
 ota_http_server firmware disable --id 2
 ota_http_server firmware replace --id 2 --file firmware_v1_2_1.bin
+ota_http_server firmware delete --pid 1 --version 1.2.0
 ```
 
 Firmware records include release metadata, binary checksum information, and active/inactive status for OTA distribution.
+
+### Administrative activity logging
+
+Administrative CLI activities on data entities and admin token generation via HTTP are logged to `AppPaths.logs/admin_activity.log` in JSON-lines format.
+Logged actions are:
+
+- `add`
+- `enable`
+- `disable`
+- `remove` (mapped from firmware `delete`)
+- `list`
+- `get`
+
+Firmware download requests are intentionally not written to this file.
+
+Supported rotation criteria for this log (and reusable for other logs) are:
+
+- `size` (rotate when file reaches a max size)
+- `time` (rotate on schedule, e.g. daily at midnight UTC)
+- `hybrid` (rotate on size or schedule, whichever comes first)
+
+Current default: `hybrid` with daily midnight UTC + size cap.
 
 ## Editable project - directory Structure
 
@@ -361,6 +384,8 @@ Example defaults include:
 * JWT algorithm: "HS256"
 * JWT expiry: 30 minutes
 * Audit log file: "ota_audit.log"
+* Admin activity log file: "admin_activity.log"
+* Rotation strategy: "hybrid" (daily midnight UTC or max size, whichever comes first)
 * Firmware directories: "firmware", "www"
 
 ### Configuration File (`config.toml`)
@@ -381,7 +406,6 @@ admin_secret = "adminsecret"
 www_dir = "www"
 firmware_dir = "firmware"
 url_firmware = "firmware"
-ota_audit_log = "ota_audit.log"
 ```
 Note: In the configuration file, keys use `underscores` (`_`), while the corresponding CLI options use `hyphens` (`-`).
 
@@ -394,7 +418,12 @@ For `dynamic runtime overrides`, the server can read environment variables. Thes
 * "jwt_max_expiry": os.getenv("OTA_JWT_MAX_EXPIRY_SECONDS"),
 * "jwt_secret": os.getenv("OTA_JWT_SECRET"),
 * "admin_secret": os.getenv("OTA_ADMIN_SECRET"),
-* "ota_audit_log": os.getenv("OTA_AUDIT_LOG")
+* "admin_activity_log": os.getenv("OTA_ADMIN_ACTIVITY_LOG")
+* "log_rotation_strategy": os.getenv("OTA_LOG_ROTATION_STRATEGY")
+* "log_rotation_max_bytes": os.getenv("OTA_LOG_ROTATION_MAX_BYTES")
+* "log_rotation_backup_count": os.getenv("OTA_LOG_ROTATION_BACKUP_COUNT")
+* "log_rotation_when": os.getenv("OTA_LOG_ROTATION_WHEN")
+* "log_rotation_interval": os.getenv("OTA_LOG_ROTATION_INTERVAL")
 * "jwt_issuer": os.getenv("OTA_JWT_ISSUER"),
 * "jwt_audience": os.getenv("OTA_JWT_AUDIENCE"),
 * "ota_db": os.getenv("OTA_DATABASE"),
@@ -727,12 +756,15 @@ The `/versions` endpoint verifies the token with `verify_sub=False`, which means
 
 ### Audit logging
 
-Token generation is logged for traceability. On success the server records an audit event with the device ID, project, and expiration time.
+Token generation is logged for traceability through the same admin activity logger used by CLI admin commands.
+On success the server records an event with `interface=http`, `entity=token`, `action=generate`, and target details (IP, device, project, expiration).
+
+Firmware download requests are logged to a separate rotatable log file, `ota_download.log`, using the same JSON event format and rotation policy as the admin activity log. The OTA request logger records the project, version, route, IP address, HTTP status code, and outcome for `/firmware/<project>/<version>`, `/firmware/<project>/latest`, and `/firmware/<project>/versions` requests.
 
 Example log entry:
 
-```text
-[2026-08-19T14:00:00+00:00] [AUDIT] device=e6f87d77-4216-4be1-ab83-b5fa6792b747 project=smart_fan exp=1755585600
+```json
+{"action":"download","entity":"firmware","interface":"http","outcome":"success","target":{"ip":"127.0.0.1","path":"/firmware/smart_fan/2.0.0","project":"smart_fan","status_code":200,"version":"2.0.0"},"timestamp":"2026-08-19T14:00:00+00:00"}
 ```
 
 ### Security notes

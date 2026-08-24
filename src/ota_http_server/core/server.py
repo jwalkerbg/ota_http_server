@@ -1,7 +1,5 @@
 # core/server.py
 
-import csv
-import os
 import re
 from pathlib import Path
 from datetime import datetime, timezone, UTC
@@ -40,7 +38,8 @@ def create_app(cfg: Config) -> Flask:
     jwt_issuer=cfg.config['parameters']['jwt_issuer']
     jwt_audience=cfg.config['parameters']['jwt_audience']
     admin_secret=cfg.config['parameters']['admin_secret']
-    ota_audit_log=cfg.config['parameters']['ota_audit_log']
+    admin_activity_logger = cfg.config.get("admin_activity_logger")
+    ota_download_logger = cfg.config.get("ota_download_logger")
 
     if use_jwt and (not jwt_secret or not admin_secret):
         raise ValueError("JWT is enabled but jwt_secret or admin_secret is not set")
@@ -90,20 +89,45 @@ def create_app(cfg: Config) -> Flask:
         sorted_versions = [v for _, v in version_files]
         return str(project_path), sorted_versions, version_files
 
-    def log_audit_event(ip:str|None, action:str, details:str) -> None:
-        """Append a token generation audit log entry."""
-        timestamp = datetime.now(UTC).isoformat()
+    def log_admin_activity(*, outcome: str, target: dict[str, object], error: str | None = None) -> None:
+        if admin_activity_logger is None:
+            return
+        admin_activity_logger.log_activity(
+            interface="http",
+            entity="token",
+            action="generate",
+            outcome=outcome,
+            target=target,
+            error=error,
+        )
 
-        app_paths = cfg.config['parameters']['app_paths']
-        ota_audit_log = (app_paths.logs_dir / Path(cfg.config['parameters']['ota_audit_log'])).resolve()
+    def log_ota_download_request(*, project: str | None, version: str | None, endpoint: str, outcome: str, status_code: int | None = None, error: str | None = None) -> None:
+        if ota_download_logger is None:
+            return
 
-        new_file = not os.path.exists(ota_audit_log)
-        with open(ota_audit_log, "a", newline="", encoding="utf-8") as csvfile:
-            writer = csv.writer(csvfile)
-            if new_file:
-                writer.writerow(["timestamp", "ip", "action", "details"])
-            writer.writerow([timestamp, ip, action, details])
-        logger.info(f"[AUDIT] %s | %s | %s | %s", timestamp, ip, action, details)
+        route_action = {
+            "firmware": "download",
+            "latest_firmware": "latest",
+            "list_versions": "versions",
+        }.get(endpoint, "download")
+
+        target: dict[str, object] = {
+            "ip": request.remote_addr,
+            "project": project,
+            "path": request.path,
+        }
+        if version is not None:
+            target["version"] = version
+        if status_code is not None:
+            target["status_code"] = status_code
+
+        ota_download_logger.log_download(
+            interface="http",
+            action=route_action,
+            outcome=outcome,
+            target=target,
+            error=error,
+        )
 
     def get_firmware_file_path(project: str, filename: str) -> Path:
         try:
@@ -115,6 +139,26 @@ def create_app(cfg: Config) -> Flask:
         app_paths = cfg.config['parameters']['app_paths']
         project_dir = app_paths.project_dir(project).resolve()
         return (project_dir / filename).resolve()
+
+    @app.after_request
+    def log_ota_request_response(response: Response) -> Response:
+        endpoint = request.endpoint
+        if endpoint not in {"firmware", "latest_firmware", "list_versions"}:
+            return response
+
+        view_args = request.view_args or {}
+        project = view_args.get("project")
+        version = view_args.get("version")
+        status_code = response.status_code
+        outcome = "success" if 200 <= status_code < 400 else "failed"
+        log_ota_download_request(
+            project=project,
+            version=version,
+            endpoint=endpoint,
+            outcome=outcome,
+            status_code=status_code,
+        )
+        return response
 
     # ---------------------------------------------------------------
     #                          ROUTES
@@ -257,14 +301,21 @@ def create_app(cfg: Config) -> Flask:
         if not data:
             abort(400, "Missing JSON body")
 
-        token_result:TokenResult = authservice.create_device_token(data)
+        target: dict[str, object] = {
+            "ip": request.remote_addr,
+            "device_id": data.get("device_id"),
+            "project": data.get("project"),
+        }
+        try:
+            token_result:TokenResult = authservice.create_device_token(data)
+        except Exception as exc:
+            log_admin_activity(outcome="failed", target=target, error=str(exc))
+            raise
 
-        # Audit logging
-        log_audit_event(
-            ip=request.remote_addr,
-            action="generate_token",
-            details=f"device={token_result.payload.get('sub','')}, project={token_result.payload.get('project','')}, exp={token_result.payload.get('exp','')}"
-        )
+        target["device_id"] = token_result.payload.get("sub", target["device_id"])
+        target["project"] = token_result.payload.get("project", target["project"])
+        target["expires_at"] = token_result.payload.get("exp")
+        log_admin_activity(outcome="success", target=target)
 
         return jsonify({
             "token": token_result.token,

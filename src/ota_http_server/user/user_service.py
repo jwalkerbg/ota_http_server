@@ -6,18 +6,20 @@ from ota_http_server.core.data_models import User
 from ota_http_server.core.formatters import UserFormatter
 from ota_http_server.database.database_service import DatabaseService
 from ota_http_server.logger import get_app_logger
+from ota_http_server.logger.admin_activity_logger import normalize_admin_activity_action
 
 logger = get_app_logger(__name__)
 
 class UserService:
     def __init__(self, cfg: Config):
         self.cfg = cfg
+        self.admin_activity_logger = self.cfg.config.get("admin_activity_logger")
 
     # CLI command handler for user operations
 
     def command_handler(self) -> None:
         command = self.cfg.config.get('user_command')
-        logger.info("Handling user command: %s", command)
+        logger.verbose("Handling user command: %s", command)
 
         # these handlers expect their parameters in self.cfg.config
         handlers= {
@@ -30,9 +32,30 @@ class UserService:
 
         handler = handlers.get(command)
         if handler is not None:
-            handler()
+            action = normalize_admin_activity_action(command)
+            try:
+                handler()
+                self._log_admin_activity(command=action, outcome="success")
+            except Exception as exc:
+                self._log_admin_activity(command=action, outcome="failed", error=str(exc))
+                raise
         else:
-            logger.debug("Invalid user command received: %s", command)
+            logger.error("Invalid user command received: %s", command)
+
+    def _log_admin_activity(self, command: str | None, outcome: str, error: str | None = None) -> None:
+        if command is None or self.admin_activity_logger is None:
+            return
+        self.admin_activity_logger.log_activity(
+            interface="cli",
+            entity="user",
+            action=command,
+            outcome=outcome,
+            target={
+                "user_id": self.cfg.config["parameters"].get("user_id"),
+                "username": self.cfg.config["parameters"].get("username"),
+            },
+            error=error,
+        )
 
     def _add_user(self) -> None:
         username = self.cfg.config["parameters"]["username"]
@@ -90,9 +113,9 @@ class UserService:
                 "User id or username must be provided"
             )
         if user is not None:
-            logger.verbose("User found: %s", user)
+            logger.info("User found: %s", user)
         else:
-            logger.verbose("User not found")
+            logger.info("User not found")
 
     def _list_users(self) -> None:
         db_service: DatabaseService = self.cfg.config["db_service"]
@@ -106,9 +129,9 @@ class UserService:
             users = db_service.user_get_list(is_active=is_active)
 
         if users:
-            logger.verbose("\n%s", UserFormatter.format_list(users))
+            logger.info("\n%s", UserFormatter.format_list(users))
         else:
-            logger.verbose("No users found")
+            logger.info("No users found")
 
     # REST API methods for user operations can be added here, e.g., create_user, get_user, update_user, delete_user, etc.
 

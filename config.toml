@@ -9,6 +9,14 @@ firmware_dir = "firmware"
 url_firmware = "firmware"
 jwt_issuer = "okto7-ota"
 jwt_audience = "ota_api"
+admin_activity_log = "admin_activity.log"
+ota_download_log = "ota_download.log"
+ota_audit_log = "ota_download.log"
+log_rotation_strategy = "hybrid"
+log_rotation_max_bytes = 10485760
+log_rotation_backup_count = 14
+log_rotation_when = "midnight"
+log_rotation_interval = 1
 
 [logging]
 verbose = 3
@@ -26,4 +34,3 @@ dbpassword = "SlavaUkraini"
 
 [database.sqlite]
 db_file = "ota_db.sqlite"
-

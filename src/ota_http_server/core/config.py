@@ -46,7 +46,14 @@ class ParametersConfig(TypedDict, total=False):
     www_dir: str
     firmware_dir: str
     url_firmware: str
+    admin_activity_log: str
+    ota_download_log: str
     ota_audit_log: str
+    log_rotation_strategy: str
+    log_rotation_max_bytes: int
+    log_rotation_backup_count: int
+    log_rotation_when: str
+    log_rotation_interval: int
     app_directory: str
     init_db_migrate: bool
     migrate_dry_run: bool
@@ -147,7 +154,14 @@ class Config:
             'www_dir': "www",
             'firmware_dir': "firmware",
             'url_firmware': "firmware",
-            'ota_audit_log': "ota_audit_log.csv",
+            "admin_activity_log": "admin_activity.log",
+            "ota_download_log": "ota_download.log",
+            "ota_audit_log": "ota_download.log",
+            "log_rotation_strategy": "hybrid",
+            "log_rotation_max_bytes": 10 * 1024 * 1024,
+            "log_rotation_backup_count": 14,
+            "log_rotation_when": "midnight",
+            "log_rotation_interval": 1,
             'app_directory': "C:\\ProgramData\\ota_http_server",
             'init_db_migrate': True,
             'migrate_dry_run': False,
@@ -283,8 +297,30 @@ class Config:
                     "url_firmware": {
                         "type": "string"
                     },
+                    "admin_activity_log": {
+                        "type": "string"
+                    },
+                    "ota_download_log": {
+                        "type": "string"
+                    },
                     "ota_audit_log": {
                         "type": "string"
+                    },
+                    "log_rotation_strategy": {
+                        "type": "string",
+                        "enum": ["size", "time", "hybrid"]
+                    },
+                    "log_rotation_max_bytes": {
+                        "type": "number"
+                    },
+                    "log_rotation_backup_count": {
+                        "type": "number"
+                    },
+                    "log_rotation_when": {
+                        "type": "string"
+                    },
+                    "log_rotation_interval": {
+                        "type": "number"
                     },
                     "app_directory": {
                         "type": "string"
@@ -402,6 +438,9 @@ class Config:
                             },
                             "dbport": {
                                 "type": "number"
+                            },
+                            "database": {
+                                "type": "string"
                             },
                             "dbuser": {
                                 "type": "string"
@@ -521,7 +560,14 @@ class Config:
                 "jwt_max_expiry": os.getenv("OTA_JWT_MAX_EXPIRY_SECONDS"),
                 "jwt_secret": os.getenv("OTA_JWT_SECRET"),
                 "admin_secret": os.getenv("OTA_ADMIN_SECRET"),
-                "ota_audit_log": os.getenv("OTA_AUDIT_LOG"),
+                "admin_activity_log": os.getenv("OTA_ADMIN_ACTIVITY_LOG"),
+                "ota_download_log": os.getenv("OTA_OTA_DOWNLOAD_LOG") or os.getenv("OTA_OTA_AUDIT_LOG") or os.getenv("OTA_SERVER_OTA_LOG"),
+                "ota_audit_log": os.getenv("OTA_OTA_AUDIT_LOG") or os.getenv("OTA_OTA_DOWNLOAD_LOG") or os.getenv("OTA_SERVER_OTA_LOG"),
+                "log_rotation_strategy": os.getenv("OTA_LOG_ROTATION_STRATEGY"),
+                "log_rotation_max_bytes": os.getenv("OTA_LOG_ROTATION_MAX_BYTES"),
+                "log_rotation_backup_count": os.getenv("OTA_LOG_ROTATION_BACKUP_COUNT"),
+                "log_rotation_when": os.getenv("OTA_LOG_ROTATION_WHEN"),
+                "log_rotation_interval": os.getenv("OTA_LOG_ROTATION_INTERVAL"),
                 "jwt_issuer": os.getenv("OTA_JWT_ISSUER"),
                 "jwt_audience": os.getenv("OTA_JWT_AUDIENCE"),
                 "app_directory": os.getenv("OTA_APP_DIRECTORY")
@@ -566,6 +612,24 @@ class Config:
                 self.config['logging']['use_color'] = config_cli.use_color
             if config_cli.use_string_handler is not None:
                 self.config['logging']['use_string_handler'] = config_cli.use_string_handler
+            if getattr(config_cli, "admin_activity_log", None) is not None:
+                self.config["parameters"]["admin_activity_log"] = config_cli.admin_activity_log
+            if getattr(config_cli, "ota_download_log", None) is not None:
+                self.config["parameters"]["ota_download_log"] = config_cli.ota_download_log
+                self.config["parameters"]["ota_audit_log"] = config_cli.ota_download_log
+            if getattr(config_cli, "ota_audit_log", None) is not None:
+                self.config["parameters"]["ota_audit_log"] = config_cli.ota_audit_log
+                self.config["parameters"]["ota_download_log"] = config_cli.ota_audit_log
+            if getattr(config_cli, "log_rotation_strategy", None) is not None:
+                self.config["parameters"]["log_rotation_strategy"] = config_cli.log_rotation_strategy
+            if getattr(config_cli, "log_rotation_max_bytes", None) is not None:
+                self.config["parameters"]["log_rotation_max_bytes"] = config_cli.log_rotation_max_bytes
+            if getattr(config_cli, "log_rotation_backup_count", None) is not None:
+                self.config["parameters"]["log_rotation_backup_count"] = config_cli.log_rotation_backup_count
+            if getattr(config_cli, "log_rotation_when", None) is not None:
+                self.config["parameters"]["log_rotation_when"] = config_cli.log_rotation_when
+            if getattr(config_cli, "log_rotation_interval", None) is not None:
+                self.config["parameters"]["log_rotation_interval"] = config_cli.log_rotation_interval
 
             # Handle database options
             if config_cli.dbtype is not None:
@@ -627,9 +691,6 @@ class Config:
                     self.config['parameters']['firmware_dir'] = config_cli.firmware_dir
                 if config_cli.url_firmware is not None:
                     self.config['parameters']['url_firmware'] = config_cli.url_firmware
-                # logging parameters
-                if config_cli.ota_audit_log is not None:
-                    self.config['parameters']['ota_audit_log'] = config_cli.ota_audit_log
 
             if config_cli.command == 'db':
                 if config_cli.db_command is not None:
@@ -822,6 +883,14 @@ class Config:
                         self.config["parameters"]["firmware_version"] = config_cli.firmware_version
                     if config_cli.firmware_file is not None:
                         self.config["parameters"]["firmware_file"] = config_cli.firmware_file
+                # delete
+                if config_cli.firmware_command == "delete":
+                    if config_cli.firmware_id is not None:
+                        self.config["parameters"]["firmware_id"] = config_cli.firmware_id
+                    if config_cli.firmware_pid is not None:
+                        self.config["parameters"]["firmware_pid"] = config_cli.firmware_pid
+                    if config_cli.firmware_version is not None:
+                        self.config["parameters"]["firmware_version"] = config_cli.firmware_version
                 # list
                 if config_cli.firmware_command == "list":
                     if config_cli.firmware_record is not None:
@@ -859,7 +928,14 @@ Environment variables:
   OTA_ADMIN_SECRET        Admin secret key, can be overridden by --admin-secret CLI option
   OTA_JWT_ISSUER          JWT issuer claim value, can be overridden by --jwt-issuer CLI option
   OTA_JWT_AUDIENCE        JWT audience claim value, can be overridden by --jwt-audience CLI option
-  OTA_AUDIT_LOG           Path to the OTA audit log file (default 'ota_audit_log.csv'), can be overridden by --ota-audit-log CLI option
+  OTA_ADMIN_ACTIVITY_LOG  Path to the admin activity log file in AppPaths.logs (default 'admin_activity.log')
+  OTA_OTA_DOWNLOAD_LOG    Path to the OTA download request log file in AppPaths.logs (default 'ota_download.log')
+  OTA_OTA_AUDIT_LOG       Alias for OTA_OTA_DOWNLOAD_LOG
+  OTA_LOG_ROTATION_STRATEGY Rotation strategy for rotating logs: size, time, hybrid (default 'hybrid')
+  OTA_LOG_ROTATION_MAX_BYTES Size threshold in bytes for size/hybrid rotation (default 10485760)
+  OTA_LOG_ROTATION_BACKUP_COUNT Number of rotated files to keep (default 14)
+  OTA_LOG_ROTATION_WHEN   Time-based rotation schedule (default 'midnight')
+  OTA_LOG_ROTATION_INTERVAL Interval for time-based rotation (default 1)
   OTA_DB                  Path to the OTA database file (default 'ota_db.toml'), can be overridden by --ota-db CLI option
   OTA_DB_CACHE_TTL        Cache time-to-live for the OTA database in seconds (default 300), can be overridden by --ota-db-cache-ttl CLI option
   OTA_DB_HOST             Database host (default 'localhost'), can be overridden by --dbhost CLI option
@@ -915,13 +991,21 @@ For use in development environment without SSL certificates and JWT authenticati
     string_handler_group = logging_group.add_mutually_exclusive_group()
     string_handler_group.add_argument("--use-string-handler", action="store_const", const=True, dest="use_string_handler", help="Enable string handler to store logs in an internal buffer")
     string_handler_group.add_argument("--no-use-string-handler", action="store_const", const=False, dest="use_string_handler", help="Disable string handler to store logs in an internal buffer")
+    logging_group.add_argument("--admin-activity-log", dest="admin_activity_log", help="Admin activity log file name in AppPaths.logs (default 'admin_activity.log')")
+    logging_group.add_argument("--ota-download-log", dest="ota_download_log", help="OTA download request log file name in AppPaths.logs (default 'ota_download.log')")
+    logging_group.add_argument("--ota-audit-log", dest="ota_audit_log", help="Alias for --ota-download-log")
+    logging_group.add_argument("--log-rotation-strategy", dest="log_rotation_strategy", choices=["size", "time", "hybrid"], help="Rotation strategy for rotating logs: size, time, hybrid")
+    logging_group.add_argument("--log-rotation-max-bytes", dest="log_rotation_max_bytes", type=int, help="Maximum size in bytes before rotating for size/hybrid strategies")
+    logging_group.add_argument("--log-rotation-backup-count", dest="log_rotation_backup_count", type=int, help="Number of rotated files to keep")
+    logging_group.add_argument("--log-rotation-when", dest="log_rotation_when", help="Timed rotation schedule, e.g. midnight, D, H")
+    logging_group.add_argument("--log-rotation-interval", dest="log_rotation_interval", type=int, help="Timed rotation interval")
     exception_group = logging_group.add_mutually_exclusive_group()
     exception_group.add_argument("--exc-full-stack", action="store_const", const=True, dest='exc_full_stack', help="Enable full stack logging for exceptions (useful for development and debugging)")
     exception_group.add_argument("--no-exc-full-stack", action="store_const", const=False, dest='exc_full_stack', help="Disable full stack logging for exceptions (useful for production)")
 
     # database options
     db_group = parser.add_argument_group("Database")
-    db_group.add_argument("--dbtype", dest="dbtype", type=str, choices=["mysql", "sqlite"], required=True, help="Database type (mysql or sqlite), overrides OTA_DB_TYPE environment variable")
+    db_group.add_argument("--dbtype", dest="dbtype", type=str, choices=["mysql", "sqlite"], required=False, help="Database type (mysql or sqlite), overrides OTA_DB_TYPE environment variable")
     # MySQL options
     db_group.add_argument("--dbhost", dest="dbhost", type=str, help="Database host (default 'localhost'), overrides OTA_DB_HOST environment variable")
     db_group.add_argument("--dbport", dest="dbport", type=int, help="Database port (default 3306), overrides OTA_DB_PORT environment variable")
@@ -942,7 +1026,7 @@ For use in development environment without SSL certificates and JWT authenticati
     app_dir_group.add_argument("--app-directory", dest="app_directory", type=str, help="Path to the application directory (default 'C:\\ProgramData\\ota_http_server'), overrides OTA_APP_DIRECTORY environment variable.\nHere the configuration file, audit log and database files are stored.\nIf the directory does not exist, it will be created automatically.")
 
     # application options & parameters
-    subparsers = parser.add_subparsers(dest="command", required=True)
+    subparsers = parser.add_subparsers(dest="command", required=False, help="Sub-command to run. If not specified, no action will be taken.")
 
     run_parser = subparsers.add_parser("runserver", help="Start OTA HTTP server")
 
@@ -975,9 +1059,6 @@ For use in development environment without SSL certificates and JWT authenticati
     server_group.add_argument("--www-dir", dest="www_dir", help="Root directory for files (default 'www')")
     server_group.add_argument("--firmware-dir", dest="firmware_dir", help="Subdirectory for firmware files (default 'firmware')")
     server_group.add_argument("--url-firmware", dest="url_firmware", help="The URL path segment for firmware (default 'firmware', corresponds with `firmware-dir`)")
-
-    logging_group = run_parser.add_argument_group("Logging")
-    logging_group.add_argument("--ota-audit-log", dest="ota_audit_log", help="Path to the OTA audit log file (default 'ota_audit_log.csv'), overrides OTA_AUDIT_LOG environment variable")
 
     # db
     db_parser = subparsers.add_parser(name="db", help="Database operations")
@@ -1108,6 +1189,11 @@ For use in development environment without SSL certificates and JWT authenticati
     replace_firmware_parser.add_argument("--pid", dest="firmware_pid", type=int, required=False, help="ID of the project the firmware is related to")
     replace_firmware_parser.add_argument("--version", dest="firmware_version", type=str, required=False, help="Version of the firmware to replace")
     replace_firmware_parser.add_argument("--file", dest="firmware_file", type=str, required=True, help="Path to the new firmware file")
+    # firmware delete
+    delete_firmware_parser = firmware_subparsers.add_parser("delete", help="Delete uploaded firmware file and corresponding database record")
+    delete_firmware_parser.add_argument("--id", dest="firmware_id", type=int, required=False, help="ID of the firmware record to delete. --id takes precedence over --pid/--version.")
+    delete_firmware_parser.add_argument("--pid", dest="firmware_pid", type=int, required=False, help="ID of the project the firmware is related to")
+    delete_firmware_parser.add_argument("--version", dest="firmware_version", type=str, required=False, help="Version of the firmware to delete")
     # firmware list
     list_firmware_parser = firmware_subparsers.add_parser("list", help="List available firmware")
     list_firmware_parser.add_argument("--record", dest="firmware_record", action="store_const", const=True, help="List full records of firmware, including all fields. If not specified, only a summary of firmware will be listed.")

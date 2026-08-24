@@ -7,15 +7,19 @@ from pathlib import Path
 from ota_http_server.core.config import Config
 from ota_http_server.core.data_models import Firmware, AppPaths
 from ota_http_server.database.database_service import DatabaseService
+from ota_http_server.database.db_mysql_service import FirmwareNotFoundError as MySQLFirmwareNotFoundError
+from ota_http_server.database.db_sqlite_service import FirmwareNotFoundError as SqliteFirmwareNotFoundError
 from ota_http_server.core.formatters import FirmwareFormatter, FirmwareListItemFormatter
 from ota_http_server.firmware.filename_validation import validate_firmware_filename
 from ota_http_server.logger import get_app_logger
+from ota_http_server.logger.admin_activity_logger import normalize_admin_activity_action
 
 logger = get_app_logger(__name__)
 
 class FirmwareService:
     def __init__(self, cfg: Config):
         self.cfg = cfg
+        self.admin_activity_logger = self.cfg.config.get("admin_activity_logger")
 
     def _sha256_file(self, file_path: Path) -> str:
         digest = hashlib.sha256()
@@ -28,12 +32,13 @@ class FirmwareService:
 
     def command_handler(self) -> None:
         command = self.cfg.config.get('firmware_command')
-        logger.info("Handling firmware command: %s", command)
+        logger.verbose("Handling firmware command: %s", command)
 
         # these handlers expect their parameters in self.cfg.config
         handlers= {
             "add": self._add_firmware,
             "replace": self._replace_firmware,
+            "delete": self._delete_firmware,
             "enable": self._enable_firmware,
             "disable": self._disable_firmware,
             "get": self._get_firmware,
@@ -42,9 +47,31 @@ class FirmwareService:
 
         handler = handlers.get(command)
         if handler is not None:
-            handler()
+            action = normalize_admin_activity_action(command)
+            try:
+                handler()
+                self._log_admin_activity(command=action, outcome="success")
+            except Exception as exc:
+                self._log_admin_activity(command=action, outcome="failed", error=str(exc))
+                raise
         else:
-            logger.debug("Invalid firmware command received: %s", command)
+            logger.error("Invalid firmware command received: %s", command)
+
+    def _log_admin_activity(self, command: str | None, outcome: str, error: str | None = None) -> None:
+        if command is None or self.admin_activity_logger is None:
+            return
+        self.admin_activity_logger.log_activity(
+            interface="cli",
+            entity="firmware",
+            action=command,
+            outcome=outcome,
+            target={
+                "firmware_id": self.cfg.config["parameters"].get("firmware_id"),
+                "project_id": self.cfg.config["parameters"].get("firmware_pid"),
+                "version": self.cfg.config["parameters"].get("firmware_version"),
+            },
+            error=error,
+        )
 
     def _add_firmware(self) -> None:
         pid = self.cfg.config["parameters"]["firmware_pid"]
@@ -171,6 +198,49 @@ class FirmwareService:
         )
         logger.info("Updated firmware record %s", replacement)
 
+    def _delete_firmware(self) -> None:
+        firmware_id = self.cfg.config["parameters"].get("firmware_id")
+        pid = self.cfg.config["parameters"].get("firmware_pid")
+        version = self.cfg.config["parameters"].get("firmware_version")
+
+        db_service: DatabaseService = self.cfg.config["db_service"]
+        app_paths: AppPaths = self.cfg.config["parameters"]["app_paths"]
+
+        try:
+            if firmware_id is not None:
+                deleted = db_service.firmware_delete_by_id(firmware_id)
+            elif pid is not None and version is not None:
+                deleted = db_service.firmware_delete_by_project_version(
+                    project_id=pid,
+                    version=version,
+                )
+            else:
+                raise ValueError("Firmware id or project id plus version must be provided")
+        except (SqliteFirmwareNotFoundError, MySQLFirmwareNotFoundError):
+            if firmware_id is not None:
+                logger.info("No uploaded firmware found for firmware_id=%s. Nothing to delete.", firmware_id)
+            else:
+                logger.info("No uploaded firmware found for project_id=%s and version=%s. Nothing to delete.", pid, version)
+            return
+
+        validate_firmware_filename(deleted.filename)
+        project_dir = app_paths.project_dir(deleted.project_name).resolve(strict=False)
+        firmware_file_path = (project_dir / deleted.filename).resolve(strict=False)
+        if firmware_file_path.parent != project_dir:
+            raise ValueError(
+                f"Refusing to delete firmware file outside project directory: {firmware_file_path}"
+            )
+
+        if firmware_file_path.exists():
+            firmware_file_path.unlink()
+            logger.info("Deleted firmware file '%s'", firmware_file_path)
+        else:
+            logger.info(
+                "Firmware file '%s' does not exist on disk; database record has been deleted.",
+                firmware_file_path,
+            )
+        logger.info("Deleted firmware record id=%s", deleted.id)
+
     def _enable_firmware(self) -> None:
         id = self.cfg.config["parameters"]["firmware_id"]
         pid = self.cfg.config["parameters"]["firmware_pid"]
@@ -220,17 +290,17 @@ class FirmwareService:
         if id is not None:
             firmware = db_service.firmware_get_by_id(id)
             if firmware:
-                logger.verbose("Firmware found: %s", firmware)
+                logger.info("Firmware found: %s", firmware)
             else:
-                logger.verbose("Firmware with ID = %d not found", id)
+                logger.info("Firmware with ID = %d not found", id)
             return
 
         if pid is not None and version is not None:
             firmware = db_service.firmware_get_by_project_version(project_id=pid, version=version)
             if firmware:
-                logger.verbose("Firmware found: %s", firmware)
+                logger.info("Firmware found: %s", firmware)
             else:
-                logger.verbose("Firmware with pid = %d and version = %s not found", pid, version)
+                logger.info("Firmware with pid = %d and version = %s not found", pid, version)
             return
 
         raise ValueError(
@@ -247,13 +317,13 @@ class FirmwareService:
         if self.cfg.config["parameters"]["firmware_record"] == True:
             firmware = db_service.firmware_get_record(is_active=is_active, project_id=project_id)
             if firmware:
-                logger.verbose("\n%s",FirmwareFormatter.format_list(firmware))
+                logger.info("\n%s",FirmwareFormatter.format_list(firmware))
             else:
                 logger.info("No firmware found.")
 
         else:
             firmware = db_service.firmware_get_list(is_active=is_active, project_id=project_id)
             if firmware:
-                logger.verbose("\n%s\n",FirmwareListItemFormatter.format_list(firmware))
+                logger.info("\n%s\n",FirmwareListItemFormatter.format_list(firmware))
             else:
                 logger.info("No firmware found.")

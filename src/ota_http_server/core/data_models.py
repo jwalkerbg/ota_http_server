@@ -223,6 +223,12 @@ class FirmwareListItem:
     file_size: int
     channel: str
 
+@dataclass
+class FirmwareDeleteInfo:
+    id: int
+    project_name: str
+    filename: str
+
 class AppPaths:
     def __init__(self, cfg: Config):
         self._cfg = cfg
