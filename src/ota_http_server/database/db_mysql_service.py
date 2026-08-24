@@ -18,6 +18,10 @@ from ota_http_server.core.data_models import (
     Target,
     User,
 )
+from ota_http_server.database.mysql_sql_tracing import (
+    is_sql_tracing_enabled,
+    with_mysql_sql_tracing,
+)
 from ota_http_server.database.migration_mysql_runner import MigrationMySQLRunner
 from ota_http_server.logger import get_app_logger
 
@@ -119,9 +123,11 @@ class DatabaseMySQLService:
             password=db_config["dbpassword"],
             autocommit=False,
         )
-        if self.cfg.config["parameters"]["trace_sql"] and hasattr(conn, "set_trace_callback"):
-            conn.set_trace_callback(lambda sql: logger.debug("SQL: %s", sql))
-        return conn
+        sql_trace_enabled = is_sql_tracing_enabled(
+            self.cfg.config["parameters"]["trace_sql"],
+            db_config["dbecho"],
+        )
+        return with_mysql_sql_tracing(conn, logger, sql_trace_enabled)
 
     @staticmethod
     def _as_datetime(value: Any) -> datetime | None:

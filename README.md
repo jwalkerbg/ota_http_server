@@ -258,6 +258,7 @@ ota_http_server runserver --help
 ```
 
 Server configuration options include host, port, certificate settings, JWT flags, and database connection parameters. The database can be selected with `--dbtype` (`sqlite` or `mysql`), while SQLite file path is controlled with `--dbfile`.
+To print executed SQL statements in logs for both SQLite and MySQL, enable SQL tracing with `--trace-sql` (or `--dbecho` for MySQL compatibility) and set logging verbosity to debug (`--verbose 6`).
 
 ### Database operations
 
