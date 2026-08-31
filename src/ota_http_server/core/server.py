@@ -164,12 +164,50 @@ def create_app(cfg: Config) -> Flask:
     #                          ROUTES
     # ---------------------------------------------------------------
 
-    def get_firmware_metadata(project_id: int, fw_version: str, device: Device | None) -> Firmware | None:
-        if device is None:
-            return dbservice.firmware_get_by_project_version(
-                project_id=project_id,
-                version=fw_version,
-            )
+    def resolve_device(project: str, project_id: int, use_jwt_mode: bool) -> Device:
+        """Resolve device UUID to device record in both JWT and --no-jwt modes.
+        
+        In JWT mode:
+            device_id = JWT.sub (extracted from token)
+        In --no-jwt mode:
+            device_id = X-Device-ID header or device_id query parameter
+        
+        Returns the device record if valid, raises HTTP error otherwise.
+        
+        Args:
+            project: Project name string from URL
+            project_id: Project ID from database
+            use_jwt_mode: Whether JWT is enabled
+        """
+        if use_jwt_mode:
+            # JWT mode: extract device UUID from token's "sub" claim
+            payload = authservice.verify_token(project, verify_sub=True)
+            device_id = payload["sub"]
+        else:
+            # --no-jwt mode: extract device UUID from X-Device-ID header or query param
+            device_id = request.headers.get("X-Device-ID")
+            if not device_id:
+                device_id = request.args.get("device_id")
+            if not device_id:
+                abort(400, "Missing X-Device-ID header or device_id query parameter")
+        
+        # Resolve device UUID to device record
+        device_rec = dbservice.device_get_by_name(device_id)
+        if device_rec is None or device_rec.project_id != project_id:
+            abort(403, "Device not registered for project")
+        
+        # Check device permission
+        if not device_rec.is_active:
+            abort(403, "Device not allowed to download firmware")
+        
+        return device_rec
+
+    def get_firmware_metadata(project_id: int, fw_version: str, device: Device) -> Firmware | None:
+        """Get firmware by project, version, and target.
+        
+        Target is always obtained from device.target_id.
+        This function never falls back to project+version only lookup.
+        """
         return dbservice.firmware_get_by_project_version_target(
             project_id=project_id,
             version=fw_version,
@@ -184,20 +222,8 @@ def create_app(cfg: Config) -> Flask:
         if not project_rec.is_active:
             abort(403, "Project is disabled")
 
-        device_rec: Device | None = None
-        if use_jwt:
-            # 1. Decode JWT
-            payload = authservice.verify_token(project, verify_sub=True)
-            # 2. Extract identity
-            device_id = payload["sub"]
-
-            # 3. Check membership
-            device_rec = dbservice.device_get_by_name(device_id)
-            if device_rec is None or device_rec.project_id != project_rec.id:
-                abort(403, "Device not registered for project")
-            # 4. Check device permission
-            if not device_rec.is_active:
-                abort(403, "Device not allowed to download firmware")
+        # Resolve device in both JWT and --no-jwt modes
+        device_rec = resolve_device(project, project_rec.id, use_jwt)
 
         firmware_rec = get_firmware_metadata(
             project_id=project_rec.id,
@@ -224,26 +250,16 @@ def create_app(cfg: Config) -> Flask:
         if not project_rec.is_active:
             abort(403, "Project is disabled")
 
-        if use_jwt:
-            # 1. Decode JWT
-            payload = authservice.verify_token(project, verify_sub=True)
-            # 2. Extract identity
-            device_id = payload["sub"]
+        # Resolve device in both JWT and --no-jwt modes
+        device_rec = resolve_device(project, project_rec.id, use_jwt)
 
-            # 3. Check membership
-            device_rec = dbservice.device_get_by_name(device_id)
-            if device_rec is None or device_rec.project_id != project_rec.id:
-                abort(403, "Device not registered for project")
-            # 4. Check device permission
-            if not device_rec.is_active:
-                abort(403, "Device not allowed to download firmware")
-
+        # Get all firmware records for this project and target
         firmware_records = [
             fw for fw in dbservice.firmware_get_record()
-            if fw.project_id == project_rec.id
+            if fw.project_id == project_rec.id and fw.target_id == device_rec.target_id
         ]
         if not firmware_records:
-            abort(404, "No firmware metadata found for project")
+            abort(404, "No firmware metadata found for project and target")
 
         latest_firmware_rec = max(firmware_records, key=lambda fw: fw.version)
         if not latest_firmware_rec.is_active:

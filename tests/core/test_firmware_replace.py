@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from ota_http_server.core.config import parse_args
-from ota_http_server.core.data_models import Firmware, Project, Target, User
+from ota_http_server.core.data_models import Firmware, Project, Target, User, Device
 from ota_http_server.device.device_service import DeviceService
 from ota_http_server.firmware.filename_validation import validate_firmware_filename
 from ota_http_server.firmware.firmware_service import FirmwareService
@@ -129,7 +129,20 @@ def test_firmware_route_rejects_unsafe_stored_filename(tmp_path, monkeypatch):
         created_at=None,
         updated_at=None,
     )
-    db_service.firmware_get_by_project_version.return_value = Firmware(
+    db_service.device_get_by_name.return_value = Device(
+        id=1,
+        uuid="device-1",
+        project_id=12,
+        target_id=1,
+        model="test",
+        serial_number="sn",
+        current_version="1.0.0",
+        last_seen=None,
+        is_active=True,
+        created_at=None,
+        updated_at=None,
+    )
+    db_service.firmware_get_by_project_version_target.return_value = Firmware(
         id=7,
         project_id=12,
         target_id=1,
@@ -165,7 +178,7 @@ def test_firmware_route_rejects_unsafe_stored_filename(tmp_path, monkeypatch):
     }
 
     app = create_app(cfg)
-    response = app.test_client().get("/firmware/proj/1.2.3")
+    response = app.test_client().get("/firmware/proj/1.2.3?device_id=device-1")
 
     assert response.status_code == 404
 
@@ -186,6 +199,19 @@ def test_latest_firmware_route_rejects_unsafe_stored_filename(tmp_path, monkeypa
         display_name="Proj",
         description="",
         created_by=1,
+        is_active=True,
+        created_at=None,
+        updated_at=None,
+    )
+    db_service.device_get_by_name.return_value = Device(
+        id=1,
+        uuid="device-1",
+        project_id=12,
+        target_id=1,
+        model="test",
+        serial_number="sn",
+        current_version="1.0.0",
+        last_seen=None,
         is_active=True,
         created_at=None,
         updated_at=None,
@@ -228,7 +254,7 @@ def test_latest_firmware_route_rejects_unsafe_stored_filename(tmp_path, monkeypa
     }
 
     app = create_app(cfg)
-    response = app.test_client().get("/firmware/proj/latest")
+    response = app.test_client().get("/firmware/proj/latest?device_id=device-1")
 
     assert response.status_code == 404
 
