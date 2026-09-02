@@ -13,6 +13,7 @@ from ota_http_server.database.database_service import DatabaseService
 from ota_http_server.firmware.filename_validation import validate_firmware_filename
 from ota_http_server.logger import get_app_logger
 from ota_http_server.core.config import Config
+from ota_http_server.api import register_api_blueprints
 
 logger = get_app_logger(__name__)
 
@@ -58,6 +59,7 @@ def create_app(cfg: Config) -> Flask:
     # Flask app factory with JWT authentication and secure admin endpoint.
     #
     app = Flask(__name__.split('.', maxsplit=1)[0])
+    register_api_blueprints(app)
 
     # ---------------------------------------------------------------
     #                       HELPER FUNCTIONS
