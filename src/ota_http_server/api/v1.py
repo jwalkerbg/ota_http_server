@@ -45,6 +45,7 @@ def register_api_error_handlers(app):
         return jsonify(payload), 500
 
 
+@api_v1.route("", methods=["GET"])
 @api_v1.route("/", methods=["GET"])
 def api_root() -> tuple[object, int]:
     return jsonify({
