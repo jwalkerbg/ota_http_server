@@ -171,14 +171,14 @@ def create_app(cfg: Config) -> Flask:
 
     def resolve_device(project: str, project_id: int, use_jwt_mode: bool) -> Device:
         """Resolve device UUID to device record in both JWT and --no-jwt modes.
-        
+
         In JWT mode:
             device_id = JWT.sub (extracted from token)
         In --no-jwt mode:
             device_id = X-Device-ID header or device_id query parameter
-        
+
         Returns the device record if valid, raises HTTP error otherwise.
-        
+
         Args:
             project: Project name string from URL
             project_id: Project ID from database
@@ -195,21 +195,21 @@ def create_app(cfg: Config) -> Flask:
                 device_id = request.args.get("device_id")
             if not device_id:
                 abort(400, "Missing X-Device-ID header or device_id query parameter")
-        
+
         # Resolve device UUID to device record
         device_rec = dbservice.device_get_by_name(device_id)
         if device_rec is None or device_rec.project_id != project_id:
             abort(403, "Device not registered for project")
-        
+
         # Check device permission
         if not device_rec.is_active:
             abort(403, "Device not allowed to download firmware")
-        
+
         return device_rec
 
     def get_firmware_metadata(project_id: int, fw_version: str, device: Device) -> Firmware | None:
         """Get firmware by project, version, and target.
-        
+
         Target is always obtained from device.target_id.
         This function never falls back to project+version only lookup.
         """
