@@ -12,7 +12,7 @@ from ota_http_server.target.target_service import TargetService
 from ota_http_server.device.device_service import DeviceService
 from ota_http_server.firmware.firmware_service import FirmwareService
 from ota_http_server.logger import get_app_logger
-from ota_http_server.logger.admin_activity_logger import AdminActivityLogger, build_admin_activity_logger, build_ota_download_logger
+from ota_http_server.logger.admin_activity_logger import build_admin_activity_logger, build_ota_download_logger
 from ota_http_server.core.data_models import AppPaths
 
 logger = get_app_logger(__name__)
@@ -22,22 +22,22 @@ def run_app(cfg:Config) -> None:
 
     # ensure app directories exist
     logger.verbose("Creating AppPaths object")
-    app_paths: AppPaths = AppPaths(cfg)
+    app_paths = AppPaths(cfg)
     # store app_paths in the configuration so as to access it elsewhere
     cfg.config['parameters']['app_paths'] = app_paths
     cfg.config["admin_activity_logger"] = build_admin_activity_logger(cfg)
     cfg.config["ota_download_logger"] = build_ota_download_logger(cfg)
-    db_service: DatabaseService = DatabaseService(cfg)
+    db_service = DatabaseService(cfg)
     cfg.config["db_service"] = db_service
-    user_service: UserService = UserService(cfg)
+    user_service = UserService(cfg)
     cfg.config["user_service"] = user_service
-    project_service: ProjectService = ProjectService(cfg)
+    project_service = ProjectService(cfg)
     cfg.config["project_service"] = project_service
-    target_service: TargetService = TargetService(cfg)
+    target_service = TargetService(cfg)
     cfg.config["target_service"] = target_service
-    device_service: DeviceService = DeviceService(cfg)
+    device_service = DeviceService(cfg)
     cfg.config["device_service"] = device_service
-    firmware_service: FirmwareService = FirmwareService(cfg)
+    firmware_service = FirmwareService(cfg)
     cfg.config["firmware_service"] = firmware_service
 
     if cfg.config['command'] == 'runserver':

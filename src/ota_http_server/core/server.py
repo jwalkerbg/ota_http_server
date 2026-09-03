@@ -53,7 +53,7 @@ def create_app(cfg: Config) -> Flask:
                               jwt_expiry=jwt_expiry,
                               jwt_max_expiry=jwt_max_expiry
                             )
-    dbservice: DatabaseService = cfg.config.get("db_service") or DatabaseService(cfg)
+    dbservice = cfg.config.get("db_service") or DatabaseService(cfg)
 
     #
     # Flask app factory with JWT authentication and secure admin endpoint.
