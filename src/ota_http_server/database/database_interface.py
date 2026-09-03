@@ -45,6 +45,19 @@ class DatabaseInterface(Protocol):
     def user_get_record(self, is_active: bool | None = None) -> list[User]:
         ...
 
+    def user_update_by_id(
+        self,
+        user_id: int,
+        *,
+        username: str | None = None,
+        email: str | None = None,
+        role: str | None = None,
+    ) -> User:
+        ...
+
+    def user_set_password_by_id(self, user_id: int, password_hash: str) -> None:
+        ...
+
     def project_add(self, project: Project) -> Project:
         ...
 
@@ -69,10 +82,30 @@ class DatabaseInterface(Protocol):
     def project_is_active(self, project_id: int) -> bool:
         ...
 
-    def project_get_record(self) -> list[Project]:
+    def project_get_record(
+        self,
+        is_active: bool | None = None,
+        created_by: int | None = None,
+        created_by_username: str | None = None,
+    ) -> list[Project]:
         ...
 
-    def project_get_list(self) -> list[ProjectListItem]:
+    def project_get_list(
+        self,
+        is_active: bool | None = None,
+        created_by: int | None = None,
+        created_by_username: str | None = None,
+    ) -> list[ProjectListItem]:
+        ...
+
+    def project_update_by_id(
+        self,
+        project_id: int,
+        *,
+        name: str | None = None,
+        display_name: str | None = None,
+        description: str | None = None,
+    ) -> Project:
         ...
 
     def target_add(self, target: Target) -> Target:
@@ -129,6 +162,18 @@ class DatabaseInterface(Protocol):
         is_active: bool | None = None,
         project_id: int | None = None,
     ) -> list[DeviceListItem]:
+        ...
+
+    def device_update_by_id(
+        self,
+        device_id: int,
+        *,
+        project_id: int | None = None,
+        target_id: int | None = None,
+        model: str | None = None,
+        serial_number: str | None = None,
+        current_version: str | None = None,
+    ) -> Device:
         ...
 
     def firmware_add(self, firmware: Firmware) -> Firmware:
@@ -194,4 +239,15 @@ class DatabaseInterface(Protocol):
         is_active: bool | None = None,
         project_id: int | None = None,
     ) -> list[FirmwareListItem]:
+        ...
+
+    def firmware_update_by_id(
+        self,
+        firmware_id: int,
+        *,
+        version: str | None = None,
+        release_notes: str | None = None,
+        channel: str | None = None,
+        target_id: int | None = None,
+    ) -> Firmware:
         ...

@@ -69,6 +69,24 @@ class DatabaseService:
     def user_get_record(self, is_active: bool | None = None) -> list[User]:
         return self._database.user_get_record(is_active=is_active)
 
+    def user_update_by_id(
+        self,
+        user_id: int,
+        *,
+        username: str | None = None,
+        email: str | None = None,
+        role: str | None = None,
+    ) -> User:
+        return self._database.user_update_by_id(
+            user_id,
+            username=username,
+            email=email,
+            role=role,
+        )
+
+    def user_set_password_by_id(self, user_id: int, password_hash: str) -> None:
+        self._database.user_set_password_by_id(user_id, password_hash)
+
     def project_add(self, project: Project) -> Project:
         return self._database.project_add(project)
 
@@ -93,11 +111,44 @@ class DatabaseService:
     def project_is_active(self, project_id: int) -> bool:
         return self._database.project_is_active(project_id)
 
-    def project_get_record(self) -> list[Project]:
-        return self._database.project_get_record()
+    def project_get_record(
+        self,
+        is_active: bool | None = None,
+        created_by: int | None = None,
+        created_by_username: str | None = None,
+    ) -> list[Project]:
+        return self._database.project_get_record(
+            is_active=is_active,
+            created_by=created_by,
+            created_by_username=created_by_username,
+        )
 
-    def project_get_list(self) -> list[ProjectListItem]:
-        return self._database.project_get_list()
+    def project_get_list(
+        self,
+        is_active: bool | None = None,
+        created_by: int | None = None,
+        created_by_username: str | None = None,
+    ) -> list[ProjectListItem]:
+        return self._database.project_get_list(
+            is_active=is_active,
+            created_by=created_by,
+            created_by_username=created_by_username,
+        )
+
+    def project_update_by_id(
+        self,
+        project_id: int,
+        *,
+        name: str | None = None,
+        display_name: str | None = None,
+        description: str | None = None,
+    ) -> Project:
+        return self._database.project_update_by_id(
+            project_id,
+            name=name,
+            display_name=display_name,
+            description=description,
+        )
 
     def target_add(self, target: Target) -> Target:
         return self._database.target_add(target)
@@ -161,6 +212,25 @@ class DatabaseService:
             project_id=project_id,
         )
 
+    def device_update_by_id(
+        self,
+        device_id: int,
+        *,
+        project_id: int | None = None,
+        target_id: int | None = None,
+        model: str | None = None,
+        serial_number: str | None = None,
+        current_version: str | None = None,
+    ) -> Device:
+        return self._database.device_update_by_id(
+            device_id,
+            project_id=project_id,
+            target_id=target_id,
+            model=model,
+            serial_number=serial_number,
+            current_version=current_version,
+        )
+
     def firmware_add(self, firmware: Firmware) -> Firmware:
         return self._database.firmware_add(firmware=firmware)
 
@@ -199,7 +269,7 @@ class DatabaseService:
         return self._database.firmware_disable_by_project_version(project_id=project_id, version=version)
 
     def firmware_get_by_id(self, id: int) -> Firmware | None:
-        return self._database.firmware_get_by_id(id=id)
+        return self._database.firmware_get_by_id(id)
 
     def firmware_get_by_project_version(
             self,
@@ -236,3 +306,20 @@ class DatabaseService:
         project_id: int | None = None,
     ) -> list[FirmwareListItem]:
         return self._database.firmware_get_list(is_active=is_active, project_id=project_id)
+
+    def firmware_update_by_id(
+        self,
+        firmware_id: int,
+        *,
+        version: str | None = None,
+        release_notes: str | None = None,
+        channel: str | None = None,
+        target_id: int | None = None,
+    ) -> Firmware:
+        return self._database.firmware_update_by_id(
+            firmware_id,
+            version=version,
+            release_notes=release_notes,
+            channel=channel,
+            target_id=target_id,
+        )

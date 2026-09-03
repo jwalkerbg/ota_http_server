@@ -242,6 +242,7 @@ class FirmwareListItem:
     filename: str
     file_size: int
     channel: str
+    is_active: bool
 
 @dataclass
 class FirmwareDeleteInfo:

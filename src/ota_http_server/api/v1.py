@@ -53,6 +53,10 @@ def api_root() -> tuple[object, int]:
         "status": "ok",
         "routes": {
             "status": "/api/v1/status",
+            "users": "/api/v1/users",
+            "projects": "/api/v1/projects",
+            "devices": "/api/v1/devices",
+            "firmware": "/api/v1/firmware",
         },
     }), 200
 

@@ -53,12 +53,15 @@ def create_app(cfg: Config) -> Flask:
                               jwt_expiry=jwt_expiry,
                               jwt_max_expiry=jwt_max_expiry
                             )
-    dbservice = DatabaseService(cfg)  # Placeholder for future database service integration
+    dbservice = cfg.config.get("db_service") or DatabaseService(cfg)
 
     #
     # Flask app factory with JWT authentication and secure admin endpoint.
     #
     app = Flask(__name__.split('.', maxsplit=1)[0])
+    # Make shared services available to the API blueprints via current_app.
+    app.extensions["db_service"] = dbservice
+    app.extensions["app_paths"] = cfg.config['parameters']['app_paths']
     register_api_blueprints(app)
 
     # ---------------------------------------------------------------

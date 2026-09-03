@@ -360,6 +360,126 @@ class DatabaseSqliteService:
     def user_get_record(self, is_active: bool | None = None) -> list[User]:
         return self.user_get_list(is_active=is_active)
 
+    def user_update_by_id(
+        self,
+        user_id: int,
+        *,
+        username: str | None = None,
+        email: str | None = None,
+        role: str | None = None,
+    ) -> User:
+        """
+        Partially update a user. Only non-None arguments are written.
+
+        Raises:
+            ValueError: If no field to update is provided.
+            UserNotFoundError: If the user does not exist.
+            UserAlreadyExistsError: If username or email is already taken.
+            DatabaseError: For unexpected database errors.
+        """
+
+        updates: dict[str, object] = {}
+        if username is not None:
+            updates["username"] = username
+        if email is not None:
+            updates["email"] = email
+        if role is not None:
+            updates["role"] = role
+        if not updates:
+            raise ValueError("At least one field must be provided to update a user")
+
+        now = datetime.now(UTC)
+        assignments = ", ".join(f"{column} = ?" for column in updates)
+
+        try:
+            with self._connect() as conn:
+                cursor = conn.execute(
+                    f"""
+                    UPDATE users
+                    SET
+                        {assignments},
+                        updated_at = ?
+                    WHERE id = ?
+                    """,
+                    (*updates.values(), now.isoformat(), user_id),
+                )
+
+                if cursor.rowcount == 0:
+                    raise UserNotFoundError(f"User id={user_id} not found")
+
+                row = conn.execute(
+                    """
+                    SELECT
+                        id,
+                        username,
+                        password_hash,
+                        email,
+                        role,
+                        is_active,
+                        created_at,
+                        updated_at
+                    FROM users
+                    WHERE id = ?
+                    """,
+                    (user_id,),
+                ).fetchone()
+
+                conn.commit()
+
+                return self._row_to_user(row)
+
+        except sqlite3.IntegrityError as e:
+            message = str(e)
+            if "users.username" in message:
+                raise UserAlreadyExistsError(
+                    f"Username '{username}' already exists"
+                ) from e
+            if "users.email" in message:
+                raise UserAlreadyExistsError(
+                    f"Email '{email}' already exists"
+                ) from e
+            raise DatabaseError(
+                f"Database integrity error while updating user id={user_id}: {message}"
+            ) from e
+        except sqlite3.Error as e:
+            raise DatabaseError(
+                f"Database error updating user id={user_id}"
+            ) from e
+
+    def user_set_password_by_id(self, user_id: int, password_hash: str) -> None:
+        """
+        Replace a user's password hash.
+
+        Raises:
+            UserNotFoundError: If the user does not exist.
+            DatabaseError: For unexpected database errors.
+        """
+
+        now = datetime.now(UTC)
+
+        try:
+            with self._connect() as conn:
+                cursor = conn.execute(
+                    """
+                    UPDATE users
+                    SET
+                        password_hash = ?,
+                        updated_at = ?
+                    WHERE id = ?
+                    """,
+                    (password_hash, now.isoformat(), user_id),
+                )
+
+                if cursor.rowcount == 0:
+                    raise UserNotFoundError(f"User id={user_id} not found")
+
+                conn.commit()
+
+        except sqlite3.Error as e:
+            raise DatabaseError(
+                f"Database error setting password for user id={user_id}"
+            ) from e
+
     def _row_to_project(self, row: sqlite3.Row) -> Project:
 
             return Project(
@@ -568,13 +688,52 @@ class DatabaseSqliteService:
                 f"Database error checking whether project {project_id} is active"
             ) from e
 
-    def project_get_record(self) -> list[Project]:
+    def _build_project_filters(
+        self,
+        is_active: bool | None = None,
+        created_by: int | None = None,
+        created_by_username: str | None = None,
+        *,
+        users_joined: bool = False,
+    ) -> tuple[str, tuple[object, ...]]:
+        filters: list[str] = []
+        params: list[object] = []
+        if is_active is not None:
+            filters.append("projects.is_active = ?")
+            params.append(1 if is_active else 0)
+        if created_by is not None:
+            filters.append("projects.created_by = ?")
+            params.append(created_by)
+        if created_by_username is not None:
+            if users_joined:
+                filters.append("users.username = ?")
+            else:
+                filters.append(
+                    "projects.created_by = (SELECT id FROM users WHERE username = ?)"
+                )
+            params.append(created_by_username)
+        where_clause = ""
+        if filters:
+            where_clause = " WHERE " + " AND ".join(filters)
+        return where_clause, tuple(params)
+
+    def project_get_record(
+        self,
+        is_active: bool | None = None,
+        created_by: int | None = None,
+        created_by_username: str | None = None,
+    ) -> list[Project]:
 
         try:
             with self._connect() as conn:
+                where_clause, params = self._build_project_filters(
+                    is_active=is_active,
+                    created_by=created_by,
+                    created_by_username=created_by_username,
+                )
 
                 cursor = conn.execute(
-                    """
+                    f"""
                     SELECT
                         id,
                         name,
@@ -585,8 +744,10 @@ class DatabaseSqliteService:
                         created_at,
                         updated_at
                     FROM projects
+                    {where_clause}
                     ORDER BY name
-                    """
+                    """,
+                    params,
                 )
 
                 rows = cursor.fetchall()
@@ -601,13 +762,24 @@ class DatabaseSqliteService:
                 "Database error retrieving projects"
             ) from e
 
-    def project_get_list(self) -> list[ProjectListItem]:
+    def project_get_list(
+        self,
+        is_active: bool | None = None,
+        created_by: int | None = None,
+        created_by_username: str | None = None,
+    ) -> list[ProjectListItem]:
 
         try:
             with self._connect() as conn:
+                where_clause, params = self._build_project_filters(
+                    is_active=is_active,
+                    created_by=created_by,
+                    created_by_username=created_by_username,
+                    users_joined=True,
+                )
 
                 cursor = conn.execute(
-                    """
+                    f"""
                     SELECT
                         projects.id,
                         projects.name,
@@ -618,8 +790,10 @@ class DatabaseSqliteService:
                     FROM projects
                     JOIN users
                         ON users.id = projects.created_by
+                    {where_clause}
                     ORDER BY projects.name
-                    """
+                    """,
+                    params,
                 )
 
                 rows = cursor.fetchall()
@@ -639,6 +813,87 @@ class DatabaseSqliteService:
         except sqlite3.Error as e:
             raise DatabaseError(
                 "Database error retrieving project list"
+            ) from e
+
+    def project_update_by_id(
+        self,
+        project_id: int,
+        *,
+        name: str | None = None,
+        display_name: str | None = None,
+        description: str | None = None,
+    ) -> Project:
+        """
+        Partially update a project. Only non-None arguments are written.
+
+        Raises:
+            ValueError: If no field to update is provided.
+            ProjectNotFoundError: If the project does not exist.
+            ProjectAlreadyExistsError: If the new name is already taken.
+            DatabaseError: For unexpected database errors.
+        """
+
+        updates: dict[str, object] = {}
+        if name is not None:
+            updates["name"] = name
+        if display_name is not None:
+            updates["display_name"] = display_name
+        if description is not None:
+            updates["description"] = description
+        if not updates:
+            raise ValueError("At least one field must be provided to update a project")
+
+        now = datetime.now(UTC)
+        assignments = ", ".join(f"{column} = ?" for column in updates)
+
+        try:
+            with self._connect() as conn:
+                cursor = conn.execute(
+                    f"""
+                    UPDATE projects
+                    SET
+                        {assignments},
+                        updated_at = ?
+                    WHERE id = ?
+                    """,
+                    (*updates.values(), now.isoformat(), project_id),
+                )
+
+                if cursor.rowcount == 0:
+                    raise ProjectNotFoundError(f"Project id={project_id} not found")
+
+                row = conn.execute(
+                    """
+                    SELECT
+                        id,
+                        name,
+                        display_name,
+                        description,
+                        created_by,
+                        is_active,
+                        created_at,
+                        updated_at
+                    FROM projects
+                    WHERE id = ?
+                    """,
+                    (project_id,),
+                ).fetchone()
+
+                conn.commit()
+
+                return self._row_to_project(row)
+
+        except sqlite3.IntegrityError as e:
+            if e.sqlite_errorname == "SQLITE_CONSTRAINT_UNIQUE":
+                raise ProjectAlreadyExistsError(
+                    f"Project '{name}' already exists"
+                ) from e
+            raise DatabaseError(
+                f"Database integrity error updating project id={project_id}: {str(e)}"
+            ) from e
+        except sqlite3.Error as e:
+            raise DatabaseError(
+                f"Database error updating project id={project_id}"
             ) from e
 
     def _row_to_target(self, row: sqlite3.Row) -> Target:
@@ -1107,6 +1362,103 @@ class DatabaseSqliteService:
                 "Database error retrieving device list"
             ) from e
 
+    def device_update_by_id(
+        self,
+        device_id: int,
+        *,
+        project_id: int | None = None,
+        target_id: int | None = None,
+        model: str | None = None,
+        serial_number: str | None = None,
+        current_version: str | None = None,
+    ) -> Device:
+        """
+        Partially update a device. Only non-None arguments are written.
+
+        Raises:
+            ValueError: If no field to update is provided.
+            DeviceNotFoundError: If the device does not exist.
+            DeviceAlreadyExistsError: If the new serial number is already taken.
+            TargetNotFoundError: If a referenced project or target does not exist.
+            DatabaseError: For unexpected database errors.
+        """
+
+        updates: dict[str, object] = {}
+        if project_id is not None:
+            updates["project_id"] = project_id
+        if target_id is not None:
+            updates["target_id"] = target_id
+        if model is not None:
+            updates["model"] = model
+        if serial_number is not None:
+            updates["serial_number"] = serial_number
+        if current_version is not None:
+            updates["current_version"] = current_version
+        if not updates:
+            raise ValueError("At least one field must be provided to update a device")
+
+        now = datetime.now(UTC)
+        assignments = ", ".join(f"{column} = ?" for column in updates)
+
+        try:
+            with self._connect() as conn:
+                cursor = conn.execute(
+                    f"""
+                    UPDATE devices
+                    SET
+                        {assignments},
+                        updated_at = ?
+                    WHERE id = ?
+                    """,
+                    (*updates.values(), now.isoformat(), device_id),
+                )
+
+                if cursor.rowcount == 0:
+                    raise DeviceNotFoundError(f"Device id={device_id} not found")
+
+                row = conn.execute(
+                    """
+                    SELECT
+                        id,
+                        uuid,
+                        project_id,
+                        target_id,
+                        model,
+                        serial_number,
+                        current_version,
+                        last_seen,
+                        is_active,
+                        created_at,
+                        updated_at
+                    FROM devices
+                    WHERE id = ?
+                    """,
+                    (device_id,),
+                ).fetchone()
+
+                conn.commit()
+
+                return self._row_to_device(row)
+
+        except sqlite3.IntegrityError as e:
+            match e.sqlite_errorname:
+                case "SQLITE_CONSTRAINT_UNIQUE":
+                    raise DeviceAlreadyExistsError(
+                        f"Device serial number '{serial_number}' already exists"
+                    ) from e
+                case "SQLITE_CONSTRAINT_FOREIGNKEY":
+                    raise TargetNotFoundError(
+                        f"Database integrity violation: Project id={project_id} or target id={target_id} does not exist"
+                    ) from e
+                case _:
+                    raise DatabaseError(
+                        f"Database integrity error updating device id={device_id}: {str(e)}"
+                    ) from e
+        except sqlite3.Error as e:
+            raise DatabaseError(
+                f"Database error updating device id={device_id}"
+            ) from e
+
     def _row_to_firmware(self, row: sqlite3.Row) -> Firmware:
 
             return Firmware(
@@ -1134,7 +1486,8 @@ class DatabaseSqliteService:
             version=row["version"],
             filename=row["filename"],
             file_size=row["file_size"],
-            channel=row["channel"]
+            channel=row["channel"],
+            is_active=bool(row["is_active"]),
         )
 
     def firmware_add(self, firmware: Firmware) -> Firmware:
@@ -1697,7 +2050,8 @@ class DatabaseSqliteService:
                         firmware.version,
                         firmware.filename,
                         firmware.file_size,
-                        firmware.channel
+                        firmware.channel,
+                        firmware.is_active
                     FROM firmware
                     JOIN projects
                         ON projects.id = firmware.project_id
@@ -1719,4 +2073,103 @@ class DatabaseSqliteService:
         except sqlite3.Error as e:
             raise DatabaseError(
                 "Database error retrieving firmware"
+            ) from e
+
+    def firmware_update_by_id(
+        self,
+        firmware_id: int,
+        *,
+        version: str | None = None,
+        release_notes: str | None = None,
+        channel: str | None = None,
+        target_id: int | None = None,
+    ) -> Firmware:
+        """
+        Partially update firmware metadata. Only non-None arguments are written.
+
+        Raises:
+            ValueError: If no field to update is provided or the channel is invalid.
+            FirmwareNotFoundError: If the firmware does not exist.
+            FirmwareAlreadyExistsError: If the new version conflicts with an existing record.
+            TargetNotFoundError: If the referenced target does not exist.
+            DatabaseError: For unexpected database errors.
+        """
+
+        updates: dict[str, object] = {}
+        if version is not None:
+            updates["version"] = version
+        if release_notes is not None:
+            updates["release_notes"] = release_notes
+        if channel is not None:
+            updates["channel"] = channel
+        if target_id is not None:
+            updates["target_id"] = target_id
+        if not updates:
+            raise ValueError("At least one field must be provided to update firmware")
+
+        now = datetime.now(UTC)
+        assignments = ", ".join(f"{column} = ?" for column in updates)
+
+        try:
+            with self._connect() as conn:
+                cursor = conn.execute(
+                    f"""
+                    UPDATE firmware
+                    SET
+                        {assignments},
+                        updated_at = ?
+                    WHERE id = ?
+                    """,
+                    (*updates.values(), now.isoformat(), firmware_id),
+                )
+
+                if cursor.rowcount == 0:
+                    raise FirmwareNotFoundError(f"Firmware id={firmware_id} not found")
+
+                row = conn.execute(
+                    """
+                    SELECT
+                        id,
+                        project_id,
+                        target_id,
+                        version,
+                        filename,
+                        file_size,
+                        checksum,
+                        release_notes,
+                        channel,
+                        is_active,
+                        created_at,
+                        updated_at
+                    FROM firmware
+                    WHERE id = ?
+                    """,
+                    (firmware_id,),
+                ).fetchone()
+
+                conn.commit()
+
+                return self._row_to_firmware(row)
+
+        except sqlite3.IntegrityError as e:
+            match e.sqlite_errorname:
+                case "SQLITE_CONSTRAINT_UNIQUE":
+                    raise FirmwareAlreadyExistsError(
+                        f"Firmware '{version}' already exists"
+                    ) from e
+                case "SQLITE_CONSTRAINT_FOREIGNKEY":
+                    raise TargetNotFoundError(
+                        f"Database integrity violation: Target id={target_id} does not exist"
+                    ) from e
+                case "SQLITE_CONSTRAINT_CHECK":
+                    raise ValueError(
+                        f"Invalid firmware channel '{channel}'"
+                    ) from e
+                case _:
+                    raise DatabaseError(
+                        f"Database integrity error updating firmware id={firmware_id}: {str(e)}"
+                    ) from e
+        except sqlite3.Error as e:
+            raise DatabaseError(
+                f"Database error updating firmware id={firmware_id}"
             ) from e
