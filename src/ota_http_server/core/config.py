@@ -3,8 +3,18 @@
 import os
 import sys
 from typing import Dict, Any, Mapping, TypedDict
+from ota_http_server.core.data_models import AppPaths
 import argparse
 from jsonschema import validate, ValidationError
+
+from ota_http_server.database.database_service import DatabaseService
+from ota_http_server.user.user_service import UserService
+from ota_http_server.project.project_service import ProjectService
+from ota_http_server.target.target_service import TargetService
+from ota_http_server.device.device_service import DeviceService
+from ota_http_server.firmware.firmware_service import FirmwareService
+
+from ota_http_server.logger.admin_activity_logger import AdminActivityLogger, ServerOtaLogger
 
 from ota_http_server.logger import get_app_logger
 
@@ -46,6 +56,7 @@ class ParametersConfig(TypedDict, total=False):
     www_dir: str
     firmware_dir: str
     url_firmware: str
+    app_paths: AppPaths
     admin_activity_log: str
     ota_download_log: str
     ota_audit_log: str
@@ -114,6 +125,17 @@ class ConfigDict(TypedDict):
     logging: LoggingConfig
     parameters: ParametersConfig
     database: DatabaseConfig
+
+    command: str
+    user_service: UserService
+    project_service: ProjectService
+    device_service: DeviceService
+    firmware_service: FirmwareService
+    target_service: TargetService
+    #database_service: DatabaseService
+    db_service: DatabaseService
+    admin_activity_logger: AdminActivityLogger
+    ota_download_logger: ServerOtaLogger
 
 USER_ROLES = [
     "admin",
