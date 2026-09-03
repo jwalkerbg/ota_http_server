@@ -19,8 +19,10 @@
     - [Database operations](#database-operations)
     - [User operations](#user-operations)
     - [Project operations](#project-operations)
+    - [Target operations](#target-operations)
     - [Device operations](#device-operations)
     - [Firmware operations](#firmware-operations)
+    - [Administrative activity logging](#administrative-activity-logging)
   - [Editable project - directory Structure](#editable-project---directory-structure)
   - [Configuration](#configuration)
     - [Default Hardcoded Values (Lowest Priority).](#default-hardcoded-values-lowest-priority)
@@ -37,12 +39,23 @@
     - [Apache VirtualHost configuration](#apache-virtualhost-configuration)
     - [httpd-proxy-ota.conf:](#httpd-proxy-otaconf)
   - [JWT-Based Authentication for OTA Access](#jwt-based-authentication-for-ota-access)
-    - [Token Generation](#token-generation)
-    - [JWT Payload Fields](#jwt-payload-fields)
-    - [JWT Generation Logic](#jwt-generation-logic)
-    - [Token Usage (Devices)](#token-usage-devices)
-    - [Audit Logging](#audit-logging)
-    - [Security Notes](#security-notes)
+    - [Token format and trust model](#token-format-and-trust-model)
+    - [Token generation](#token-generation)
+    - [JWT claims used by the current implementation](#jwt-claims-used-by-the-current-implementation)
+    - [Token verification rules](#token-verification-rules)
+    - [Token usage by devices](#token-usage-by-devices)
+    - [Version metadata endpoints](#version-metadata-endpoints)
+    - [Audit logging](#audit-logging)
+    - [Security notes](#security-notes)
+    - [Recommended additions and implementation notes](#recommended-additions-and-implementation-notes)
+  - [REST API](#rest-api)
+    - [General conventions](#general-conventions)
+    - [System endpoints](#system-endpoints)
+    - [REST API users](#rest-api-users)
+    - [REST API projects](#rest-api-projects)
+    - [REST API devices](#rest-api-devices)
+    - [REST API firmware](#rest-api-firmware)
+    - [REST API errors](#rest-api-errors)
   - [Favicon](#favicon)
     - [Example OTA Firmware URL](#example-ota-firmware-url)
   - [Code Quality and Static Analysis](#code-quality-and-static-analysis)
@@ -801,6 +814,117 @@ The JWT flow is now aligned with the codebase:
 4. `?token=` is accepted only for safe methods (`GET` and `HEAD`)
 5. `expires_seconds` is capped by `jwt_max_expiry` before the token is signed
 6. Future revocation and rotation policies can still be added later, but the current token model is now explicit and auditable
+
+## REST API
+
+The server provides an unauthenticated JSON REST API under `/api/v1`. Authentication and authorization are not currently implemented for these endpoints. Protect the API with a trusted network boundary or reverse proxy if it is exposed beyond a development or administrative environment.
+
+### General conventions
+
+* Collection endpoints accept both the path with and without a trailing slash.
+* Resource identifiers are numeric database IDs unless stated otherwise.
+* `GET` and `PATCH` resource endpoints return the resource as a JSON object.
+* Collection endpoints return an object containing an array named after the resource: `users`, `projects`, `devices`, or `firmware`.
+* `POST` creation endpoints return `201 Created`; successful updates and actions return `200 OK`.
+* JSON request bodies must be objects. Unknown fields are rejected with `400 Bad Request`.
+
+### System endpoints
+
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| `GET` | `/api/v1` | Returns API version, status, and route links. |
+| `GET` | `/api/v1/status` | Returns `{"status": "ok", "time": "..."}`. |
+
+### REST API users
+
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| `GET` | `/api/v1/users?state=enabled\|disabled` | List users, optionally filtered by active state. |
+| `POST` | `/api/v1/users` | Create a user. Required JSON fields: `username`, `password`, `email`, `role`. |
+| `GET` | `/api/v1/users/<id>` | Get a user. Password hashes are never returned. |
+| `PATCH` | `/api/v1/users/<id>` | Update one or more of `username`, `email`, and `role`. |
+| `DELETE` | `/api/v1/users/<id>` | Deactivate a user without deleting its record. |
+| `POST` | `/api/v1/users/<id>/activate` | Activate a user. |
+| `POST` | `/api/v1/users/<id>/deactivate` | Deactivate a user. |
+| `POST` | `/api/v1/users/<id>/password` | Change the password. JSON body: `{"password": "new-secret"}`. |
+
+Example:
+
+```bash
+curl -X POST http://localhost:8070/api/v1/users \
+  -H "Content-Type: application/json" \
+  -d '{"username":"operator","password":"secret","email":"operator@example.com","role":"operator"}'
+```
+
+### REST API projects
+
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| `GET` | `/api/v1/projects?state=enabled\|disabled` | List projects, optionally filtered by state. |
+| `GET` | `/api/v1/projects?userid=<id>` | Filter projects by creator user ID. |
+| `GET` | `/api/v1/projects?username=<name>` | Filter projects by creator username. `userid` and `username` cannot be combined. |
+| `POST` | `/api/v1/projects` | Create a project. Required JSON fields: `name`, `created_by`; optional fields: `display_name`, `description`. |
+| `GET` | `/api/v1/projects/<id>` | Get a project. |
+| `PATCH` | `/api/v1/projects/<id>` | Update one or more of `name`, `display_name`, and `description`. |
+| `DELETE` | `/api/v1/projects/<id>` | Deactivate a project without deleting its record. |
+| `POST` | `/api/v1/projects/<id>/activate` | Activate a project. |
+| `POST` | `/api/v1/projects/<id>/deactivate` | Deactivate a project. |
+
+### REST API devices
+
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| `GET` | `/api/v1/devices?state=enabled\|disabled` | List devices, optionally filtered by state. |
+| `GET` | `/api/v1/devices?projectid=<id>` | Filter devices by project ID. |
+| `POST` | `/api/v1/devices` | Create a device. Required JSON fields: `uuid`, `project_id`. Optional fields: `target_id`, `model`, `serial_number`, `current_version`. |
+| `GET` | `/api/v1/devices/<id>` | Get a device. |
+| `PATCH` | `/api/v1/devices/<id>` | Update one or more of `project_id`, `target_id`, `model`, `serial_number`, and `current_version`. |
+| `DELETE` | `/api/v1/devices/<id>` | Deactivate a device without deleting its record. |
+| `POST` | `/api/v1/devices/<id>/activate` | Activate a device. |
+| `POST` | `/api/v1/devices/<id>/deactivate` | Deactivate a device. |
+
+If `target_id` is omitted when creating a device, the default `Not defined` target is assigned.
+
+### REST API firmware
+
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| `GET` | `/api/v1/firmware?state=enabled\|disabled` | List firmware, optionally filtered by state. |
+| `GET` | `/api/v1/firmware?projectid=<id>` | Filter firmware by project ID. |
+| `POST` | `/api/v1/firmware` | Upload firmware using `multipart/form-data`. Required fields: `file`, `project_id`, `version`. Optional fields: `target_id`, `channel`, `release_notes`. |
+| `GET` | `/api/v1/firmware/<id>` | Get firmware metadata. |
+| `PATCH` | `/api/v1/firmware/<id>` | Update one or more of `version`, `release_notes`, `channel`, and `target_id`. |
+| `DELETE` | `/api/v1/firmware/<id>` | Delete the firmware database record and image file. |
+| `GET` | `/api/v1/firmware/<id>/download` | Download the firmware image as an attachment. |
+
+Supported firmware channels are `stable`, `beta`, and `dev`. If `target_id` or `channel` is omitted during upload, the defaults are `Not defined` and `stable` respectively. Firmware filenames must pass the server's filename validation.
+
+Example upload:
+
+```bash
+curl -X POST http://localhost:8070/api/v1/firmware \
+  -F "file=@firmware_v1.bin" \
+  -F "project_id=1" \
+  -F "version=1.0.0" \
+  -F "channel=stable" \
+  -F "release_notes=Initial release"
+```
+
+### REST API errors
+
+API errors are returned as JSON with a consistent envelope:
+
+```json
+{
+  "error": {
+    "code": 404,
+    "message": "Device id=999 not found"
+  }
+}
+```
+
+HTTP errors such as `400`, `404`, `405`, and `409` use their corresponding status code. Unexpected API failures return `500` and the message `Internal server error`.
+
 ## Favicon
 
 The server automatically serves ```/favicon.ico``` from the ```www/``` directory if present.
