@@ -49,6 +49,8 @@
     - [Security notes](#security-notes)
     - [Recommended additions and implementation notes](#recommended-additions-and-implementation-notes)
   - [REST API](#rest-api)
+    - [REST API authentication](#rest-api-authentication)
+    - [REST API authorization](#rest-api-authorization)
     - [General conventions](#general-conventions)
     - [System endpoints](#system-endpoints)
     - [REST API users](#rest-api-users)
@@ -817,9 +819,61 @@ The JWT flow is now aligned with the codebase:
 
 ## REST API
 
-The server provides a JSON REST API under `/api/v1`. Each endpoint declares a centralized resource/action permission. Authentication is intentionally separate: when an authentication layer provides an identified user with one of the `viewer`, `operator`, or `admin` roles, authorization returns `403 Forbidden` when the role lacks the endpoint permission. Until authentication is integrated, requests without an identified user retain the API's existing behavior.
+The server provides a JSON REST API under `/api/v1`. REST API authentication uses username/password login and short-lived JWT access tokens. After authentication, each endpoint applies a centralized resource/action permission based on the user's current database role.
 
-Authentication integrations should call `ota_http_server.api.authorization.set_current_user(user)` during the request, where `user.role` is one of the supported roles. Alternatively, an integration can set the application extension `api_authenticated_user_loader` to a zero-argument callable returning that user. The authorization policy is defined centrally in `ota_http_server.api.authorization`; it does not process credentials, tokens, or passwords.
+### REST API authentication
+
+Login is available without a token:
+
+```bash
+curl -X POST http://localhost:8070/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"operator","password":"secret"}'
+```
+
+A successful login returns a JWT access token valid for 30 minutes by default:
+
+```json
+{
+  "access_token": "<JWT>",
+  "token_type": "Bearer",
+  "expires_in": 1800
+}
+```
+
+Send the token in the `Authorization` header for protected REST API requests:
+
+```bash
+curl http://localhost:8070/api/v1/auth/me \
+  -H "Authorization: Bearer <JWT>"
+```
+
+`GET /api/v1/auth/me` returns the authenticated user's public information. Passwords and password hashes are never returned. All other REST API endpoints require a valid Bearer token. The server validates the JWT signature, configured algorithm, issuer, audience, issued-at time, and expiration, then loads the user from the database. The database remains authoritative: deleted or inactive users cannot use previously issued tokens, and the current database role is used for authorization.
+
+User-token settings can be configured independently from OTA/device token settings:
+
+| Setting | Default | Environment variable | CLI option |
+| --- | --- | --- | --- |
+| User-token audience | `ota_users_api` | `OTA_JWT_USER_AUDIENCE` | `--jwt-user-audience` |
+| User-token lifetime (seconds) | `1800` | `OTA_JWT_USER_EXPIRY_SECONDS` | `--jwt-user-expiry` |
+
+The user tokens reuse the configured JWT secret, algorithm, and issuer (`jwt_secret`, `jwt_alg`, and `jwt_issuer`), but use a separate audience from OTA/device authentication. Configure the secret through the configuration file, environment, or CLI; never commit a production secret to source control. Use HTTPS in production for login and Bearer-token requests.
+
+Authentication failures return `401 Unauthorized` using the standard JSON error envelope. Invalid credentials use the same generic message for unknown users, incorrect passwords, and inactive users.
+
+### REST API authorization
+
+Authorization is permission-based and is applied after authentication. Each endpoint declares one centralized permission in `ota_http_server.api.authorization`. A successfully authenticated user receives `403 Forbidden` when their role does not include the required permission.
+
+The supported roles and permissions are:
+
+| Role | Permissions |
+| --- | --- |
+| `viewer` | Read system status, projects, devices, and firmware; download firmware; access `/auth/me` |
+| `operator` | All viewer permissions, plus create/update projects and devices, and upload/update firmware |
+| `admin` | All defined permissions, including user management and delete operations |
+
+Login and `/auth/me` are available to every role. Authorization does not trust a role claim from the JWT for access decisions; it uses the authenticated user's current role from the database. The REST user authentication flow is separate from OTA/device authentication, which continues to use its own device-oriented JWT validation and claims.
 
 ### General conventions
 
