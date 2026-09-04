@@ -9,6 +9,7 @@ import hmac
 
 from .data_models import Device, Firmware, TokenResult
 from .auth_service import AuthService
+from .user_auth_service import UserAuthService
 from ota_http_server.database.database_service import DatabaseService
 from ota_http_server.firmware.filename_validation import validate_firmware_filename
 from ota_http_server.logger import get_app_logger
@@ -38,6 +39,8 @@ def create_app(cfg: Config) -> Flask:
     jwt_secret=cfg.config['parameters']['jwt_secret']
     jwt_issuer=cfg.config['parameters']['jwt_issuer']
     jwt_audience=cfg.config['parameters']['jwt_audience']
+    jwt_user_audience=cfg.config['parameters'].get('jwt_user_audience', 'ota_users_api')
+    jwt_user_expiry=int(cfg.config['parameters'].get('jwt_user_expiry', 1800))
     admin_secret=cfg.config['parameters']['admin_secret']
     admin_activity_logger = cfg.config.get("admin_activity_logger")
     ota_download_logger = cfg.config.get("ota_download_logger")
@@ -53,6 +56,13 @@ def create_app(cfg: Config) -> Flask:
                               jwt_expiry=jwt_expiry,
                               jwt_max_expiry=jwt_max_expiry
                             )
+    user_authservice = UserAuthService(
+        jwt_secret=jwt_secret,
+        jwt_algorithm=jwt_algorithm,
+        jwt_issuer=jwt_issuer,
+        jwt_audience=jwt_user_audience,
+        jwt_expiry=jwt_user_expiry,
+    )
     dbservice = cfg.config.get("db_service") or DatabaseService(cfg)
 
     #
@@ -62,6 +72,8 @@ def create_app(cfg: Config) -> Flask:
     # Make shared services available to the API blueprints via current_app.
     app.extensions["db_service"] = dbservice
     app.extensions["app_paths"] = cfg.config['parameters']['app_paths']
+    app.extensions["user_auth_service"] = user_authservice
+    app.extensions["use_jwt_user_auth"] = use_jwt
     register_api_blueprints(app)
 
     # ---------------------------------------------------------------

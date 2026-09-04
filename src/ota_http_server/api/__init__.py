@@ -2,7 +2,9 @@
 
 from flask import Flask
 
+from .authentication import authenticate_request_hook
 from .v1 import api_v1, register_api_error_handlers
+from .v1_auth import api_v1_auth
 from .v1_devices import api_v1_devices
 from .v1_firmware import api_v1_firmware
 from .v1_projects import api_v1_projects
@@ -13,10 +15,12 @@ def register_api_blueprints(app: Flask) -> None:
     """Register current API versions on the application."""
     register_api_error_handlers(app)
     app.register_blueprint(api_v1)
+    app.register_blueprint(api_v1_auth)
     app.register_blueprint(api_v1_users)
     app.register_blueprint(api_v1_projects)
     app.register_blueprint(api_v1_devices)
     app.register_blueprint(api_v1_firmware)
+    app.before_request(authenticate_request_hook)
 
 
 __all__ = ["api_v1", "register_api_blueprints"]

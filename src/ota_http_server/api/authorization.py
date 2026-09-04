@@ -33,6 +33,8 @@ FIRMWARE_UPLOAD = "firmware.upload"
 FIRMWARE_UPDATE = "firmware.update"
 FIRMWARE_DELETE = "firmware.delete"
 FIRMWARE_DOWNLOAD = "firmware.download"
+AUTH_LOGIN = "auth.login"
+AUTH_SELF = "auth.self"
 
 ROLES = frozenset({"viewer", "operator", "admin"})
 
@@ -55,7 +57,13 @@ PERMISSIONS = frozenset({
     FIRMWARE_UPDATE,
     FIRMWARE_DELETE,
     FIRMWARE_DOWNLOAD,
+    AUTH_LOGIN,
+    AUTH_SELF,
 })
+
+# Permissions granted to every role regardless of their other privileges:
+# logging in and reading one's own identity are not privileged operations.
+_COMMON_PERMISSIONS = frozenset({AUTH_LOGIN, AUTH_SELF})
 
 ROLE_PERMISSIONS = {
     "viewer": frozenset({
@@ -64,7 +72,7 @@ ROLE_PERMISSIONS = {
         DEVICES_READ,
         FIRMWARE_READ,
         FIRMWARE_DOWNLOAD,
-    }),
+    }) | _COMMON_PERMISSIONS,
     "operator": frozenset({
         SYSTEM_READ,
         PROJECTS_READ,
@@ -77,7 +85,7 @@ ROLE_PERMISSIONS = {
         FIRMWARE_UPLOAD,
         FIRMWARE_UPDATE,
         FIRMWARE_DOWNLOAD,
-    }),
+    }) | _COMMON_PERMISSIONS,
     "admin": PERMISSIONS,
 }
 
