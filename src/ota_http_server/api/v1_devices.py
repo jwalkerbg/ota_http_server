@@ -7,6 +7,13 @@ from flask import Blueprint, jsonify
 from ota_http_server.core.data_models import Device
 from ota_http_server.target.target_service import DEFAULT_TARGET_NAME
 
+from .authorization import (
+    DEVICES_CREATE,
+    DEVICES_DELETE,
+    DEVICES_READ,
+    DEVICES_UPDATE,
+    require_permission,
+)
 from .common import (
     DEVICE_ALREADY_DISABLED,
     DEVICE_ALREADY_ENABLED,
@@ -47,6 +54,7 @@ def _resolve_target_id(target_id: int | None) -> int:
 
 @api_v1_devices.route("", methods=["GET"])
 @api_v1_devices.route("/", methods=["GET"])
+@require_permission(DEVICES_READ)
 def list_devices():
     """List devices, optionally filtered by ?projectid= and ?state=."""
     devices = get_db().device_get_list(
@@ -58,6 +66,7 @@ def list_devices():
 
 @api_v1_devices.route("", methods=["POST"])
 @api_v1_devices.route("/", methods=["POST"])
+@require_permission(DEVICES_CREATE)
 def create_device():
     data = json_body()
     reject_unknown_fields(
@@ -102,6 +111,7 @@ def create_device():
 
 
 @api_v1_devices.route("/<int:device_id>", methods=["GET"])
+@require_permission(DEVICES_READ)
 def get_device(device_id: int):
     device = get_db().device_get_by_id(device_id)
     if device is None:
@@ -110,6 +120,7 @@ def get_device(device_id: int):
 
 
 @api_v1_devices.route("/<int:device_id>", methods=["PATCH"])
+@require_permission(DEVICES_UPDATE)
 def update_device(device_id: int):
     data = json_body()
     reject_unknown_fields(
@@ -157,16 +168,19 @@ def _set_device_active(device_id: int, active: bool) -> tuple[object, int]:
 
 
 @api_v1_devices.route("/<int:device_id>", methods=["DELETE"])
+@require_permission(DEVICES_DELETE)
 def deactivate_device(device_id: int):
     """DELETE deactivates the device; the record and its audit history are kept."""
     return _set_device_active(device_id, False)
 
 
 @api_v1_devices.route("/<int:device_id>/activate", methods=["POST"])
+@require_permission(DEVICES_UPDATE)
 def activate_device(device_id: int):
     return _set_device_active(device_id, True)
 
 
 @api_v1_devices.route("/<int:device_id>/deactivate", methods=["POST"])
+@require_permission(DEVICES_UPDATE)
 def deactivate_device_action(device_id: int):
     return _set_device_active(device_id, False)

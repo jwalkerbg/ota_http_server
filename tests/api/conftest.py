@@ -51,12 +51,21 @@ def app(tmp_path):
 
     application = create_app(cfg)
     application.extensions["db_service"].init_db()
+    application.extensions["api_authenticated_user_loader"] = lambda: SimpleNamespace(role="admin")
     return application
 
 
 @pytest.fixture()
 def client(app):
     return app.test_client()
+
+
+@pytest.fixture()
+def set_api_role(app):
+    def _set_api_role(role: str) -> None:
+        app.extensions["api_authenticated_user_loader"] = lambda: SimpleNamespace(role=role)
+
+    return _set_api_role
 
 
 @pytest.fixture()

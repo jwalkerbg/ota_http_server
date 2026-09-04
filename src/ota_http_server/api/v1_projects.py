@@ -6,6 +6,13 @@ from flask import Blueprint, abort, jsonify, request
 
 from ota_http_server.core.data_models import Project
 
+from .authorization import (
+    PROJECTS_CREATE,
+    PROJECTS_DELETE,
+    PROJECTS_READ,
+    PROJECTS_UPDATE,
+    require_permission,
+)
 from .common import (
     PROJECT_ALREADY_DISABLED,
     PROJECT_ALREADY_ENABLED,
@@ -30,6 +37,7 @@ api_v1_projects = Blueprint("api_v1_projects", __name__, url_prefix="/api/v1/pro
 
 @api_v1_projects.route("", methods=["GET"])
 @api_v1_projects.route("/", methods=["GET"])
+@require_permission(PROJECTS_READ)
 def list_projects():
     """List projects, optionally filtered by ?userid=, ?username= and ?state=."""
     created_by = parse_int_query_param("userid")
@@ -47,6 +55,7 @@ def list_projects():
 
 @api_v1_projects.route("", methods=["POST"])
 @api_v1_projects.route("/", methods=["POST"])
+@require_permission(PROJECTS_CREATE)
 def create_project():
     data = json_body()
     reject_unknown_fields(data, {"name", "display_name", "description", "created_by"})
@@ -79,6 +88,7 @@ def create_project():
 
 
 @api_v1_projects.route("/<int:project_id>", methods=["GET"])
+@require_permission(PROJECTS_READ)
 def get_project(project_id: int):
     project = get_db().project_get_by_id(project_id)
     if project is None:
@@ -87,6 +97,7 @@ def get_project(project_id: int):
 
 
 @api_v1_projects.route("/<int:project_id>", methods=["PATCH"])
+@require_permission(PROJECTS_UPDATE)
 def update_project(project_id: int):
     data = json_body()
     reject_unknown_fields(data, {"name", "display_name", "description"})
@@ -131,16 +142,19 @@ def _set_project_active(project_id: int, active: bool) -> tuple[object, int]:
 
 
 @api_v1_projects.route("/<int:project_id>", methods=["DELETE"])
+@require_permission(PROJECTS_DELETE)
 def deactivate_project(project_id: int):
     """DELETE deactivates the project; the record and its audit history are kept."""
     return _set_project_active(project_id, False)
 
 
 @api_v1_projects.route("/<int:project_id>/activate", methods=["POST"])
+@require_permission(PROJECTS_UPDATE)
 def activate_project(project_id: int):
     return _set_project_active(project_id, True)
 
 
 @api_v1_projects.route("/<int:project_id>/deactivate", methods=["POST"])
+@require_permission(PROJECTS_UPDATE)
 def deactivate_project_action(project_id: int):
     return _set_project_active(project_id, False)

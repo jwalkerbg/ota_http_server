@@ -7,6 +7,8 @@ from datetime import UTC, datetime
 from flask import Blueprint, current_app, jsonify, request
 from werkzeug.exceptions import HTTPException
 
+from .authorization import SYSTEM_READ, require_permission
+
 api_v1 = Blueprint("api_v1", __name__, url_prefix="/api/v1")
 
 
@@ -47,6 +49,7 @@ def register_api_error_handlers(app):
 
 @api_v1.route("", methods=["GET"])
 @api_v1.route("/", methods=["GET"])
+@require_permission(SYSTEM_READ)
 def api_root() -> tuple[object, int]:
     return jsonify({
         "version": "v1",
@@ -62,6 +65,7 @@ def api_root() -> tuple[object, int]:
 
 
 @api_v1.route("/status", methods=["GET"])
+@require_permission(SYSTEM_READ)
 def api_status() -> tuple[object, int]:
     return jsonify({
         "status": "ok",

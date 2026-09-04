@@ -11,6 +11,14 @@ from ota_http_server.core.data_models import Firmware
 from ota_http_server.firmware.filename_validation import validate_firmware_filename
 from ota_http_server.target.target_service import DEFAULT_TARGET_NAME
 
+from .authorization import (
+    FIRMWARE_DELETE,
+    FIRMWARE_DOWNLOAD,
+    FIRMWARE_READ,
+    FIRMWARE_UPDATE,
+    FIRMWARE_UPLOAD,
+    require_permission,
+)
 from .common import (
     FIRMWARE_ALREADY_EXISTS,
     FIRMWARE_NOT_FOUND,
@@ -45,6 +53,7 @@ def _save_with_sha256(stream, destination: Path) -> str:
 
 @api_v1_firmware.route("", methods=["GET"])
 @api_v1_firmware.route("/", methods=["GET"])
+@require_permission(FIRMWARE_READ)
 def list_firmware():
     """List firmware versions, optionally filtered by ?projectid= and ?state=."""
     firmware = get_db().firmware_get_list(
@@ -56,6 +65,7 @@ def list_firmware():
 
 @api_v1_firmware.route("", methods=["POST"])
 @api_v1_firmware.route("/", methods=["POST"])
+@require_permission(FIRMWARE_UPLOAD)
 def upload_firmware():
     """Upload a firmware image as multipart/form-data with a 'file' part."""
     db = get_db()
@@ -159,6 +169,7 @@ def upload_firmware():
 
 
 @api_v1_firmware.route("/<int:firmware_id>", methods=["GET"])
+@require_permission(FIRMWARE_READ)
 def get_firmware(firmware_id: int):
     firmware = get_db().firmware_get_by_id(firmware_id)
     if firmware is None:
@@ -167,6 +178,7 @@ def get_firmware(firmware_id: int):
 
 
 @api_v1_firmware.route("/<int:firmware_id>", methods=["PATCH"])
+@require_permission(FIRMWARE_UPDATE)
 def update_firmware(firmware_id: int):
     """Update firmware metadata (version, release_notes, channel, target_id)."""
     data = json_body()
@@ -199,6 +211,7 @@ def update_firmware(firmware_id: int):
 
 
 @api_v1_firmware.route("/<int:firmware_id>", methods=["DELETE"])
+@require_permission(FIRMWARE_DELETE)
 def delete_firmware(firmware_id: int):
     """Delete a firmware release: removes the database record and the image file."""
     db = get_db()
@@ -225,6 +238,7 @@ def delete_firmware(firmware_id: int):
 
 
 @api_v1_firmware.route("/<int:firmware_id>/download", methods=["GET"])
+@require_permission(FIRMWARE_DOWNLOAD)
 def download_firmware(firmware_id: int):
     db = get_db()
     firmware = db.firmware_get_by_id(firmware_id)

@@ -817,7 +817,9 @@ The JWT flow is now aligned with the codebase:
 
 ## REST API
 
-The server provides an unauthenticated JSON REST API under `/api/v1`. Authentication and authorization are not currently implemented for these endpoints. Protect the API with a trusted network boundary or reverse proxy if it is exposed beyond a development or administrative environment.
+The server provides a JSON REST API under `/api/v1`. Each endpoint declares a centralized resource/action permission. Authentication is intentionally separate: when an authentication layer provides an identified user with one of the `viewer`, `operator`, or `admin` roles, authorization returns `403 Forbidden` when the role lacks the endpoint permission. Until authentication is integrated, requests without an identified user retain the API's existing behavior.
+
+Authentication integrations should call `ota_http_server.api.authorization.set_current_user(user)` during the request, where `user.role` is one of the supported roles. Alternatively, an integration can set the application extension `api_authenticated_user_loader` to a zero-argument callable returning that user. The authorization policy is defined centrally in `ota_http_server.api.authorization`; it does not process credentials, tokens, or passwords.
 
 ### General conventions
 

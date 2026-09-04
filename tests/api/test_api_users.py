@@ -69,6 +69,20 @@ def test_create_user_rejects_unknown_field(client):
     assert response.status_code == 400
 
 
+def test_create_user_rejects_unsupported_role(client):
+    response = client.post(
+        "/api/v1/users",
+        json={
+            "username": "bob",
+            "password": "s3cret",
+            "email": "bob@example.com",
+            "role": "unsupported",
+        },
+    )
+
+    assert response.status_code == 400
+
+
 def test_get_user(client, user):
     response = client.get(f"/api/v1/users/{user.id}")
 
@@ -109,6 +123,12 @@ def test_patch_user_not_found(client):
     response = client.patch("/api/v1/users/999", json={"role": "viewer"})
 
     assert response.status_code == 404
+
+
+def test_patch_user_rejects_unsupported_role(client, user):
+    response = client.patch(f"/api/v1/users/{user.id}", json={"role": "unsupported"})
+
+    assert response.status_code == 400
 
 
 def test_patch_user_conflict(client, user, make_user):
