@@ -105,6 +105,31 @@ def test_user_service_logs_admin_activity_for_cli_list():
     assert kwargs["outcome"] == "success"
 
 
+def test_time_rotation_swallows_permission_error_from_concurrent_process(tmp_path, monkeypatch):
+    log_path = tmp_path / "admin_activity.log"
+    policy = RotationPolicy(
+        strategy="time",
+        max_bytes=0,
+        backup_count=3,
+        when="midnight",
+        interval=1,
+        utc=True,
+    )
+
+    handler = create_rotating_file_handler(log_path, policy)
+    handler.rolloverAt = int(datetime(2026, 8, 23, 0, 0, tzinfo=timezone.utc).timestamp())
+    handler.stream = handler._open()
+
+    def _rename_raises_permission_error(*_args, **_kwargs):
+        raise PermissionError(32, "The process cannot access the file because it is being used by another process")
+
+    monkeypatch.setattr("os.rename", _rename_raises_permission_error)
+
+    # Must not raise, even though the underlying rename fails as it would when
+    # another process (e.g. a running server) has the log file open.
+    handler.doRollover()
+
+
 def test_firmware_service_maps_delete_to_remove_for_activity_logging():
     cfg = SimpleNamespace()
     cfg.config = {

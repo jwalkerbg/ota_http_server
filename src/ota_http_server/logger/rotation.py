@@ -16,7 +16,32 @@ class RotationPolicy:
     utc: bool
 
 
-class DateAwareTimedRotatingFileHandler(TimedRotatingFileHandler):
+class SafeRotateMixin:
+    """Tolerate rotation failures caused by another process holding the log file open.
+
+    On Windows, ``os.rename`` fails with ``PermissionError`` (WinError 32) if another
+    process (e.g. a concurrently running ``runserver`` instance) has the log file open.
+    Without this guard, that exception propagates out of ``doRollover``, gets reported by
+    ``logging.Handler.handleError`` as a noisy "Logging error" traceback, and the log
+    record that triggered it is dropped. Skipping the rotation for this attempt lets
+    logging continue uninterrupted; the file will be rotated on a later attempt once the
+    lock is released.
+    """
+
+    def rotate(self, source: str, dest: str) -> None:
+        try:
+            super().rotate(source, dest)  # type: ignore[misc]
+        except OSError as exc:
+            logging.getLogger(__name__).debug(
+                "Skipping log rotation for %s -> %s: %s", source, dest, exc
+            )
+
+
+class SafeRotatingFileHandler(SafeRotateMixin, RotatingFileHandler):
+    """Size-based rotation that tolerates concurrent-process file locks."""
+
+
+class DateAwareTimedRotatingFileHandler(SafeRotateMixin, TimedRotatingFileHandler):
     """Rotate logs to names like "app-2026-08-22.log" instead of "app.log.2026-08-22"."""
 
     _DATE_SUFFIX_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
@@ -115,7 +140,7 @@ def create_rotating_file_handler(log_file_path: Path, policy: RotationPolicy) ->
     encoding = "utf-8"
 
     if strategy == "size":
-        return RotatingFileHandler(
+        return SafeRotatingFileHandler(
             filename=log_file,
             maxBytes=max(0, int(policy.max_bytes)),
             backupCount=max(1, int(policy.backup_count)),
