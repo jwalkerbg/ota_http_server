@@ -3,6 +3,8 @@ from datetime import datetime, timezone
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
+import pytest
+
 from ota_http_server.firmware.firmware_service import FirmwareService
 from ota_http_server.logger.admin_activity_logger import build_admin_activity_logger
 from ota_http_server.logger.rotation import RotationPolicy, SizeAndTimeRotatingFileHandler, create_rotating_file_handler
@@ -121,12 +123,70 @@ def test_time_rotation_swallows_permission_error_from_concurrent_process(tmp_pat
     handler.stream = handler._open()
 
     def _rename_raises_permission_error(*_args, **_kwargs):
-        raise PermissionError(32, "The process cannot access the file because it is being used by another process")
+        raise PermissionError(
+            13,
+            "The process cannot access the file because it is being used by another process",
+            None,
+            32,
+        )
 
     monkeypatch.setattr("os.rename", _rename_raises_permission_error)
 
     # Must not raise, even though the underlying rename fails as it would when
     # another process (e.g. a running server) has the log file open.
+    handler.doRollover()
+
+
+def test_time_rotation_propagates_unrelated_permission_errors(tmp_path, monkeypatch):
+    log_path = tmp_path / "admin_activity.log"
+    policy = RotationPolicy(
+        strategy="time",
+        max_bytes=0,
+        backup_count=3,
+        when="midnight",
+        interval=1,
+        utc=True,
+    )
+
+    handler = create_rotating_file_handler(log_path, policy)
+    handler.rolloverAt = int(datetime(2026, 8, 23, 0, 0, tzinfo=timezone.utc).timestamp())
+    handler.stream = handler._open()
+
+    def _rename_raises_access_denied(*_args, **_kwargs):
+        raise PermissionError(13, "Access is denied", None, 5)
+
+    monkeypatch.setattr("os.rename", _rename_raises_access_denied)
+
+    with pytest.raises(PermissionError, match="Access is denied"):
+        handler.doRollover()
+
+
+def test_size_rotation_swallows_permission_error_from_concurrent_process(tmp_path, monkeypatch):
+    log_path = tmp_path / "admin_activity.log"
+    backup_path = tmp_path / "admin_activity.log.1"
+    log_path.write_text("current log", encoding="utf-8")
+    backup_path.write_text("previous log", encoding="utf-8")
+    policy = RotationPolicy(
+        strategy="size",
+        max_bytes=1024,
+        backup_count=2,
+        when="midnight",
+        interval=1,
+        utc=True,
+    )
+
+    handler = create_rotating_file_handler(log_path, policy)
+
+    def _rename_raises_permission_error(*_args, **_kwargs):
+        raise PermissionError(
+            13,
+            "The process cannot access the file because it is being used by another process",
+            None,
+            32,
+        )
+
+    monkeypatch.setattr("os.rename", _rename_raises_permission_error)
+
     handler.doRollover()
 
 

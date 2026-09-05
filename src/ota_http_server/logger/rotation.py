@@ -31,7 +31,9 @@ class SafeRotateMixin:
     def rotate(self, source: str, dest: str) -> None:
         try:
             super().rotate(source, dest)  # type: ignore[misc]
-        except OSError as exc:
+        except PermissionError as exc:
+            if exc.winerror != 32:
+                raise
             logging.getLogger(__name__).debug(
                 "Skipping log rotation for %s -> %s: %s", source, dest, exc
             )
@@ -39,6 +41,16 @@ class SafeRotateMixin:
 
 class SafeRotatingFileHandler(SafeRotateMixin, RotatingFileHandler):
     """Size-based rotation that tolerates concurrent-process file locks."""
+
+    def doRollover(self) -> None:
+        try:
+            super().doRollover()
+        except PermissionError as exc:
+            if exc.winerror != 32:
+                raise
+            logging.getLogger(__name__).debug(
+                "Skipping size-based log rotation for %s: %s", self.baseFilename, exc
+            )
 
 
 class DateAwareTimedRotatingFileHandler(SafeRotateMixin, TimedRotatingFileHandler):
