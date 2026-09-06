@@ -1,7 +1,10 @@
 # user_service.py
 
+import getpass
+
 from ota_http_server.core.config import Config
 from ota_http_server.core.passwords import Passwords
+from ota_http_server.core.password_policy import PasswordPolicy
 from ota_http_server.core.data_models import User
 from ota_http_server.core.formatters import UserFormatter
 from ota_http_server.database.database_service import DatabaseService
@@ -9,6 +12,23 @@ from ota_http_server.logger import get_app_logger
 from ota_http_server.logger.admin_activity_logger import normalize_admin_activity_action
 
 logger = get_app_logger(__name__)
+
+
+class UserServiceError(Exception):
+    """Base class for user service failures."""
+
+
+class UserNotFoundError(UserServiceError):
+    """Raised when the target user does not exist."""
+
+
+class InactiveUserError(UserServiceError):
+    """Raised when an inactive user attempts a self-service operation."""
+
+
+class CurrentPasswordMismatchError(UserServiceError):
+    """Raised when the supplied current password does not match the stored one."""
+
 
 class UserService:
     def __init__(self, cfg: Config):
@@ -27,7 +47,8 @@ class UserService:
             "enable": self._enable_user,
             "disable": self._disable_user,
             "get": self._get_user,
-            "list": self._list_users
+            "list": self._list_users,
+            "password-change": self._change_user_password
         }
 
         handler = handlers.get(command)
@@ -133,6 +154,97 @@ class UserService:
         else:
             logger.info("No users found")
 
-    # REST API methods for user operations can be added here, e.g., create_user, get_user, update_user, delete_user, etc.
+    # Password management (shared by the CLI and the REST API)
 
-    # placeholder for future REST API methods
+    def _password_policy(self) -> PasswordPolicy:
+        return PasswordPolicy.from_mapping(self.cfg.config.get("parameters"))
+
+    def _require_user(self, user_id: int) -> User:
+        db_service: DatabaseService = self.cfg.config["db_service"]
+        user = db_service.user_get_by_id(user_id)
+        if user is None:
+            raise UserNotFoundError(f"User id={user_id} not found")
+        return user
+
+    def change_password(
+        self,
+        user_id: int,
+        current_password: str,
+        new_password: str,
+        confirm_password: str,
+    ) -> None:
+        """Self-service password change; requires the current password.
+
+        Raises:
+            UserNotFoundError: the user does not exist.
+            InactiveUserError: the user is not active.
+            CurrentPasswordMismatchError: the current password is wrong.
+            PasswordPolicyError: the new password or confirmation is invalid.
+        """
+        user = self._require_user(user_id)
+        if not user.is_active:
+            raise InactiveUserError(f"User id={user_id} is inactive")
+        if not Passwords.verify(current_password, user.password_hash):
+            raise CurrentPasswordMismatchError("Current password is incorrect")
+
+        self._password_policy().validate_with_confirmation(new_password, confirm_password)
+
+        db_service: DatabaseService = self.cfg.config["db_service"]
+        db_service.user_set_password_by_id(user_id, Passwords.hash(new_password))
+
+    def reset_password(
+        self,
+        user_id: int,
+        new_password: str,
+        confirm_password: str,
+    ) -> None:
+        """Administrative password reset; the current password is not required.
+
+        Inactive users may be reset: resetting a password never activates,
+        deactivates, or otherwise modifies the user account.
+
+        Raises:
+            UserNotFoundError: the user does not exist.
+            PasswordPolicyError: the new password or confirmation is invalid.
+        """
+        self._require_user(user_id)
+
+        self._password_policy().validate_with_confirmation(new_password, confirm_password)
+
+        db_service: DatabaseService = self.cfg.config["db_service"]
+        db_service.user_set_password_by_id(user_id, Passwords.hash(new_password))
+
+    def _change_user_password(self) -> None:
+        """CLI handler: administrative password reset with secure prompts.
+
+        Passwords are read interactively with getpass and are never accepted
+        as command-line arguments, displayed, or logged.
+        """
+        db_service: DatabaseService = self.cfg.config["db_service"]
+        user_id = self.cfg.config["parameters"]["user_id"]
+        username = self.cfg.config["parameters"]["username"]
+
+        user = None
+        if user_id is not None:
+            user = db_service.user_get_by_id(user_id)
+        elif username is not None:
+            user = db_service.user_get_by_username(username)
+        else:
+            raise ValueError(
+                "User id or username must be provided"
+            )
+
+        if user is None:
+            raise UserNotFoundError(
+                f"User id={user_id} not found" if user_id is not None
+                else f"User username='{username}' not found"
+            )
+
+        # keep the resolved id so the admin activity log records it
+        self.cfg.config["parameters"]["user_id"] = user.id
+
+        new_password = getpass.getpass("New password: ")
+        confirm_password = getpass.getpass("Confirm new password: ")
+
+        self.reset_password(user.id, new_password, confirm_password)
+        logger.info("Password updated for user '%s' (id=%s)", user.username, user.id)

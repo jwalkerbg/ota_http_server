@@ -17,6 +17,8 @@ log_rotation_max_bytes = 10485760
 log_rotation_backup_count = 14
 log_rotation_when = "midnight"
 log_rotation_interval = 1
+#password_min_length = 8
+#password_max_length = 1024
 
 [logging]
 verbose = 3

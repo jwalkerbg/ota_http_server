@@ -14,6 +14,7 @@ from ota_http_server.database.database_service import DatabaseService
 from ota_http_server.firmware.filename_validation import validate_firmware_filename
 from ota_http_server.logger import get_app_logger
 from ota_http_server.core.config import Config
+from ota_http_server.user.user_service import UserService
 from ota_http_server.api import register_api_blueprints
 
 logger = get_app_logger(__name__)
@@ -64,6 +65,8 @@ def create_app(cfg: Config) -> Flask:
         jwt_expiry=jwt_user_expiry,
     )
     dbservice = cfg.config.get("db_service") or DatabaseService(cfg)
+    # keep the configuration in sync so services built from cfg reuse the same instance
+    cfg.config["db_service"] = dbservice
 
     #
     # Flask app factory with JWT authentication and secure admin endpoint.
@@ -74,6 +77,8 @@ def create_app(cfg: Config) -> Flask:
     app.extensions["app_paths"] = cfg.config['parameters']['app_paths']
     app.extensions["user_auth_service"] = user_authservice
     app.extensions["use_jwt_user_auth"] = use_jwt
+    app.extensions["user_service"] = cfg.config.get("user_service") or UserService(cfg)
+    app.extensions["admin_activity_logger"] = admin_activity_logger
     register_api_blueprints(app)
 
     # ---------------------------------------------------------------

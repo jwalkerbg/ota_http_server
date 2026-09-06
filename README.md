@@ -294,9 +294,13 @@ ota_http_server user list --enabled
 ota_http_server user get --username admin
 ota_http_server user enable --user-id 1
 ota_http_server user disable --username admin
+ota_http_server user password-change --username john
+ota_http_server user password-change --user-id 2
 ```
 
-User records support creation, retrieval, listing, and activation/deactivation.
+User records support creation, retrieval, listing, activation/deactivation, and password changes.
+
+`user password-change` is an administrative password reset: it selects the target user with `--user-id` or `--username` (`--user-id` takes precedence) and prompts securely for the new password and its confirmation using `getpass`. Passwords are never accepted as command-line arguments, displayed, or logged. The new password must satisfy the configured password policy and is stored only as an Argon2 hash. Resetting a password never activates, deactivates, or changes the role of the user account.
 
 ### Project operations
 
@@ -456,6 +460,8 @@ For `dynamic runtime overrides`, the server can read environment variables. Thes
 * "log_rotation_interval": os.getenv("OTA_LOG_ROTATION_INTERVAL")
 * "jwt_issuer": os.getenv("OTA_JWT_ISSUER"),
 * "jwt_audience": os.getenv("OTA_JWT_AUDIENCE"),
+* "password_min_length": os.getenv("OTA_PASSWORD_MIN_LENGTH"),
+* "password_max_length": os.getenv("OTA_PASSWORD_MAX_LENGTH"),
 * "ota_db": os.getenv("OTA_DATABASE"),
 * "ota_db_cache_ttl": os.getenv("OTA_DB_CACHE_TTL")
 
@@ -902,7 +908,17 @@ Login and `/auth/me` are available to every role. Authorization does not trust a
 | `DELETE` | `/api/v1/users/<id>` | Deactivate a user without deleting its record. |
 | `POST` | `/api/v1/users/<id>/activate` | Activate a user. |
 | `POST` | `/api/v1/users/<id>/deactivate` | Deactivate a user. |
-| `POST` | `/api/v1/users/<id>/password` | Change the password. JSON body: `{"password": "new-secret"}`. |
+| `POST` | `/api/v1/users/me/password` | Self-service password change. JSON body: `{"current_password": "old-secret", "new_password": "new-secret", "confirm_password": "new-secret"}`. Requires the current password. |
+| `POST` | `/api/v1/users/<id>/password` | Administrative password reset; the current password is not required. JSON body: `{"new_password": "new-secret", "confirm_password": "new-secret"}`. Requires the `users.update` permission. |
+
+Password management details:
+
+* Both endpoints return `{"id": <user-id>, "message": "Password updated"}` on success and never return a password or password hash. Password hashes are never accepted as input; unknown JSON fields are rejected with `400 Bad Request`.
+* The new password must satisfy the configured password policy (`password_min_length` / `password_max_length`, see below) and `confirm_password` must match `new_password`; violations return `400 Bad Request`.
+* An incorrect `current_password` on the self-service endpoint returns `400 Bad Request`. Inactive users cannot use the self-service endpoint (`401 Unauthorized`), while administrators may reset the password of an inactive user without activating the account.
+* Password changes never modify the user's role, active state, or other account properties.
+* Password changes do not revoke previously issued JWT access tokens: the project has no token blacklist, so existing tokens remain valid until they expire. The old password can no longer be used to log in.
+* Password operations are recorded in the admin activity log with non-sensitive data only (timestamp, interface, actor/target user IDs, action `password-change` or `password-reset`, outcome). Passwords and password hashes are never logged.
 
 Example:
 
@@ -911,6 +927,17 @@ curl -X POST http://localhost:8070/api/v1/users \
   -H "Content-Type: application/json" \
   -d '{"username":"operator","password":"secret","email":"operator@example.com","role":"operator"}'
 ```
+
+### Password policy
+
+Password validation is centralized in `ota_http_server.core.password_policy` and is shared by the CLI, the REST API, and the user service layer. The policy is deliberately modest so it does not interfere with password managers or generated passwords: only length limits are enforced. Both limits are configurable:
+
+| Setting | Default | Environment variable |
+| --- | --- | --- |
+| `password_min_length` | `8` | `OTA_PASSWORD_MIN_LENGTH` |
+| `password_max_length` | `1024` | `OTA_PASSWORD_MAX_LENGTH` |
+
+The limits can also be set in the `[parameters]` section of `config.toml`. Empty passwords and mismatched confirmations are always rejected, and passwords are stored only as Argon2 hashes.
 
 ### REST API projects
 

@@ -100,6 +100,11 @@ def get_db() -> DatabaseService:
     return current_app.extensions["db_service"]
 
 
+def get_user_service():
+    """Return the user service attached to the current application."""
+    return current_app.extensions["user_service"]
+
+
 def get_app_paths() -> AppPaths:
     """Return the application paths attached to the current application."""
     return current_app.extensions["app_paths"]

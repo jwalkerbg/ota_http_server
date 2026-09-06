@@ -180,21 +180,73 @@ def test_deactivate_user_not_found(client):
     assert response.status_code == 404
 
 
-def test_set_user_password(client, user, db):
+def test_reset_user_password(client, user, db):
     response = client.post(
         f"/api/v1/users/{user.id}/password",
-        json={"password": "new-password"},
+        json={"new_password": "new-password", "confirm_password": "new-password"},
     )
 
     assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["message"] == "Password updated"
+    assert "password" not in payload
+    assert "password_hash" not in payload
     stored = db.user_get_by_id(user.id)
     assert Passwords.verify("new-password", stored.password_hash)
 
 
-def test_set_user_password_not_found(client):
-    response = client.post("/api/v1/users/999/password", json={"password": "x"})
+def test_reset_user_password_not_found(client):
+    response = client.post(
+        "/api/v1/users/999/password",
+        json={"new_password": "new-password", "confirm_password": "new-password"},
+    )
 
     assert response.status_code == 404
+
+
+def test_reset_user_password_confirmation_mismatch(client, user):
+    response = client.post(
+        f"/api/v1/users/{user.id}/password",
+        json={"new_password": "new-password", "confirm_password": "other-password"},
+    )
+
+    assert response.status_code == 400
+
+
+def test_reset_user_password_policy_violation(client, user, db):
+    response = client.post(
+        f"/api/v1/users/{user.id}/password",
+        json={"new_password": "short", "confirm_password": "short"},
+    )
+
+    assert response.status_code == 400
+    assert Passwords.verify("secret", db.user_get_by_id(user.id).password_hash)
+
+
+def test_reset_user_password_rejects_password_hash_field(client, user):
+    response = client.post(
+        f"/api/v1/users/{user.id}/password",
+        json={
+            "new_password": "new-password",
+            "confirm_password": "new-password",
+            "password_hash": "$argon2id$ forged",
+        },
+    )
+
+    assert response.status_code == 400
+
+
+def test_reset_user_password_does_not_change_status_or_role(client, user, db):
+    response = client.post(
+        f"/api/v1/users/{user.id}/password",
+        json={"new_password": "new-password", "confirm_password": "new-password"},
+    )
+
+    assert response.status_code == 200
+    stored = db.user_get_by_id(user.id)
+    assert stored.is_active is True
+    assert stored.role == "admin"
+    assert stored.username == "alice"
 
 
 def test_list_users_state_filter(client, make_user):

@@ -51,6 +51,8 @@ class ParametersConfig(TypedDict, total=False):
     admin_activity_log: str
     ota_download_log: str
     ota_audit_log: str
+    password_min_length: int
+    password_max_length: int
     log_rotation_strategy: str
     log_rotation_max_bytes: int
     log_rotation_backup_count: int
@@ -163,6 +165,8 @@ class Config:
             "admin_activity_log": "admin_activity.log",
             "ota_download_log": "ota_download.log",
             "ota_audit_log": "ota_download.log",
+            "password_min_length": 8,
+            "password_max_length": 1024,
             "log_rotation_strategy": "hybrid",
             "log_rotation_max_bytes": 10 * 1024 * 1024,
             "log_rotation_backup_count": 14,
@@ -319,6 +323,14 @@ class Config:
                     },
                     "ota_audit_log": {
                         "type": "string"
+                    },
+                    "password_min_length": {
+                        "type": "number",
+                        "minimum": 1
+                    },
+                    "password_max_length": {
+                        "type": "number",
+                        "minimum": 1
                     },
                     "log_rotation_strategy": {
                         "type": "string",
@@ -592,6 +604,8 @@ class Config:
                 "jwt_audience": os.getenv("OTA_JWT_AUDIENCE"),
                 "jwt_user_audience": os.getenv("OTA_JWT_USER_AUDIENCE"),
                 "jwt_user_expiry": os.getenv("OTA_JWT_USER_EXPIRY_SECONDS"),
+                "password_min_length": os.getenv("OTA_PASSWORD_MIN_LENGTH"),
+                "password_max_length": os.getenv("OTA_PASSWORD_MAX_LENGTH"),
                 "app_directory": os.getenv("OTA_APP_DIRECTORY")
             },
             "database": {
@@ -773,6 +787,12 @@ class Config:
                         self.config["parameters"]["user_status"] = config_cli.user_status
                     else:
                         self.config["parameters"]["user_status"] = None
+                # password-change
+                if config_cli.user_command == 'password-change':
+                    if config_cli.user_id is not None:
+                        self.config["parameters"]["user_id"] = config_cli.user_id
+                    if config_cli.username is not None:
+                        self.config["parameters"]["username"] = config_cli.username
 
             if config_cli.command == 'project':
                 if config_cli.project_command is not None:
@@ -1168,6 +1188,10 @@ For use in development environment without SSL certificates and JWT authenticati
     get_user_parser = user_subparsers.add_parser(name="get", help="Get user information")
     get_user_parser.add_argument("--user-id", dest="user_id", type=int, required=False, help="ID of the user to be retrieved")
     get_user_parser.add_argument("--username", dest="username", type=str, required=False, help="Username of the user to be retrieved. Give --user-id or --username. --user-id takes precedence.")
+    # user password-change
+    password_change_user_parser = user_subparsers.add_parser(name="password-change", help="Change (reset) a user's password. The new password is prompted for securely and is never accepted as a command-line argument.")
+    password_change_user_parser.add_argument("--user-id", dest="user_id", type=int, required=False, help="ID of the user whose password is changed")
+    password_change_user_parser.add_argument("--username", dest="username", type=str, required=False, help="Username of the user whose password is changed. Give --user-id or --username. --user-id takes precedence.")
     # list
     list_user_parser = user_subparsers.add_parser(name="list", help="List all users")
     list_user_parser.add_argument("--record", dest="user_record", action="store_const", const=True, help="List full records of users, including all fields. If not specified, only a summary of users will be listed.")
