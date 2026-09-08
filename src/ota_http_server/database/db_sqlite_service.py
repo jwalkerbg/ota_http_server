@@ -2083,6 +2083,9 @@ class DatabaseSqliteService:
         release_notes: str | None = None,
         channel: str | None = None,
         target_id: int | None = None,
+        filename: str | None = None,
+        file_size: int | None = None,
+        checksum: str | None = None,
     ) -> Firmware:
         """
         Partially update firmware metadata. Only non-None arguments are written.
@@ -2104,6 +2107,12 @@ class DatabaseSqliteService:
             updates["channel"] = channel
         if target_id is not None:
             updates["target_id"] = target_id
+        if filename is not None:
+            updates["filename"] = filename
+        if file_size is not None:
+            updates["file_size"] = file_size
+        if checksum is not None:
+            updates["checksum"] = checksum
         if not updates:
             raise ValueError("At least one field must be provided to update firmware")
 

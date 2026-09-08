@@ -315,6 +315,9 @@ class DatabaseService:
         release_notes: str | None = None,
         channel: str | None = None,
         target_id: int | None = None,
+        filename: str | None = None,
+        file_size: int | None = None,
+        checksum: str | None = None,
     ) -> Firmware:
         return self._database.firmware_update_by_id(
             firmware_id,
@@ -322,4 +325,7 @@ class DatabaseService:
             release_notes=release_notes,
             channel=channel,
             target_id=target_id,
+            filename=filename,
+            file_size=file_size,
+            checksum=checksum,
         )

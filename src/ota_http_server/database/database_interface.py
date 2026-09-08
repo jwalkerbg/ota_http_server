@@ -249,5 +249,8 @@ class DatabaseInterface(Protocol):
         release_notes: str | None = None,
         channel: str | None = None,
         target_id: int | None = None,
+        filename: str | None = None,
+        file_size: int | None = None,
+        checksum: str | None = None,
     ) -> Firmware:
         ...

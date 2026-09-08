@@ -51,6 +51,34 @@ def _save_with_sha256(stream, destination: Path) -> str:
     return digest.hexdigest()
 
 
+def _store_firmware_file(upload, project_dir: Path, *, overwrite_path: Path | None = None):
+    """
+    Validate an uploaded firmware file and write it into ``project_dir``.
+
+    ``overwrite_path`` may be supplied when replacing an existing firmware's
+    image with a new upload of the same filename; in that case writing over
+    that exact path is allowed even though it already exists.
+
+    Returns a tuple of (destination_path, file_size, checksum).
+
+    Raises:
+        ValueError: If the filename is invalid.
+        FileExistsError: If the destination file already exists and is not
+            the file being intentionally replaced (``overwrite_path``).
+    """
+    validate_firmware_filename(upload.filename)
+
+    destination_path = (project_dir / upload.filename).resolve()
+
+    if destination_path.exists() and destination_path != overwrite_path:
+        raise FileExistsError(f"Firmware file already exists: {destination_path.name}")
+
+    checksum = _save_with_sha256(upload.stream, destination_path)
+    file_size = destination_path.stat().st_size
+
+    return destination_path, file_size, checksum
+
+
 @api_v1_firmware.route("", methods=["GET"])
 @api_v1_firmware.route("/", methods=["GET"])
 @require_permission(FIRMWARE_READ)
@@ -115,11 +143,6 @@ def upload_firmware():
             return error_response(500, f"Default target '{DEFAULT_TARGET_NAME}' does not exist")
         target_id = target.id
 
-    try:
-        validate_firmware_filename(upload.filename)
-    except ValueError as exc:
-        return error_response(400, str(exc))
-
     if db.firmware_get_by_project_version_target(
         project_id=project_id,
         version=version,
@@ -132,14 +155,13 @@ def upload_firmware():
 
     app_paths = get_app_paths()
     project_dir = app_paths.ensure_project_dir(project.name)
-    destination_path = (project_dir / upload.filename).resolve()
 
-    if destination_path.exists():
-        return error_response(
-            409, f"Firmware file already exists: {destination_path.name}"
-        )
-
-    checksum = _save_with_sha256(upload.stream, destination_path)
+    try:
+        destination_path, file_size, checksum = _store_firmware_file(upload, project_dir)
+    except ValueError as exc:
+        return error_response(400, str(exc))
+    except FileExistsError as exc:
+        return error_response(409, str(exc))
 
     firmware = Firmware(
         id=None,
@@ -147,7 +169,7 @@ def upload_firmware():
         target_id=target_id,
         version=version,
         filename=destination_path.name,
-        file_size=destination_path.stat().st_size,
+        file_size=file_size,
         checksum=checksum,
         release_notes=release_notes,
         channel=channel,
@@ -180,7 +202,21 @@ def get_firmware(firmware_id: int):
 @api_v1_firmware.route("/<int:firmware_id>", methods=["PATCH"])
 @require_permission(FIRMWARE_UPDATE)
 def update_firmware(firmware_id: int):
-    """Update firmware metadata (version, release_notes, channel, target_id)."""
+    """
+    Update firmware metadata (version, release_notes, channel, target_id).
+
+    To replace the firmware image itself, send a multipart/form-data request
+    with a 'file' part containing the new firmware image. Metadata fields may
+    be supplied alongside the file as additional form fields. The old image
+    file is deleted once the new one has been stored and the database record
+    updated.
+    """
+    db = get_db()
+    upload = request.files.get("file")
+
+    if upload is not None:
+        return _replace_firmware_file(db, firmware_id, upload)
+
     data = json_body()
     reject_unknown_fields(data, {"version", "release_notes", "channel", "target_id"})
 
@@ -191,7 +227,7 @@ def update_firmware(firmware_id: int):
         )
 
     try:
-        updated = get_db().firmware_update_by_id(
+        updated = db.firmware_update_by_id(
             firmware_id,
             version=optional_str(data, "version"),
             release_notes=optional_str(data, "release_notes"),
@@ -208,6 +244,70 @@ def update_firmware(firmware_id: int):
         return error_response(400, str(exc))
 
     return jsonify(firmware_to_dict(updated)), 200
+
+
+def _replace_firmware_file(db, firmware_id: int, upload):
+    """Replace the stored firmware image for an existing firmware record."""
+    if not upload.filename:
+        return error_response(400, "Form field 'file' with a firmware image is required")
+
+    firmware = db.firmware_get_by_id(firmware_id)
+    if firmware is None:
+        return error_response(404, f"Firmware id={firmware_id} not found")
+
+    project = db.project_get_by_id(firmware.project_id)
+    if project is None:
+        return error_response(404, f"Project id={firmware.project_id} not found")
+
+    try:
+        validate_firmware_filename(firmware.filename)
+    except ValueError:
+        return error_response(500, "Stored firmware filename is not safe to replace")
+
+    app_paths = get_app_paths()
+    project_dir = app_paths.ensure_project_dir(project.name).resolve()
+    old_file_path = (project_dir / firmware.filename).resolve()
+    if old_file_path.parent != project_dir:
+        return error_response(500, "Stored firmware filename is not safe to replace")
+
+    try:
+        destination_path, file_size, checksum = _store_firmware_file(
+            upload, project_dir, overwrite_path=old_file_path
+        )
+    except ValueError as exc:
+        return error_response(400, str(exc))
+    except FileExistsError as exc:
+        return error_response(409, str(exc))
+
+    try:
+        updated = db.firmware_update_by_id(
+            firmware_id,
+            filename=destination_path.name,
+            file_size=file_size,
+            checksum=checksum,
+        )
+    except ValueError as exc:
+        if destination_path != old_file_path:
+            destination_path.unlink(missing_ok=True)
+        return error_response(400, str(exc))
+    except FIRMWARE_NOT_FOUND as exc:
+        if destination_path != old_file_path:
+            destination_path.unlink(missing_ok=True)
+        return error_response(404, str(exc))
+    except FIRMWARE_ALREADY_EXISTS as exc:
+        if destination_path != old_file_path:
+            destination_path.unlink(missing_ok=True)
+        return error_response(409, str(exc))
+    except TARGET_NOT_FOUND as exc:
+        if destination_path != old_file_path:
+            destination_path.unlink(missing_ok=True)
+        return error_response(400, str(exc))
+
+    if old_file_path != destination_path and old_file_path.exists():
+        old_file_path.unlink()
+
+    return jsonify(firmware_to_dict(updated)), 200
+
 
 
 @api_v1_firmware.route("/<int:firmware_id>", methods=["DELETE"])

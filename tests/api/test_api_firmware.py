@@ -149,6 +149,82 @@ def test_patch_firmware_version_conflict(client, make_firmware, project):
     assert response.status_code == 409
 
 
+def test_patch_firmware_replace_file_same_name(client, firmware, db, app, project):
+    """Replacing with a file of the same name overwrites content in place."""
+    app_paths = app.extensions["app_paths"]
+    old_path = app_paths.project_dir(project.name) / firmware.filename
+
+    new_content = b"new-image-bytes"
+    response = client.patch(
+        f"/api/v1/firmware/{firmware.id}",
+        data={"file": (io.BytesIO(new_content), firmware.filename)},
+        content_type="multipart/form-data",
+    )
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["filename"] == firmware.filename
+    assert payload["file_size"] == len(new_content)
+    assert payload["checksum"] == hashlib.sha256(new_content).hexdigest()
+    assert old_path.read_bytes() == new_content
+
+
+def test_patch_firmware_replace_file_new_name(client, firmware, db, app, project):
+    """Replacing with a differently named file removes the old file and stores the new one."""
+    app_paths = app.extensions["app_paths"]
+    old_path = app_paths.project_dir(project.name) / firmware.filename
+
+    new_content = b"new-image-bytes-2"
+    response = client.patch(
+        f"/api/v1/firmware/{firmware.id}",
+        data={"file": (io.BytesIO(new_content), "renamed.bin")},
+        content_type="multipart/form-data",
+    )
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["filename"] == "renamed.bin"
+    assert payload["file_size"] == len(new_content)
+    assert payload["checksum"] == hashlib.sha256(new_content).hexdigest()
+    assert not old_path.exists()
+    new_path = app_paths.project_dir(project.name) / "renamed.bin"
+    assert new_path.read_bytes() == new_content
+
+
+def test_patch_firmware_replace_file_not_found(client):
+    response = client.patch(
+        "/api/v1/firmware/999",
+        data={"file": (io.BytesIO(b"x"), "fw.bin")},
+        content_type="multipart/form-data",
+    )
+
+    assert response.status_code == 404
+
+
+def test_patch_firmware_replace_file_unsafe_filename(client, firmware):
+    response = client.patch(
+        f"/api/v1/firmware/{firmware.id}",
+        data={"file": (io.BytesIO(b"x"), "../evil.bin")},
+        content_type="multipart/form-data",
+    )
+
+    assert response.status_code == 400
+
+
+def test_patch_firmware_replace_file_name_conflict(client, make_firmware, project):
+    """Renaming to an existing other firmware's filename is rejected."""
+    first = make_firmware(project, version="1.0.0")
+    second = make_firmware(project, version="2.0.0")
+
+    response = client.patch(
+        f"/api/v1/firmware/{first.id}",
+        data={"file": (io.BytesIO(b"x"), second.filename)},
+        content_type="multipart/form-data",
+    )
+
+    assert response.status_code == 409
+
+
 def test_delete_firmware(client, firmware, db, app, project):
     app_paths = app.extensions["app_paths"]
     stored = app_paths.project_dir(project.name) / firmware.filename
