@@ -1,0 +1,155 @@
+# Release Notes - Version 3.4.0
+
+**Release Date:** 2026-09-08
+**Redmine Task:** #421
+
+## Overview
+
+Version 3.4.0 introduces a JSON REST API for administration, user authentication and role-based authorization, user password management, safer concurrent log rotation, and firmware replacement support. The release also documents the new API and updates the project version to 3.4.0.
+
+---
+
+## Major Features
+
+### 1. REST API (RT #387, RT #411)
+
+Added a versioned JSON API under `/api/v1` for managing OTA server resources.
+
+**Highlights:**
+- Added API discovery and health/status endpoints.
+- Added CRUD and action endpoints for users, projects, devices, and firmware.
+- Added consistent JSON request and error handling.
+- Added support for collection routes with or without trailing slashes.
+- Added API integration tests covering the supported resources and common error cases.
+- Added comprehensive REST API documentation to `README.md`.
+
+### 2. REST API Authentication (RT #414)
+
+Added username/password login backed by short-lived JWT access tokens.
+
+**Highlights:**
+- Added `POST /api/v1/auth/login` and `GET /api/v1/auth/me`.
+- Validates JWT signature, algorithm, issuer, audience, issued-at time, and expiration.
+- Loads the current user from the database for every authenticated request.
+- Keeps REST API user tokens separate from OTA/device token audience and claims.
+- Added configurable user-token audience and lifetime settings.
+- Uses generic authentication errors and never exposes password hashes.
+
+### 3. Role-Based REST API Authorization (RT #413)
+
+Added centralized resource/action permissions for REST API endpoints.
+
+**Supported roles:**
+- `viewer`: Read status, projects, devices, and firmware; download firmware.
+- `operator`: Viewer permissions plus project/device changes and firmware upload/update.
+- `admin`: All defined permissions, including user management and delete operations.
+
+Authorization uses the user's current database role rather than trusting a role claim in the JWT. Unauthorized authenticated requests return `403 Forbidden`.
+
+### 4. User Password Management (RT #417)
+
+Added centralized password policy and password lifecycle management.
+
+**Highlights:**
+- Added configurable password validation and policy enforcement.
+- Added service-layer password changes and administrative resets.
+- Added authenticated REST API password operations.
+- Added secure CLI password prompts.
+- Added password-management configuration and documentation.
+- Added service, CLI, REST API, and regression test coverage.
+
+### 5. Firmware File Replacement (RT #418)
+
+Added REST API support for replacing firmware files while updating firmware metadata.
+
+**Highlights:**
+- Added firmware replacement handling to the API.
+- Extended database interfaces and both SQLite and MySQL services for replacement operations.
+- Added validation and API test coverage for replacement flows.
+
+---
+
+## Improvements and Fixes
+
+### Concurrent Log Rotation (RT #416)
+
+- Fixed `PermissionError` failures when admin logs rotate concurrently.
+- Hardened Windows sharing-violation handling during rotation.
+- Preserved unrelated permission errors instead of suppressing them.
+- Protected size-based rotation backup renames.
+- Expanded admin activity logging tests for concurrent rotation behavior.
+
+### Type and Code Quality Maintenance (RT #412)
+
+- Applied and then reverted an experimental mypy-related change.
+- Removed trailing whitespace from the affected server code.
+
+---
+
+## Configuration Changes
+
+REST API user tokens have settings independent from OTA/device tokens:
+
+| Setting | Default | Environment variable | CLI option |
+| --- | --- | --- | --- |
+| User-token audience | `ota_users_api` | `OTA_JWT_USER_AUDIENCE` | `--jwt-user-audience` |
+| User-token lifetime | `1800` seconds | `OTA_JWT_USER_EXPIRY_SECONDS` | `--jwt-user-expiry` |
+
+Password policy settings are available through the application configuration and environment/CLI configuration paths documented in `README.md`.
+
+---
+
+## Testing
+
+This release adds or expands coverage for:
+
+- REST API status, users, projects, devices, and firmware.
+- REST API authentication and JWT validation.
+- Role-based authorization and permission enforcement.
+- Password policy, password changes, resets, and API flows.
+- Firmware replacement.
+- Concurrent admin log rotation.
+
+---
+
+## Code Changes Summary
+
+Changes from commit `04830beeb7b57edfca4095c61bf2d4ef4ff8604d` (exclusive) through `11ccfc3187ea6701b79e6baf3cb477e04a7c7366`:
+
+- **Files changed:** 37
+- **Lines added:** 6,078
+- **Lines removed:** 44
+- **Net change:** +6,034 lines
+
+---
+
+## Upgrade Notes
+
+- Existing OTA/device JWT authentication remains available and uses its existing configuration.
+- Configure the REST API JWT secret, issuer, and user-token settings before enabling administrative API clients.
+- Use HTTPS for API login and all Bearer-token requests in production.
+- Review the password policy configuration before creating or resetting users.
+- No database migration step is required beyond the normal application startup process.
+
+---
+
+## Known Issues
+
+None identified for this release.
+
+---
+
+## Contributors
+
+- imc (lead developer)
+- Ivan Cenov (release coordination)
+
+---
+
+## Version History
+
+- **3.4.0** - Current Release
+- **3.3.0** - Previous Release
+
+For detailed commit history, see:
+`git log 04830beeb7b57edfca4095c61bf2d4ef4ff8604d..11ccfc3187ea6701b79e6baf3cb477e04a7c7366`
