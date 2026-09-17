@@ -8,6 +8,8 @@ from typing import Protocol
 
 from flask import abort, current_app, g
 
+from ota_http_server.core.config import USER_ROLES
+
 
 class AuthenticatedUser(Protocol):
     """The user identity supplied by the authentication layer."""
@@ -28,6 +30,7 @@ DEVICES_READ = "devices.read"
 DEVICES_CREATE = "devices.create"
 DEVICES_UPDATE = "devices.update"
 DEVICES_DELETE = "devices.delete"
+DEVICE_OTA = "device.ota"
 FIRMWARE_READ = "firmware.read"
 FIRMWARE_UPLOAD = "firmware.upload"
 FIRMWARE_UPDATE = "firmware.update"
@@ -35,8 +38,6 @@ FIRMWARE_DELETE = "firmware.delete"
 FIRMWARE_DOWNLOAD = "firmware.download"
 AUTH_LOGIN = "auth.login"
 AUTH_SELF = "auth.self"
-
-ROLES = frozenset({"viewer", "operator", "admin"})
 
 PERMISSIONS = frozenset({
     SYSTEM_READ,
@@ -52,6 +53,7 @@ PERMISSIONS = frozenset({
     DEVICES_CREATE,
     DEVICES_UPDATE,
     DEVICES_DELETE,
+    DEVICE_OTA,
     FIRMWARE_READ,
     FIRMWARE_UPLOAD,
     FIRMWARE_UPDATE,
@@ -87,7 +89,12 @@ ROLE_PERMISSIONS = {
         FIRMWARE_DOWNLOAD,
     }) | _COMMON_PERMISSIONS,
     "admin": PERMISSIONS,
+    "manager": PERMISSIONS,
 }
+
+assert set(ROLE_PERMISSIONS) == set(USER_ROLES), (
+    "ROLE_PERMISSIONS must define an entry for every role in USER_ROLES"
+)
 
 AuthenticatedUserLoader = Callable[[], AuthenticatedUser | None]
 

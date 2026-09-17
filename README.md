@@ -163,7 +163,7 @@ The `users` table stores application accounts used for authentication and access
 | `username` | TEXT | Unique account name |
 | `password_hash` | TEXT | Stored as a hash, never as plaintext |
 | `email` | TEXT | Unique email address |
-| `role` | TEXT | Role-based access control (`admin`, `operator`, `viewer`) |
+| `role` | TEXT | Role-based access control (`admin`, `manager`, `operator`, `viewer`) |
 | `is_active` | INTEGER | `1` = enabled, `0` = disabled |
 | `created_at` | TEXT | Created timestamp |
 | `updated_at` | TEXT | Last modification timestamp |
@@ -877,7 +877,8 @@ The supported roles and permissions are:
 | --- | --- |
 | `viewer` | Read system status, projects, devices, and firmware; download firmware; access `/auth/me` |
 | `operator` | All viewer permissions, plus create/update projects and devices, and upload/update firmware |
-| `admin` | All defined permissions, including user management and delete operations |
+| `admin` | All defined permissions, including user management, device OTA, and delete operations |
+| `manager` | All defined permissions, same as `admin` |
 
 Login and `/auth/me` are available to every role. Authorization does not trust a role claim from the JWT for access decisions; it uses the authenticated user's current role from the database. The REST user authentication flow is separate from OTA/device authentication, which continues to use its own device-oriented JWT validation and claims.
 

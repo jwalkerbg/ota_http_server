@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from flask import Blueprint, abort, current_app, jsonify
 
+from ota_http_server.core.config import USER_ROLES
 from ota_http_server.core.data_models import User
 from ota_http_server.core.password_policy import PasswordPolicyError
 from ota_http_server.core.passwords import Passwords
@@ -19,7 +20,6 @@ from .authorization import (
     USERS_DELETE,
     USERS_READ,
     USERS_UPDATE,
-    ROLES,
     get_current_user,
     require_permission,
 )
@@ -87,8 +87,8 @@ def create_user():
     password = required_str(data, "password")
     email = required_str(data, "email")
     role = required_str(data, "role")
-    if role not in ROLES:
-        return error_response(400, f"Field 'role' must be one of: {', '.join(sorted(ROLES))}")
+    if role not in USER_ROLES:
+        return error_response(400, f"Field 'role' must be one of: {', '.join(sorted(USER_ROLES))}")
 
     user = User(
         id=None,
@@ -127,8 +127,8 @@ def update_user(user_id: int):
     username = optional_str(data, "username")
     email = optional_str(data, "email")
     role = optional_str(data, "role")
-    if role is not None and role not in ROLES:
-        return error_response(400, f"Field 'role' must be one of: {', '.join(sorted(ROLES))}")
+    if role is not None and role not in USER_ROLES:
+        return error_response(400, f"Field 'role' must be one of: {', '.join(sorted(USER_ROLES))}")
 
     try:
         updated = get_db().user_update_by_id(

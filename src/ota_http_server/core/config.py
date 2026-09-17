@@ -119,11 +119,10 @@ class ConfigDict(TypedDict):
     parameters: ParametersConfig
     database: DatabaseConfig
 
-USER_ROLES = [
-    "admin",
-    "operator",
-    "viewer",
-]
+# Centralized list of valid user roles, used across the codebase (e.g.
+# config CLI validation, API authorization) so there is a single source
+# of truth for what roles exist.
+USER_ROLES = frozenset({"admin", "manager", "viewer", "operator"})
 
 class Config:
     def __init__(self) -> None:

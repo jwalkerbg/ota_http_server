@@ -34,7 +34,7 @@ class User:
     username: str       # should be unique in the database.
     password_hash: str  # store only a hash (for example bcrypt or Argon2), never the plaintext password.
     email: str          # email of the user
-    role: str           # allows role-based access control later (admin, operator, viewer).
+    role: str           # allows role-based access control (see core.config.USER_ROLES).
     is_active: bool     # lets you disable a user account without deleting its audit history.
     created_at: Optional[datetime]
     updated_at: Optional[datetime]  # useful for auditing and future administration features.
