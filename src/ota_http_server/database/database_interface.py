@@ -1,8 +1,9 @@
 # database_interface.py
 
+from datetime import datetime
 from typing import Protocol
 
-from ota_http_server.core.data_models import User, Project, ProjectListItem, Target, Device, DeviceListItem, Firmware, FirmwareListItem, FirmwareDeleteInfo
+from ota_http_server.core.data_models import User, Project, ProjectListItem, Target, Device, DeviceListItem, UserDevice, Firmware, FirmwareListItem, FirmwareDeleteInfo
 
 class DatabaseInterface(Protocol):
 
@@ -174,6 +175,18 @@ class DatabaseInterface(Protocol):
         serial_number: str | None = None,
         current_version: str | None = None,
     ) -> Device:
+        ...
+
+    def user_device_add(self, user_device: UserDevice) -> UserDevice:
+        ...
+
+    def user_device_get(self, user_id: int, device_id: int) -> UserDevice | None:
+        ...
+
+    def user_device_is_expired(self, user_id: int, device_id: int) -> bool:
+        ...
+
+    def user_device_set_expiry(self, user_id: int, device_id: int, expires_at: datetime | None) -> UserDevice:
         ...
 
     def firmware_add(self, firmware: Firmware) -> Firmware:

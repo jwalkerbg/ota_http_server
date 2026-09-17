@@ -11,6 +11,7 @@ from ota_http_server.project.project_service import ProjectService
 from ota_http_server.target.target_service import TargetService
 from ota_http_server.device.device_service import DeviceService
 from ota_http_server.firmware.firmware_service import FirmwareService
+from ota_http_server.user_device.user_device_service import UserDeviceService
 from ota_http_server.logger import get_app_logger
 from ota_http_server.logger.admin_activity_logger import build_admin_activity_logger, build_ota_download_logger
 from ota_http_server.core.data_models import AppPaths
@@ -39,6 +40,8 @@ def run_app(cfg:Config) -> None:
     cfg.config["device_service"] = device_service
     firmware_service = FirmwareService(cfg)
     cfg.config["firmware_service"] = firmware_service
+    user_device_service = UserDeviceService(cfg)
+    cfg.config["user_device_service"] = user_device_service
 
     if cfg.config['command'] == 'runserver':
         try:
@@ -116,5 +119,12 @@ def run_app(cfg:Config) -> None:
             logger.error("%s", str(e), exc_info=cfg.config['logging']['exc_full_stack'])
         finally:
             logger.info("Exiting firmware CLI")
+    elif cfg.config['command'] == 'userdev':
+        try:
+            user_device_service.command_handler()
+        except Exception as e:
+            logger.error("%s", str(e), exc_info=cfg.config['logging']['exc_full_stack'])
+        finally:
+            logger.info("Exiting userdev CLI")
     else:
         logger.warning("Unknown command '%s' specified, no action taken", cfg.config['command'])

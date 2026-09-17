@@ -6,7 +6,7 @@ from datetime import datetime, UTC
 
 from ota_http_server.core.config import Config
 from ota_http_server.database.migration_sqlite3_runner import MigrationRunner
-from ota_http_server.core.data_models import ProjectListItem, User, Project, Target, Device, DeviceListItem, Firmware, FirmwareListItem, FirmwareDeleteInfo
+from ota_http_server.core.data_models import ProjectListItem, User, Project, Target, Device, DeviceListItem, UserDevice, Firmware, FirmwareListItem, FirmwareDeleteInfo
 from ota_http_server.core.data_models import AppPaths
 from ota_http_server.logger import get_app_logger
 
@@ -67,6 +67,12 @@ class FirmwareAlreadyEnabledError(Exception):
     pass
 
 class FirmwareAlreadyDisabledError(Exception):
+    pass
+
+class UserDeviceAlreadyExistsError(Exception):
+    pass
+
+class UserDeviceNotFoundError(Exception):
     pass
 
 class DatabaseError(Exception):
@@ -1238,6 +1244,102 @@ class DatabaseSqliteService:
             raise DatabaseError(
                 f"Database error checking whether device {device_id} is active"
             ) from e
+
+    @staticmethod
+    def _row_to_user_device(row: sqlite3.Row) -> UserDevice:
+        return UserDevice(
+            user_id=row["user_id"],
+            device_id=row["device_id"],
+            created_at=datetime.fromisoformat(row["created_at"]) if row["created_at"] else None,
+            expires_at=datetime.fromisoformat(row["expires_at"]) if row["expires_at"] else None,
+        )
+
+    def user_device_add(self, user_device: UserDevice) -> UserDevice:
+        now = datetime.now(UTC)
+        try:
+            with self._connect() as conn:
+                conn.execute(
+                    """
+                    INSERT INTO users_devices (user_id, device_id, created_at, expires_at)
+                    VALUES (?, ?, ?, ?)
+                    """,
+                    (
+                        user_device.user_id,
+                        user_device.device_id,
+                        now.isoformat(),
+                        user_device.expires_at.isoformat() if user_device.expires_at else None,
+                    ),
+                )
+                conn.commit()
+                user_device.created_at = now
+                return user_device
+        except sqlite3.IntegrityError as e:
+            if "UNIQUE" in str(e) or "PRIMARY KEY" in str(e):
+                raise UserDeviceAlreadyExistsError(
+                    f"User {user_device.user_id} is already assigned to device {user_device.device_id}"
+                ) from e
+            raise DatabaseError("Database integrity error creating user-device assignment") from e
+        except sqlite3.Error as e:
+            raise DatabaseError("Database error creating user-device assignment") from e
+
+    def user_device_get(self, user_id: int, device_id: int) -> UserDevice | None:
+        try:
+            with self._connect() as conn:
+                row = conn.execute(
+                    """
+                    SELECT user_id, device_id, created_at, expires_at
+                    FROM users_devices
+                    WHERE user_id = ? AND device_id = ?
+                    """,
+                    (user_id, device_id),
+                ).fetchone()
+                return self._row_to_user_device(row) if row else None
+        except sqlite3.Error as e:
+            raise DatabaseError("Database error retrieving user-device assignment") from e
+
+    def user_device_is_expired(self, user_id: int, device_id: int) -> bool:
+        user_device = self.user_device_get(user_id, device_id)
+        if user_device is None:
+            raise UserDeviceNotFoundError(
+                f"Assignment user={user_id}, device={device_id} was not found"
+            )
+        if user_device.expires_at is None:
+            return False
+        expires_at = user_device.expires_at
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=UTC)
+        return expires_at <= datetime.now(UTC)
+
+    def user_device_set_expiry(
+        self, user_id: int, device_id: int, expires_at: datetime | None
+    ) -> UserDevice:
+        if self.user_device_get(user_id, device_id) is None:
+            raise UserDeviceNotFoundError(
+                f"Assignment user={user_id}, device={device_id} was not found"
+            )
+        try:
+            with self._connect() as conn:
+                conn.execute(
+                    """
+                    UPDATE users_devices
+                    SET expires_at = ?
+                    WHERE user_id = ? AND device_id = ?
+                    """,
+                    (
+                        expires_at.isoformat() if expires_at else None,
+                        user_id,
+                        device_id,
+                    ),
+                )
+                conn.commit()
+            user_device = self.user_device_get(user_id, device_id)
+            if user_device is None:
+                raise DatabaseError("User-device assignment disappeared after update")
+            return user_device
+        except UserDeviceNotFoundError:
+            raise
+        except sqlite3.Error as e:
+            raise DatabaseError("Database error updating user-device expiry") from e
 
     def _build_device_filters(
         self,

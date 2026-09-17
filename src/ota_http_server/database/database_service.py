@@ -1,8 +1,10 @@
 # core/db.py
 
+from datetime import datetime
+
 from ota_http_server.core.config import Config
 from ota_http_server.database.database_interface import DatabaseInterface
-from ota_http_server.core.data_models import User, Project, ProjectListItem, Target, Device, DeviceListItem, Firmware, FirmwareListItem, FirmwareDeleteInfo
+from ota_http_server.core.data_models import User, Project, ProjectListItem, Target, Device, DeviceListItem, UserDevice, Firmware, FirmwareListItem, FirmwareDeleteInfo
 from ota_http_server.logger import get_app_logger
 
 logger = get_app_logger(__name__)
@@ -230,6 +232,18 @@ class DatabaseService:
             serial_number=serial_number,
             current_version=current_version,
         )
+
+    def user_device_add(self, user_device: UserDevice) -> UserDevice:
+        return self._database.user_device_add(user_device)
+
+    def user_device_get(self, user_id: int, device_id: int) -> UserDevice | None:
+        return self._database.user_device_get(user_id, device_id)
+
+    def user_device_is_expired(self, user_id: int, device_id: int) -> bool:
+        return self._database.user_device_is_expired(user_id, device_id)
+
+    def user_device_set_expiry(self, user_id: int, device_id: int, expires_at: datetime | None) -> UserDevice:
+        return self._database.user_device_set_expiry(user_id, device_id, expires_at)
 
     def firmware_add(self, firmware: Firmware) -> Firmware:
         return self._database.firmware_add(firmware=firmware)

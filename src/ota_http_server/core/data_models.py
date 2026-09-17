@@ -189,6 +189,25 @@ class DeviceListItem:
     is_active: bool
 
 @dataclass
+class UserDevice:
+    user_id: int
+    device_id: int
+    created_at: Optional[datetime]
+    expires_at: Optional[datetime]
+
+    def __str__(self) -> str:
+        created_at = self.created_at.strftime("%Y-%m-%d %H:%M:%S") if self.created_at else "-"
+        expires_at = self.expires_at.strftime("%Y-%m-%d %H:%M:%S") if self.expires_at else "-"
+        return (
+            f"UserDevice("
+            f"user_id:{self.user_id}, "
+            f"device_id:{self.device_id}, "
+            f"created_at:{created_at}, "
+            f"expires_at:{expires_at}"
+            f")"
+        )
+
+@dataclass
 class Firmware:
     id: Optional[int]   # the database primary key. It is None before the object is inserted into SQLite.
     project_id: int     # FK → Projects: Which project owns this firmware

@@ -905,6 +905,14 @@ class Config:
                     else:
                         self.config["parameters"]["device_pid"] = None
 
+            if config_cli.command == "userdev":
+                if config_cli.userdev_command is not None:
+                    self.config["userdev_command"] = config_cli.userdev_command
+                for option in ("userdev_user_id", "userdev_username", "userdev_device_id", "userdev_device_uuid", "userdev_expires"):
+                    value = getattr(config_cli, option, None)
+                    if value is not None:
+                        self.config["parameters"][option] = value
+
             if config_cli.command == "firmware":
                 if config_cli.firmware_command is not None:
                     self.config["firmware_command"] = config_cli.firmware_command
@@ -1269,6 +1277,30 @@ For use in development environment without SSL certificates and JWT authenticati
     device_status_group.add_argument("--enabled", dest="device_status", action="store_const", const="enabled", help="List enabled devices only")
     device_status_group.add_argument("--disabled", dest="device_status", action="store_const", const="disabled", help="List disabled devices only")
     list_device_parser.add_argument("--pid", dest="device_pid", type=int, required=False, help="List devices for project ID only")
+
+    # user-device assignments
+    userdev_parser = subparsers.add_parser(name="userdev", help="User-device permission operations")
+    userdev_subparsers = userdev_parser.add_subparsers(dest="userdev_command", required=True)
+    for command, help_text in (
+        ("add", "Add a user-device permission"),
+        ("get", "Get a user-device permission"),
+        ("isexp", "Check whether a user-device permission is expired"),
+        ("setexp", "Set or remove a user-device permission expiry"),
+    ):
+        command_parser = userdev_subparsers.add_parser(command, help=help_text)
+        user_group = command_parser.add_mutually_exclusive_group(required=True)
+        user_group.add_argument("--userid", dest="userdev_user_id", type=int, help="User ID")
+        user_group.add_argument("--username", dest="userdev_username", type=str, help="Username")
+        device_group = command_parser.add_mutually_exclusive_group(required=True)
+        device_group.add_argument("--devid", dest="userdev_device_id", type=int, help="Device ID")
+        device_group.add_argument("--devuuid", dest="userdev_device_uuid", type=str, help="Device UUID")
+        if command in ("add", "setexp"):
+            command_parser.add_argument(
+                "--expires",
+                dest="userdev_expires",
+                type=str,
+                help="ISO 8601 timestamp, e.g. 2026-09-18T12:30:00+00:00",
+            )
 
     # firmware
     firmware_parser = subparsers.add_parser(name="firmware", help="Firmware manipulation operations", )

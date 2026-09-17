@@ -2,7 +2,7 @@
 
 from datetime import datetime
 from textwrap import wrap
-from ota_http_server.core.data_models import User, Project, ProjectListItem, Device, DeviceListItem, Firmware, FirmwareListItem, Column
+from ota_http_server.core.data_models import User, Project, ProjectListItem, Device, DeviceListItem, UserDevice, Firmware, FirmwareListItem, Column
 
 class TableFormatter:
 
@@ -377,6 +377,33 @@ class DeviceListItemFormatter:
         for item in items:
             lines.extend(cls.format(item))
 
+        return "\n".join(lines)
+
+class UserDeviceFormatter:
+    ID_WIDTH = 10
+    DATE_WIDTH = 22
+
+    COLUMNS = [
+        Column("User ID", ID_WIDTH, ">"),
+        Column("Device ID", ID_WIDTH, ">"),
+        Column("Created At", DATE_WIDTH, "^"),
+        Column("Expires At", DATE_WIDTH, "^"),
+    ]
+
+    @classmethod
+    def format(cls, user_device: UserDevice) -> list[str]:
+        created = user_device.created_at.strftime("%Y-%m-%d %H:%M:%S") if user_device.created_at else "-"
+        expires = user_device.expires_at.strftime("%Y-%m-%d %H:%M:%S") if user_device.expires_at else "-"
+        return TableFormatter.format_row(
+            [str(user_device.user_id), str(user_device.device_id), created, expires],
+            cls.COLUMNS,
+        )
+
+    @classmethod
+    def format_list(cls, items: list[UserDevice]) -> str:
+        lines = [TableFormatter.header(cls.COLUMNS), TableFormatter.separator(cls.COLUMNS)]
+        for item in items:
+            lines.extend(cls.format(item))
         return "\n".join(lines)
 
 class FirmwareFormatter:

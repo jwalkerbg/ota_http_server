@@ -55,6 +55,17 @@ def test_sqlite_migration_creates_targets_and_target_foreign_keys(tmp_path):
         assert any(row[2] == "targets" and row[3] == "target_id" for row in device_foreign_keys)
         assert any(row[2] == "targets" and row[3] == "target_id" for row in firmware_foreign_keys)
 
+        user_device_columns = {
+            row[1]
+            for row in conn.execute("PRAGMA table_info(users_devices)").fetchall()
+        }
+        assert user_device_columns == {"user_id", "device_id", "created_at", "expires_at"}
+        user_device_foreign_keys = conn.execute(
+            "PRAGMA foreign_key_list(users_devices)"
+        ).fetchall()
+        assert any(row[2] == "users" and row[3] == "user_id" for row in user_device_foreign_keys)
+        assert any(row[2] == "devices" and row[3] == "device_id" for row in user_device_foreign_keys)
+
         conn.execute(
             """
             INSERT INTO users (username, password_hash, email, role, is_active)
