@@ -1286,6 +1286,7 @@ For use in development environment without SSL certificates and JWT authenticati
         ("get", "Get a user-device permission"),
         ("isexp", "Check whether a user-device permission is expired"),
         ("setexp", "Set or remove a user-device permission expiry"),
+        ("delete", "Delete a user-device permission"),
     ):
         command_parser = userdev_subparsers.add_parser(command, help=help_text)
         user_group = command_parser.add_mutually_exclusive_group(required=True)

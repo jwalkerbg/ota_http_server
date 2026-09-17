@@ -189,6 +189,9 @@ class DatabaseInterface(Protocol):
     def user_device_set_expiry(self, user_id: int, device_id: int, expires_at: datetime | None) -> UserDevice:
         ...
 
+    def user_device_delete(self, user_id: int, device_id: int) -> None:
+        ...
+
     def firmware_add(self, firmware: Firmware) -> Firmware:
         ...
 

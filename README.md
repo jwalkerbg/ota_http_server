@@ -344,6 +344,7 @@ ota_http_server userdev add --username alice --devuuid 11111111-2222-3333-4444-5
 ota_http_server userdev get --userid 1 --devid 2
 ota_http_server userdev isexp --username alice --devuuid 11111111-2222-3333-4444-555555666666
 ota_http_server userdev setexp --userid 1 --devid 2
+ota_http_server userdev delete --username alice --devuuid 11111111-2222-3333-4444-555555666666
 ```
 
 The `--userid`/`--username` and `--devid`/`--devuuid` options are mutually exclusive. The

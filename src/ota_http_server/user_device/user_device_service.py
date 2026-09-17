@@ -22,6 +22,7 @@ class UserDeviceService:
             "get": self._get,
             "isexp": self._is_expired,
             "setexp": self._set_expiry,
+            "delete": self._delete,
         }
         handler = handlers.get(command)
         if handler is None:
@@ -124,3 +125,9 @@ class UserDeviceService:
             "User-device assignment updated: %s",
             db_service.user_device_set_expiry(user_id, device_id, expires_at),
         )
+
+    def _delete(self) -> None:
+        user_id, device_id = self._resolve_ids()
+        db_service: DatabaseService = self.cfg.config["db_service"]
+        db_service.user_device_delete(user_id, device_id)
+        logger.info("User-device assignment deleted: user=%d, device=%d", user_id, device_id)

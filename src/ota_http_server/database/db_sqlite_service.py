@@ -1341,6 +1341,24 @@ class DatabaseSqliteService:
         except sqlite3.Error as e:
             raise DatabaseError("Database error updating user-device expiry") from e
 
+    def user_device_delete(self, user_id: int, device_id: int) -> None:
+        if self.user_device_get(user_id, device_id) is None:
+            raise UserDeviceNotFoundError(
+                f"Assignment user={user_id}, device={device_id} was not found"
+            )
+        try:
+            with self._connect() as conn:
+                conn.execute(
+                    """
+                    DELETE FROM users_devices
+                    WHERE user_id = ? AND device_id = ?
+                    """,
+                    (user_id, device_id),
+                )
+                conn.commit()
+        except sqlite3.Error as e:
+            raise DatabaseError("Database error deleting user-device assignment") from e
+
     def _build_device_filters(
         self,
         is_active: bool | None = None,

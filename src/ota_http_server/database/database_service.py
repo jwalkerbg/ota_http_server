@@ -245,6 +245,9 @@ class DatabaseService:
     def user_device_set_expiry(self, user_id: int, device_id: int, expires_at: datetime | None) -> UserDevice:
         return self._database.user_device_set_expiry(user_id, device_id, expires_at)
 
+    def user_device_delete(self, user_id: int, device_id: int) -> None:
+        return self._database.user_device_delete(user_id, device_id)
+
     def firmware_add(self, firmware: Firmware) -> Firmware:
         return self._database.firmware_add(firmware=firmware)
 
