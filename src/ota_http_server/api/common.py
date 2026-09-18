@@ -16,6 +16,7 @@ from ota_http_server.core.data_models import (
     Project,
     ProjectListItem,
     User,
+    UserDevice,
 )
 from ota_http_server.database import db_mysql_service, db_sqlite_service
 from ota_http_server.database.database_service import DatabaseService
@@ -75,6 +76,14 @@ DEVICE_ALREADY_ENABLED = (
 DEVICE_ALREADY_DISABLED = (
     db_sqlite_service.DeviceAlreadyDisabledError,
     db_mysql_service.DeviceAlreadyDisabledError,
+)
+USER_DEVICE_NOT_FOUND = (
+    db_sqlite_service.UserDeviceNotFoundError,
+    db_mysql_service.UserDeviceNotFoundError,
+)
+USER_DEVICE_ALREADY_EXISTS = (
+    db_sqlite_service.UserDeviceAlreadyExistsError,
+    db_mysql_service.UserDeviceAlreadyExistsError,
 )
 FIRMWARE_NOT_FOUND = (
     db_sqlite_service.FirmwareNotFoundError,
@@ -249,6 +258,15 @@ def device_list_item_to_dict(item: DeviceListItem) -> dict[str, Any]:
         "current_version": item.current_version,
         "last_seen": _iso(item.last_seen),
         "is_active": item.is_active,
+    }
+
+
+def user_device_to_dict(user_device: UserDevice) -> dict[str, Any]:
+    return {
+        "user_id": user_device.user_id,
+        "device_id": user_device.device_id,
+        "created_at": _iso(user_device.created_at),
+        "expires_at": _iso(user_device.expires_at),
     }
 
 

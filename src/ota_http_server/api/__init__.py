@@ -8,6 +8,7 @@ from .v1_auth import api_v1_auth
 from .v1_devices import api_v1_devices
 from .v1_firmware import api_v1_firmware
 from .v1_projects import api_v1_projects
+from .v1_userdevices import api_v1_userdevices
 from .v1_users import api_v1_users
 
 
@@ -19,6 +20,7 @@ def register_api_blueprints(app: Flask) -> None:
     app.register_blueprint(api_v1_users)
     app.register_blueprint(api_v1_projects)
     app.register_blueprint(api_v1_devices)
+    app.register_blueprint(api_v1_userdevices)
     app.register_blueprint(api_v1_firmware)
     app.before_request(authenticate_request_hook)
 

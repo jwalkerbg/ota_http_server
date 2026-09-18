@@ -891,7 +891,7 @@ The supported roles and permissions are:
 | Role | Permissions |
 | --- | --- |
 | `viewer` | Read system status, projects, devices, and firmware; download firmware; access `/auth/me` |
-| `operator` | All viewer permissions, plus create/update projects and devices, and upload/update firmware |
+| `operator` | All viewer permissions, plus create/update projects and devices, upload/update firmware, and full management of user-device assignments |
 | `admin` | All defined permissions, including user management, device OTA, and delete operations |
 | `manager` | All defined permissions, same as `admin` |
 
@@ -983,6 +983,26 @@ The limits can also be set in the `[parameters]` section of `config.toml`. Empty
 | `POST` | `/api/v1/devices/<id>/deactivate` | Deactivate a device. |
 
 If `target_id` is omitted when creating a device, the default `Not defined` target is assigned.
+
+### REST API user-device assignments
+
+A user-device assignment grants a user permission to operate a device, with an optional expiry timestamp. Endpoints that identify an existing assignment (`GET`, `PATCH`, `DELETE`) do so via query parameters, since the resource has no single numeric ID: exactly one of `userid`/`username` must identify the user, and exactly one of `devid`/`devuuid` must identify the device.
+
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| `POST` | `/api/v1/userdevices` | Create an assignment. JSON body identifies the user via `user_id` or `username` (exactly one), and the device via `device_id` or `device_uuid` (exactly one). Optional field: `expires_at` (ISO 8601 timestamp). |
+| `GET` | `/api/v1/userdevices?userid=<id>\|username=<name>&devid=<id>\|devuuid=<uuid>` | Get an assignment. |
+| `GET` | `/api/v1/userdevices/expiration?userid=<id>\|username=<name>&devid=<id>\|devuuid=<uuid>` | Report `{"user_id", "device_id", "expired"}` for an assignment. |
+| `PATCH` | `/api/v1/userdevices?userid=<id>\|username=<name>&devid=<id>\|devuuid=<uuid>` | Set or clear the assignment's expiry. JSON body: `{"expires_at": "..."}`. Omitting `expires_at` (or setting it to `null`) removes the existing expiry. |
+| `DELETE` | `/api/v1/userdevices?userid=<id>\|username=<name>&devid=<id>\|devuuid=<uuid>` | Delete an assignment. |
+
+Example:
+
+```bash
+curl -X POST http://localhost:8070/api/v1/userdevices \
+  -H "Content-Type: application/json" \
+  -d '{"username":"alice","device_uuid":"11111111-2222-3333-4444-555555666666","expires_at":"2026-09-18T12:30:00+00:00"}'
+```
 
 ### REST API firmware
 

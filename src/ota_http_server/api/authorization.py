@@ -31,6 +31,10 @@ DEVICES_CREATE = "devices.create"
 DEVICES_UPDATE = "devices.update"
 DEVICES_DELETE = "devices.delete"
 DEVICE_OTA = "device.ota"
+USERDEVICES_READ = "userdevices.read"
+USERDEVICES_CREATE = "userdevices.create"
+USERDEVICES_UPDATE = "userdevices.update"
+USERDEVICES_DELETE = "userdevices.delete"
 FIRMWARE_READ = "firmware.read"
 FIRMWARE_UPLOAD = "firmware.upload"
 FIRMWARE_UPDATE = "firmware.update"
@@ -54,6 +58,10 @@ PERMISSIONS = frozenset({
     DEVICES_UPDATE,
     DEVICES_DELETE,
     DEVICE_OTA,
+    USERDEVICES_READ,
+    USERDEVICES_CREATE,
+    USERDEVICES_UPDATE,
+    USERDEVICES_DELETE,
     FIRMWARE_READ,
     FIRMWARE_UPLOAD,
     FIRMWARE_UPDATE,
@@ -83,6 +91,10 @@ ROLE_PERMISSIONS = {
         DEVICES_READ,
         DEVICES_CREATE,
         DEVICES_UPDATE,
+        USERDEVICES_READ,
+        USERDEVICES_CREATE,
+        USERDEVICES_UPDATE,
+        USERDEVICES_DELETE,
         FIRMWARE_READ,
         FIRMWARE_UPLOAD,
         FIRMWARE_UPDATE,

@@ -59,6 +59,7 @@ def api_root() -> tuple[object, int]:
             "users": "/api/v1/users",
             "projects": "/api/v1/projects",
             "devices": "/api/v1/devices",
+            "userdevices": "/api/v1/userdevices",
             "firmware": "/api/v1/firmware",
         },
     }), 200
