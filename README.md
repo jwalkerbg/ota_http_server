@@ -434,6 +434,7 @@ Example defaults include:
 * JWT expiry: 30 minutes
 * Audit log file: "ota_audit.log"
 * Admin activity log file: "admin_activity.log"
+* Admin networks: `["127.0.0.0/8", "::1/128"]` (loopback only)
 * Rotation strategy: "hybrid" (daily midnight UTC or max size, whichever comes first)
 * Firmware directories: "firmware", "www"
 
@@ -452,6 +453,7 @@ jwt_alg = "HS512"
 jwt_expiry = 60
 jwt_secret = "supersecret"
 admin_secret = "adminsecret"
+admin_networks = ["127.0.0.0/8", "::1/128", "192.168.20.0/24"]
 www_dir = "www"
 firmware_dir = "firmware"
 url_firmware = "firmware"
@@ -671,6 +673,11 @@ Tokens are issued dynamically via the admin endpoint:
 ```http
 POST /admin/generate_token
 ```
+
+Access to this endpoint is additionally restricted by client IP/network via the
+`admin_networks` configuration parameter (see [Configuration](#configuration)).
+Requests originating from a network not in `admin_networks` are rejected with
+`403`, regardless of whether the correct `X-Admin-Secret` is supplied.
 
 Required headers:
 

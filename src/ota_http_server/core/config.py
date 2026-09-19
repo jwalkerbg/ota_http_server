@@ -7,6 +7,7 @@ import argparse
 from jsonschema import validate, ValidationError
 
 from ota_http_server.logger import get_app_logger
+from ota_http_server.core.network_access import DEFAULT_ADMIN_NETWORKS
 
 logger = get_app_logger(__name__)
 
@@ -43,6 +44,7 @@ class ParametersConfig(TypedDict, total=False):
     jwt_user_audience: str
     jwt_user_expiry: int
     admin_secret: str | None
+    admin_networks: list[str]
     host: str
     port: int
     www_dir: str
@@ -156,6 +158,7 @@ class Config:
             'jwt_user_audience': "ota_users_api",
             'jwt_user_expiry': 1800,
             'admin_secret': None,
+            'admin_networks': list(DEFAULT_ADMIN_NETWORKS),
             'host': "0.0.0.0",
             'port': 8071,
             'www_dir': "www",
@@ -298,6 +301,12 @@ class Config:
                     },
                     "admin_secret": {
                         "type": ["string", "null"]
+                    },
+                    "admin_networks": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
                     },
                     "host": {
                         "type": "string"

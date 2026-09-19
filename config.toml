@@ -9,6 +9,7 @@ firmware_dir = "firmware"
 url_firmware = "firmware"
 jwt_issuer = "okto7-ota"
 jwt_audience = "ota_api"
+admin_networks = ["127.0.0.0/8", "::1/128", "192.168.0.0/16"]
 admin_activity_log = "admin_activity.log"
 ota_download_log = "ota_download.log"
 ota_audit_log = "ota_download.log"

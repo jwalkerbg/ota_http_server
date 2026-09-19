@@ -14,6 +14,7 @@ from ota_http_server.database.database_service import DatabaseService
 from ota_http_server.firmware.filename_validation import validate_firmware_filename
 from ota_http_server.logger import get_app_logger
 from ota_http_server.core.config import Config
+from ota_http_server.core.network_access import require_networks, DEFAULT_ADMIN_NETWORKS
 from ota_http_server.user.user_service import UserService
 from ota_http_server.api import register_api_blueprints
 
@@ -43,6 +44,7 @@ def create_app(cfg: Config) -> Flask:
     jwt_user_audience=cfg.config['parameters'].get('jwt_user_audience', 'ota_users_api')
     jwt_user_expiry=int(cfg.config['parameters'].get('jwt_user_expiry', 1800))
     admin_secret=cfg.config['parameters']['admin_secret']
+    admin_networks=cfg.config['parameters'].get('admin_networks', DEFAULT_ADMIN_NETWORKS)
     admin_activity_logger = cfg.config.get("admin_activity_logger")
     ota_download_logger = cfg.config.get("ota_download_logger")
 
@@ -332,6 +334,7 @@ def create_app(cfg: Config) -> Flask:
     # ---------------------------------------------------------------
 
     @app.route("/admin/generate_token", methods=["POST"])
+    @require_networks(admin_networks)
     def admin_generate_token() -> Response:
         """
         Generates a JWT dynamically for a device.
