@@ -64,7 +64,6 @@ class ParametersConfig(TypedDict, total=False):
     init_db_migrate: bool
     migrate_dry_run: bool
     trace_sql: bool
-    rollback_all: bool
     user_id: int
     username: str
     user_password: str
@@ -178,7 +177,6 @@ class Config:
             'init_db_migrate': True,
             'migrate_dry_run': False,
             'trace_sql': False,
-            'rollback_all': False,
             'user_id': None,
             'username': None,
             'user_password': None,
@@ -366,9 +364,6 @@ class Config:
                         "type": "boolean"
                     },
                     "trace_sql": {
-                        "type": "boolean"
-                    },
-                    "rollback_all": {
                         "type": "boolean"
                     },
                     "user_id": {
@@ -751,8 +746,7 @@ class Config:
                     if config_cli.migrate_dry_run is not None:
                         self.config["parameters"]["migrate_dry_run"] = config_cli.migrate_dry_run
                 if config_cli.db_command == "rollback":
-                    if config_cli.rollback_all is not None:
-                        self.config["parameters"]["rollback_all"] = config_cli.rollback_all
+                    pass
 
             if config_cli.command == 'user':
                 if config_cli.user_command is not None:
@@ -1180,8 +1174,7 @@ For use in development environment without SSL certificates and JWT authenticati
     migration_parser = db_subparsers.add_parser(name="migrate", help="Execute all available and not yet executed migrations up")
     migration_parser.add_argument("--dry-run",dest="migrate_dry_run", action="store_const", const=True, help="Shows what would do without doing it really")
     # db rollback#
-    rollback_parser = db_subparsers.add_parser(name="rollback", help="Execute rollback of the last or all migrations")
-    rollback_parser.add_argument("--all", dest="rollback_all", action="store_const", const=True, help="Execute rollback of all migrations")
+    rollback_parser = db_subparsers.add_parser(name="rollback", help="Execute rollback of the last migration")
 
     # user
     user_parser = subparsers.add_parser(name="user", help="Users manipulation operations")
