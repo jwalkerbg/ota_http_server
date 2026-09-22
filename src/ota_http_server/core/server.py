@@ -48,7 +48,7 @@ def create_app(cfg: Config) -> Flask:
     ota_download_logger = cfg.config.get("ota_download_logger")
 
     if not jwt_secret or not admin_secret:
-        raise ValueError("JWT is enabled but jwt_secret or admin_secret is not set")
+        raise ValueError("jwt_secret or admin_secret is not set")
 
     authservice = AuthService(jwt_secret=jwt_secret,
                               jwt_algorithm=jwt_algorithm,
