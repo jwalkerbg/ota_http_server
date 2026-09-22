@@ -34,7 +34,6 @@ def create_app(cfg: Config) -> Flask:
     www_dir=cfg.config['parameters']['www_dir']
     firmware_dir=cfg.config['parameters']['firmware_dir']
     url_firmware=cfg.config['parameters']['url_firmware']
-    use_jwt=not cfg.config['parameters']['no_jwt']
     jwt_algorithm=cfg.config['parameters']['jwt_alg']
     jwt_expiry=int(cfg.config['parameters']['jwt_expiry'])
     jwt_max_expiry=int(cfg.config['parameters']['jwt_max_expiry'])
@@ -48,11 +47,10 @@ def create_app(cfg: Config) -> Flask:
     admin_activity_logger = cfg.config.get("admin_activity_logger")
     ota_download_logger = cfg.config.get("ota_download_logger")
 
-    if use_jwt and (not jwt_secret or not admin_secret):
+    if not jwt_secret or not admin_secret:
         raise ValueError("JWT is enabled but jwt_secret or admin_secret is not set")
 
-    authservice = AuthService(use_jwt=use_jwt,
-                              jwt_secret=jwt_secret,
+    authservice = AuthService(jwt_secret=jwt_secret,
                               jwt_algorithm=jwt_algorithm,
                               jwt_audience=jwt_audience,
                               jwt_issuer=jwt_issuer,
@@ -78,7 +76,6 @@ def create_app(cfg: Config) -> Flask:
     app.extensions["db_service"] = dbservice
     app.extensions["app_paths"] = cfg.config['parameters']['app_paths']
     app.extensions["user_auth_service"] = user_authservice
-    app.extensions["use_jwt_user_auth"] = use_jwt
     app.extensions["user_service"] = cfg.config.get("user_service") or UserService(cfg)
     app.extensions["admin_activity_logger"] = admin_activity_logger
     register_api_blueprints(app)
@@ -188,32 +185,10 @@ def create_app(cfg: Config) -> Flask:
     #                          ROUTES
     # ---------------------------------------------------------------
 
-    def resolve_device(project: str, project_id: int, use_jwt_mode: bool) -> Device:
-        """Resolve device UUID to device record in both JWT and --no-jwt modes.
-
-        In JWT mode:
-            device_id = JWT.sub (extracted from token)
-        In --no-jwt mode:
-            device_id = X-Device-ID header or device_id query parameter
-
-        Returns the device record if valid, raises HTTP error otherwise.
-
-        Args:
-            project: Project name string from URL
-            project_id: Project ID from database
-            use_jwt_mode: Whether JWT is enabled
-        """
-        if use_jwt_mode:
-            # JWT mode: extract device UUID from token's "sub" claim
-            payload = authservice.verify_token(project, verify_sub=True)
-            device_id = payload["sub"]
-        else:
-            # --no-jwt mode: extract device UUID from X-Device-ID header or query param
-            device_id = request.headers.get("X-Device-ID")
-            if not device_id:
-                device_id = request.args.get("device_id")
-            if not device_id:
-                abort(400, "Missing X-Device-ID header or device_id query parameter")
+    def resolve_device(project: str, project_id: int) -> Device:
+        """Resolve the authenticated JWT subject to a registered device."""
+        payload = authservice.verify_token(project, verify_sub=True)
+        device_id = payload["sub"]
 
         # Resolve device UUID to device record
         device_rec = dbservice.device_get_by_name(device_id)
@@ -246,8 +221,7 @@ def create_app(cfg: Config) -> Flask:
         if not project_rec.is_active:
             abort(403, "Project is disabled")
 
-        # Resolve device in both JWT and --no-jwt modes
-        device_rec = resolve_device(project, project_rec.id, use_jwt)
+        device_rec = resolve_device(project, project_rec.id)
 
         firmware_rec = get_firmware_metadata(
             project_id=project_rec.id,
@@ -274,8 +248,7 @@ def create_app(cfg: Config) -> Flask:
         if not project_rec.is_active:
             abort(403, "Project is disabled")
 
-        # Resolve device in both JWT and --no-jwt modes
-        device_rec = resolve_device(project, project_rec.id, use_jwt)
+        device_rec = resolve_device(project, project_rec.id)
 
         # Get all firmware records for this project and target
         firmware_records = [
@@ -305,8 +278,7 @@ def create_app(cfg: Config) -> Flask:
         if not project_rec.is_active:
             abort(403, "Project is disabled")
 
-        if use_jwt:
-            authservice.verify_token(project, verify_sub=False)
+        authservice.verify_token(project, verify_sub=False)
 
         firmware_records = [
             fw for fw in dbservice.firmware_get_record()

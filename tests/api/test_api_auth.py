@@ -37,7 +37,6 @@ def _base_parameters(tmp_path) -> dict:
         "www_dir": "www",
         "firmware_dir": "firmware",
         "url_firmware": "firmware",
-        "no_jwt": False,
         "jwt_alg": JWT_ALG,
         "jwt_expiry": 60,
         "jwt_max_expiry": 120,
@@ -55,7 +54,7 @@ def _base_parameters(tmp_path) -> dict:
 
 @pytest.fixture()
 def authed_app(tmp_path):
-    """A Flask app with REST user JWT authentication enabled (use_jwt=True)."""
+    """A Flask app with REST user JWT authentication enabled."""
     cfg = SimpleNamespace()
     cfg.config = {
         "parameters": _base_parameters(tmp_path),

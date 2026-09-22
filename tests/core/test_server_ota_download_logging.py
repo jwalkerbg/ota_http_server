@@ -93,7 +93,6 @@ def test_server_download_routes_log_ota_download_requests(tmp_path, monkeypatch)
                 "www_dir": str(tmp_path),
                 "firmware_dir": "firmware",
                 "url_firmware": "firmware",
-                "no_jwt": False,
                 "jwt_alg": "HS256",
                 "jwt_expiry": 60,
                 "jwt_max_expiry": 120,

@@ -1,9 +1,11 @@
 import sys
+import time
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
+import jwt
 
 from ota_http_server.core.config import parse_args
 from ota_http_server.core.data_models import Firmware, Project, Target, User, Device
@@ -11,6 +13,23 @@ from ota_http_server.device.device_service import DeviceService
 from ota_http_server.firmware.filename_validation import validate_firmware_filename
 from ota_http_server.firmware.firmware_service import FirmwareService
 from ota_http_server.user.user_service import UserService
+
+
+def _device_token() -> str:
+    now = int(time.time())
+    return jwt.encode(
+        {
+            "aud": "audience",
+            "exp": now + 60,
+            "iat": now,
+            "iss": "issuer",
+            "project": "proj",
+            "roles": ["device", "fw_download"],
+            "sub": "device-1",
+        },
+        "secret",
+        algorithm="HS256",
+    )
 
 
 def test_add_firmware_accepts_plain_filename(tmp_path, monkeypatch):
@@ -165,20 +184,21 @@ def test_firmware_route_rejects_unsafe_stored_filename(tmp_path, monkeypatch):
             "www_dir": str(tmp_path),
             "firmware_dir": "firmware",
             "url_firmware": "firmware",
-            "no_jwt": True,
             "jwt_alg": "HS256",
             "jwt_expiry": 60,
             "jwt_max_expiry": 120,
-            "jwt_secret": None,
+            "jwt_secret": "secret",
             "jwt_issuer": "issuer",
             "jwt_audience": "audience",
-            "admin_secret": None,
+            "admin_secret": "admin-secret",
             "app_paths": SimpleNamespace(project_dir=lambda project_name: project_dir, logs_dir=tmp_path),
         }
     }
 
     app = create_app(cfg)
-    response = app.test_client().get("/firmware/proj/1.2.3?device_id=device-1")
+    response = app.test_client().get(
+        f"/firmware/proj/1.2.3?device_id=device-1&token={_device_token()}"
+    )
 
     assert response.status_code == 404
 
@@ -241,20 +261,21 @@ def test_latest_firmware_route_rejects_unsafe_stored_filename(tmp_path, monkeypa
             "www_dir": str(tmp_path),
             "firmware_dir": "firmware",
             "url_firmware": "firmware",
-            "no_jwt": True,
             "jwt_alg": "HS256",
             "jwt_expiry": 60,
             "jwt_max_expiry": 120,
-            "jwt_secret": None,
+            "jwt_secret": "secret",
             "jwt_issuer": "issuer",
             "jwt_audience": "audience",
-            "admin_secret": None,
+            "admin_secret": "admin-secret",
             "app_paths": SimpleNamespace(project_dir=lambda project_name: project_dir, logs_dir=tmp_path),
         }
     }
 
     app = create_app(cfg)
-    response = app.test_client().get("/firmware/proj/latest?device_id=device-1")
+    response = app.test_client().get(
+        f"/firmware/proj/latest?device_id=device-1&token={_device_token()}"
+    )
 
     assert response.status_code == 404
 

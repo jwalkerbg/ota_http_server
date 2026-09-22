@@ -31,7 +31,7 @@ JWT_USER_EXPIRY = 1800
 
 @pytest.fixture()
 def app(tmp_path):
-    """A Flask app with REST user JWT authentication enabled (use_jwt=True)."""
+    """A Flask app with REST user JWT authentication enabled."""
     cfg = SimpleNamespace()
     cfg.config = {
         "parameters": {
@@ -39,7 +39,6 @@ def app(tmp_path):
             "www_dir": "www",
             "firmware_dir": "firmware",
             "url_firmware": "firmware",
-            "no_jwt": False,
             "jwt_alg": JWT_ALG,
             "jwt_expiry": 60,
             "jwt_max_expiry": 120,

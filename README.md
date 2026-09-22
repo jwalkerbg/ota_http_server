@@ -69,7 +69,7 @@
 
 A lightweight Python/Flask-based firmware server for Over-The-Air (OTA) updates.
 The project is organized as a `pyproject.toml` `poetry` driven project.
-Supports optional **JWT-based authentication** and can run in two modes:
+Supports **JWT-based authentication** and can run in two modes:
 
 - **Standalone mode** — Flask runs directly (with optional SSL)
 - **Reverse proxy mode** — Behind Apache (HTTP or HTTPS) with load balancing
@@ -448,7 +448,6 @@ Example `config.toml`:
 host = "0.0.0.0"
 port = 8080
 no_certs = false
-no_jwt = false
 jwt_alg = "HS512"
 jwt_expiry = 60
 jwt_secret = "supersecret"
@@ -493,7 +492,7 @@ The `CLI options` override all other configuration sources. This is ideal for te
 Example usage:
 
 ```
-ota_http_server --host 0.0.0.0 --port 8071 --no-certs --no-jwt
+ota_http_server --host 0.0.0.0 --port 8071 --no-certs
 ```
 
 ### Configuration Hierarchy (Visual)
@@ -561,7 +560,6 @@ Execute `ota_http_server --help` to see all options.
 
 See the virtual host and reverse proxy configurations to figure out ports usage.
 
-If `--no-jwt` option is given JWT token is not used even it is supplied in the header Bearer or at the end of the url.
 
 ## Apache Reverse Proxy Mode
 
@@ -631,7 +629,7 @@ ProxyPassReverse "/" "balancer://flaskcluster/"
 
 3. Authentication
 
-JWT authentication is enabled by default. Clients can pass JWT in the header or as an URL parameter.
+JWT authentication is required. Clients can pass JWT in the header or as an URL parameter.
 
 ```
 GET /firmware/projectA/01.00.02?token=<JWT>
@@ -639,7 +637,7 @@ GET /firmware/projectA/01.00.02?token=<JWT>
 
 ## JWT-Based Authentication for OTA Access
 
-The OTA server supports JWT-based access control for firmware downloads and version lookups. JWT authentication is enabled by default; it can be disabled with `--no-jwt` or the configuration flag `no_jwt = true`.
+The OTA server requires JWT-based access control for firmware downloads and version lookups.
 
 The current implementation enforces the token on the OTA endpoints that serve firmware and metadata:
 

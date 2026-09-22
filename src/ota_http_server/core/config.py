@@ -34,7 +34,6 @@ class ParametersConfig(TypedDict, total=False):
     cert: str
     key: str
     no_certs: bool
-    no_jwt: bool
     jwt_alg: str
     jwt_expiry: int
     jwt_max_expiry: int
@@ -147,7 +146,6 @@ class Config:
             'cert': "cert.pem",
             'key': "key.pem",
             'no_certs': False,
-            'no_jwt': False,
             'jwt_alg': "HS256",
             'jwt_expiry': 300,
             'jwt_max_expiry': 3600,
@@ -268,9 +266,6 @@ class Config:
                         "type": "string"
                     },
                     "no_certs": {
-                        "type": "boolean"
-                    },
-                    "no_jwt": {
                         "type": "boolean"
                     },
                     "jwt_alg": {
@@ -701,8 +696,6 @@ class Config:
                     self.config['parameters']['key'] = config_cli.key
                 if config_cli.no_certs is not None:
                     self.config['parameters']['no_certs'] = config_cli.no_certs
-                if config_cli.no_jwt is not None:
-                    self.config['parameters']['no_jwt'] = config_cli.no_jwt
                 if config_cli.jwt_alg is not None:
                     self.config['parameters']['jwt_alg'] = config_cli.jwt_alg
                 if config_cli.jwt_expiry is not None:
@@ -1061,11 +1054,6 @@ Use a custom configuration file instead of the default 'config.toml':
 For use behind a reverse proxy with SSL termination, you can disable certificates in the OTA server and let the reverse proxy handle SSL:
   ota_http_server --no-certs
 
-For use in development when no JWT authentication is needed, you can disable JWT:
-  ota_http_server --no-jwt
-
-For use in development environment without SSL certificates and JWT authentication, you can disable both:
-  ota_http_server --no-certs --no-jwt
 """
 )
 
@@ -1138,9 +1126,6 @@ For use in development environment without SSL certificates and JWT authenticati
     certs_group.add_argument("--key", dest="key", help="Path to private key file")
 
     jwt_group = run_parser.add_argument_group("JWT")
-    jwt_ex_group = jwt_group.add_mutually_exclusive_group()
-    jwt_ex_group.add_argument("--no-jwt", dest="no_jwt", action="store_const", const=True, help="Disable JWT authentication (not recommended)")
-    jwt_ex_group.add_argument("--jwt", dest="no_jwt", action="store_const", const=False, help="Enable JWT authentication")
     jwt_group.add_argument("--jwt-alg", dest="jwt_alg", type=str, help="JWT algorithm to use (default 'HS256'), overrides OTA_JWT_ALGORITHM environment variable")
     jwt_group.add_argument("--jwt-expiry", dest="jwt_expiry", type=int, help="JWT expiry time in seconds (default 300), overrides OTA_JWT_EXPIRY_SECONDS environment variable")
     jwt_group.add_argument("--jwt-max-expiry", dest="jwt_max_expiry", type=int, help="JWT max expiry time in seconds (default 3600), overrides OTA_JWT_MAX_EXPIRY_SECONDS environment variable")

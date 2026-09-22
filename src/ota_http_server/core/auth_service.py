@@ -14,8 +14,7 @@ logger = get_app_logger(__name__)
 
 class AuthService:
 
-    def __init__(self, use_jwt: bool, jwt_secret: str, jwt_algorithm: str, jwt_audience: str, jwt_issuer: str, jwt_expiry:int, jwt_max_expiry:int):
-        self.use_jwt = use_jwt
+    def __init__(self, jwt_secret: str, jwt_algorithm: str, jwt_audience: str, jwt_issuer: str, jwt_expiry:int, jwt_max_expiry:int):
         self.jwt_secret = jwt_secret
         self.jwt_algorithm = jwt_algorithm
         self.jwt_audience = jwt_audience
@@ -44,9 +43,6 @@ class AuthService:
                 "sub": "e6f87d77-4216-4be1-ab83-b5fa6792b747"               # the device identity (UUID v4), must match the X-Device-ID header or ?device_id= query param
             }
         """
-        if not self.use_jwt:
-            return {}  # JWT authentication is disabled, allow all requests
-
         token = None
         source = None
 

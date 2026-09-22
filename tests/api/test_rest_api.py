@@ -10,7 +10,6 @@ def _build_app():
             "www_dir": ".",
             "firmware_dir": "firmware",
             "url_firmware": "firmware",
-            "no_jwt": True,
             "jwt_alg": "HS256",
             "jwt_expiry": 60,
             "jwt_max_expiry": 120,

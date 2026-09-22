@@ -65,8 +65,4 @@ def authenticate_request_hook() -> None:
     # Let Flask resolve 404s for unknown routes without requiring authentication.
     if request.endpoint is None:
         return
-    if not current_app.extensions.get("use_jwt_user_auth", True):
-        # REST user authentication disabled (e.g. --no-jwt / tests): fall back to
-        # the existing api_authenticated_user_loader extension point unchanged.
-        return
     authenticate_request()
