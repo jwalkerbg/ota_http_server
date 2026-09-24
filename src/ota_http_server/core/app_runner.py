@@ -56,7 +56,7 @@ def run_app(cfg:Config) -> None:
             print("JWT: ENABLED")
             print(f"Admin activity log file: {cfg.config['parameters']['admin_activity_log']}")
             print(f"OTA download log file: {cfg.config['parameters'].get('ota_download_log', 'ota_download.log')}")
-            print("Admin token endpoint: ENABLED (/admin/generate_token)")
+            print("OTA authorization endpoint: ENABLED (POST /api/v1/auth/ota)")
             print("===========================================\n")
 
             app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1)   # type: ignore[method-assign]

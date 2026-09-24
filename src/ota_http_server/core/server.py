@@ -5,16 +5,14 @@ from pathlib import Path
 from datetime import datetime, timezone, UTC
 from flask import Flask, Response, send_file, request, abort, jsonify
 from packaging import version
-import hmac
 
-from .data_models import Device, Firmware, TokenResult
+from .data_models import Device, Firmware
 from .auth_service import AuthService
 from .user_auth_service import UserAuthService
 from ota_http_server.database.database_service import DatabaseService
 from ota_http_server.firmware.filename_validation import validate_firmware_filename
 from ota_http_server.logger import get_app_logger
 from ota_http_server.core.config import Config
-from ota_http_server.core.network_access import require_networks, DEFAULT_ADMIN_NETWORKS
 from ota_http_server.user.user_service import UserService
 from ota_http_server.api import register_api_blueprints
 
@@ -42,13 +40,11 @@ def create_app(cfg: Config) -> Flask:
     jwt_audience=cfg.config['parameters']['jwt_audience']
     jwt_user_audience=cfg.config['parameters'].get('jwt_user_audience', 'ota_users_api')
     jwt_user_expiry=int(cfg.config['parameters'].get('jwt_user_expiry', 1800))
-    admin_secret=cfg.config['parameters']['admin_secret']
-    admin_networks=cfg.config['parameters'].get('admin_networks', DEFAULT_ADMIN_NETWORKS)
     admin_activity_logger = cfg.config.get("admin_activity_logger")
     ota_download_logger = cfg.config.get("ota_download_logger")
 
-    if not jwt_secret or not admin_secret:
-        raise ValueError("jwt_secret or admin_secret is not set")
+    if not jwt_secret:
+        raise ValueError("jwt_secret is not set")
 
     authservice = AuthService(jwt_secret=jwt_secret,
                               jwt_algorithm=jwt_algorithm,
@@ -69,7 +65,7 @@ def create_app(cfg: Config) -> Flask:
     cfg.config["db_service"] = dbservice
 
     #
-    # Flask app factory with JWT authentication and secure admin endpoint.
+    # Flask app factory with JWT authentication for OTA/device and REST API access.
     #
     app = Flask(__name__.split('.', maxsplit=1)[0])
     # Make shared services available to the API blueprints via current_app.
@@ -78,6 +74,7 @@ def create_app(cfg: Config) -> Flask:
     app.extensions["user_auth_service"] = user_authservice
     app.extensions["user_service"] = cfg.config.get("user_service") or UserService(cfg)
     app.extensions["admin_activity_logger"] = admin_activity_logger
+    app.extensions["auth_service"] = authservice
     register_api_blueprints(app)
 
     # ---------------------------------------------------------------
@@ -109,18 +106,6 @@ def create_app(cfg: Config) -> Flask:
         version_files.sort(key=lambda x: version.parse(x[1]))
         sorted_versions = [v for _, v in version_files]
         return str(project_path), sorted_versions, version_files
-
-    def log_admin_activity(*, outcome: str, target: dict[str, object], error: str | None = None) -> None:
-        if admin_activity_logger is None:
-            return
-        admin_activity_logger.log_activity(
-            interface="http",
-            entity="token",
-            action="generate",
-            outcome=outcome,
-            target=target,
-            error=error,
-        )
 
     def log_ota_download_request(*, project: str | None, version: str | None, endpoint: str, outcome: str, status_code: int | None = None, error: str | None = None) -> None:
         if ota_download_logger is None:
@@ -299,55 +284,6 @@ def create_app(cfg: Config) -> Flask:
         return jsonify({
             "status": "ok",
             "time": datetime.now(UTC).isoformat()
-        })
-
-    # ---------------------------------------------------------------
-    #                      ADMIN TOKEN GENERATOR
-    # ---------------------------------------------------------------
-
-    @app.route("/admin/generate_token", methods=["POST"])
-    @require_networks(admin_networks)
-    def admin_generate_token() -> Response:
-        """
-        Generates a JWT dynamically for a device.
-        Requires header: X-Admin-Secret=<ADMIN_SECRET>
-        Body JSON:
-            {
-              "device_id": "uuid-v4",
-              "project": "project_name",
-              "expires_seconds": jwt_expiry,
-              "current_vs": "1.0.0",
-              "download_vs": "2.0.0"
-            }
-        """
-        admin_header = request.headers.get("X-Admin-Secret")
-        if not admin_header or not hmac.compare_digest(admin_header, admin_secret):
-            abort(403, "Invalid or missing admin secret")
-
-        data = request.get_json(silent=True)
-        if not data:
-            abort(400, "Missing JSON body")
-
-        target: dict[str, object] = {
-            "ip": request.remote_addr,
-            "device_id": data.get("device_id"),
-            "project": data.get("project"),
-        }
-        try:
-            token_result:TokenResult = authservice.create_device_token(data)
-        except Exception as exc:
-            log_admin_activity(outcome="failed", target=target, error=str(exc))
-            raise
-
-        target["device_id"] = token_result.payload.get("sub", target["device_id"])
-        target["project"] = token_result.payload.get("project", target["project"])
-        target["expires_at"] = token_result.payload.get("exp")
-        log_admin_activity(outcome="success", target=target)
-
-        return jsonify({
-            "token": token_result.token,
-            "expires_at": datetime.fromtimestamp(token_result.payload["exp"], tz=timezone.utc).isoformat(),
-            "payload": token_result.payload
         })
 
     return app

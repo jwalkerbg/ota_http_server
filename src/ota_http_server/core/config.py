@@ -42,7 +42,6 @@ class ParametersConfig(TypedDict, total=False):
     jwt_audience: str | None
     jwt_user_audience: str
     jwt_user_expiry: int
-    admin_secret: str | None
     admin_networks: list[str]
     host: str
     port: int
@@ -154,7 +153,6 @@ class Config:
             'jwt_audience': "ota_api",
             'jwt_user_audience': "ota_users_api",
             'jwt_user_expiry': 1800,
-            'admin_secret': None,
             'admin_networks': list(DEFAULT_ADMIN_NETWORKS),
             'host': "0.0.0.0",
             'port': 8071,
@@ -291,9 +289,6 @@ class Config:
                     },
                     "jwt_user_expiry": {
                         "type": "number"
-                    },
-                    "admin_secret": {
-                        "type": ["string", "null"]
                     },
                     "admin_networks": {
                         "type": "array",
@@ -589,7 +584,6 @@ class Config:
                 "jwt_expiry": os.getenv("OTA_JWT_EXPIRY_SECONDS"),
                 "jwt_max_expiry": os.getenv("OTA_JWT_MAX_EXPIRY_SECONDS"),
                 "jwt_secret": os.getenv("OTA_JWT_SECRET"),
-                "admin_secret": os.getenv("OTA_ADMIN_SECRET"),
                 "admin_activity_log": os.getenv("OTA_ADMIN_ACTIVITY_LOG"),
                 "ota_download_log": os.getenv("OTA_OTA_DOWNLOAD_LOG") or os.getenv("OTA_OTA_AUDIT_LOG") or os.getenv("OTA_SERVER_OTA_LOG"),
                 "ota_audit_log": os.getenv("OTA_OTA_AUDIT_LOG") or os.getenv("OTA_OTA_DOWNLOAD_LOG") or os.getenv("OTA_SERVER_OTA_LOG"),
@@ -712,8 +706,6 @@ class Config:
                     self.config['parameters']['jwt_user_audience'] = config_cli.jwt_user_audience
                 if getattr(config_cli, "jwt_user_expiry", None) is not None:
                     self.config['parameters']['jwt_user_expiry'] = config_cli.jwt_user_expiry
-                if config_cli.admin_secret is not None:
-                    self.config['parameters']['admin_secret'] = config_cli.admin_secret
                 if config_cli.app_directory is not None:
                     self.config["parameters"]["app_directory"] = config_cli.app_directory
                 # server parameters
@@ -1016,7 +1008,6 @@ Environment variables:
   OTA_JWT_EXPIRY_SECONDS  JWT expiry time in seconds (default 300)
   OTA_JWT_MAX_EXPIRY_SECONDS JWT max expiry time in seconds (default 3600)
   OTA_JWT_SECRET          JWT secret key, can be overridden by --jwt-secret CLI option
-  OTA_ADMIN_SECRET        Admin secret key, can be overridden by --admin-secret CLI option
   OTA_JWT_ISSUER          JWT issuer claim value, can be overridden by --jwt-issuer CLI option
   OTA_JWT_AUDIENCE        JWT audience claim value, can be overridden by --jwt-audience CLI option
   OTA_JWT_USER_AUDIENCE   JWT audience claim value for REST API user tokens, can be overridden by --jwt-user-audience CLI option
@@ -1134,7 +1125,6 @@ For use behind a reverse proxy with SSL termination, you can disable certificate
     jwt_group.add_argument("--jwt-audience", dest="jwt_audience", type=str, help="JWT audience claim value, overrides OTA_JWT_AUDIENCE environment variable")
     jwt_group.add_argument("--jwt-user-audience", dest="jwt_user_audience", type=str, help="JWT audience claim value for REST API user tokens, overrides OTA_JWT_USER_AUDIENCE environment variable")
     jwt_group.add_argument("--jwt-user-expiry", dest="jwt_user_expiry", type=int, help="REST API user JWT expiry time in seconds (default 1800), overrides OTA_JWT_USER_EXPIRY_SECONDS environment variable")
-    jwt_group.add_argument("--admin-secret", dest="admin_secret", type=str, help="Admin secret key, overrides OTA_ADMIN_SECRET environment variable")
 
     server_group = run_parser.add_argument_group("Server", description="""Server configuration options
   Firmware URL has format host:port/url_firmware/project/version.

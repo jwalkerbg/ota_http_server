@@ -451,7 +451,6 @@ no_certs = false
 jwt_alg = "HS512"
 jwt_expiry = 60
 jwt_secret = "supersecret"
-admin_secret = "adminsecret"
 admin_networks = ["127.0.0.0/8", "::1/128", "192.168.20.0/24"]
 www_dir = "www"
 firmware_dir = "firmware"
@@ -467,7 +466,6 @@ For `dynamic runtime overrides`, the server can read environment variables. Thes
 * "jwt_expiry": os.getenv("OTA_JWT_EXPIRY_SECONDS"),
 * "jwt_max_expiry": os.getenv("OTA_JWT_MAX_EXPIRY_SECONDS"),
 * "jwt_secret": os.getenv("OTA_JWT_SECRET"),
-* "admin_secret": os.getenv("OTA_ADMIN_SECRET"),
 * "admin_activity_log": os.getenv("OTA_ADMIN_ACTIVITY_LOG")
 * "log_rotation_strategy": os.getenv("OTA_LOG_ROTATION_STRATEGY")
 * "log_rotation_max_bytes": os.getenv("OTA_LOG_ROTATION_MAX_BYTES")
@@ -666,22 +664,29 @@ For non-safe HTTP methods, query-string tokens are rejected with `405`.
 
 ### Token generation
 
-Tokens are issued dynamically via the admin endpoint:
+Tokens are issued dynamically via the `/api/v1/auth` REST API:
 
 ```http
-POST /admin/generate_token
+POST /api/v1/auth/ota
 ```
 
-Access to this endpoint is additionally restricted by client IP/network via the
-`admin_networks` configuration parameter (see [Configuration](#configuration)).
-Requests originating from a network not in `admin_networks` are rejected with
-`403`, regardless of whether the correct `X-Admin-Secret` is supplied.
+This endpoint requires a valid REST API access token, obtained by first
+authenticating via `POST /api/v1/auth/login` (see [REST API authentication](#rest-api-authentication)).
+The `X-Admin-Secret` header used by the previous `/admin/generate_token`
+endpoint has been removed; authorization is now performed as follows:
+
+- the caller's access token must be valid and unexpired
+- the caller's role must grant the `device.ota` permission (currently `operator`, `admin`, and `manager`)
+- the caller must have a `users_devices` assignment for the target device (looked up by `device_id`), and that assignment must not be expired
+
+Requests failing any of these checks are rejected with `401` (missing/invalid
+access token) or `403` (role or device assignment does not permit OTA).
 
 Required headers:
 
 | Header | Required | Description |
 | --- | --- | --- |
-| `X-Admin-Secret` | Yes | Matches the configured server secret, usually stored in `OTA_ADMIN_SECRET` |
+| `Authorization` | Yes | `Bearer <access_token>` obtained from `POST /api/v1/auth/login` |
 | `Content-Type` | Yes | Must be `application/json` |
 
 Request body:
@@ -698,7 +703,7 @@ Request body:
 
 Fields in the request body:
 
-- `device_id` — UUID for the device that will use the token
+- `device_id` — UUID for the device that will use the token; must be a device registered in the database and assigned to the caller via `users_devices`
 - `project` — Target project name, must match the OTA project
 - `expires_seconds` — Optional, token lifetime in seconds; the server caps it by `jwt_max_expiry`
 - `current_vs` — Optional current device firmware version; accepted by the API but not included in the token payload in the current implementation
@@ -706,7 +711,7 @@ Fields in the request body:
 
 The server currently enforces a minimum validation set:
 
-- `device_id` must be a valid UUID
+- `device_id` must be a valid UUID and must resolve to a registered device
 - `project` must be provided
 - `download_vs` must be provided
 - `expires_seconds` is clamped to `jwt_max_expiry`
@@ -714,8 +719,8 @@ The server currently enforces a minimum validation set:
 Example:
 
 ```bash
-curl -X POST https://yourserver:8070/admin/generate_token \
-  -H "X-Admin-Secret: $OTA_ADMIN_SECRET" \
+curl -X POST https://yourserver:8070/api/v1/auth/ota \
+  -H "Authorization: Bearer $OTA_ACCESS_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
         "device_id": "e6f87d77-4216-4be1-ab83-b5fa6792b747",
@@ -826,7 +831,7 @@ Example log entry:
 
 ### Security notes
 
-- Keep `OTA_ADMIN_SECRET` out of source control; prefer environment variables or secret stores
+- Keep `OTA_JWT_SECRET` out of source control; prefer environment variables or secret stores
 - Always use HTTPS in production when issuing and consuming tokens
 - Use short expirations (for example 5–60 minutes) and rotate secrets as part of operational hygiene
 - Do not reuse tokens across devices or projects
@@ -896,7 +901,7 @@ The supported roles and permissions are:
 | Role | Permissions |
 | --- | --- |
 | `viewer` | Read system status, projects, devices, and firmware; download firmware; access `/auth/me` |
-| `operator` | All viewer permissions, plus create/update projects and devices, upload/update firmware, and full management of user-device assignments |
+| `operator` | All viewer permissions, plus create/update projects and devices, upload/update firmware, full management of user-device assignments, and issuing OTA tokens (`device.ota`) for assigned devices |
 | `admin` | All defined permissions, including user management, device OTA, and delete operations |
 | `manager` | All defined permissions, same as `admin` |
 

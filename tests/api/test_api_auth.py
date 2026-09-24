@@ -10,7 +10,7 @@ from types import SimpleNamespace
 import jwt
 import pytest
 
-from ota_http_server.core.data_models import AppPaths, User
+from ota_http_server.core.data_models import AppPaths, Device, Project, User, UserDevice
 from ota_http_server.core.passwords import Passwords
 from ota_http_server.core.server import create_app
 
@@ -100,6 +100,56 @@ def make_authed_user(authed_db):
         )
 
     return _make
+
+
+@pytest.fixture()
+def make_authed_project(authed_db):
+    def _make(name="smart_fan", created_by=None, is_active=True):
+        return authed_db.project_add(
+            Project(
+                id=None,
+                name=name,
+                display_name=name.replace("_", " ").title(),
+                description=f"{name} description",
+                created_by=created_by,
+                is_active=is_active,
+                created_at=None,
+                updated_at=None,
+            )
+        )
+
+    return _make
+
+
+@pytest.fixture()
+def make_authed_device(authed_db):
+    def _make(uuid="e6f87d77-4216-4be1-ab83-b5fa6792b747", project_id=None, is_active=True):
+        target = authed_db.target_get_by_name("Not defined")
+        return authed_db.device_add(
+            Device(
+                id=None,
+                uuid=uuid,
+                project_id=project_id,
+                target_id=target.id,
+                model="ESP32S3",
+                serial_number=None,
+                current_version="1.0.0",
+                last_seen=None,
+                is_active=is_active,
+                created_at=None,
+                updated_at=None,
+            )
+        )
+
+    return _make
+
+
+@pytest.fixture()
+def assign_authed_user_device(authed_db):
+    def _assign(user, device, expires_at=None):
+        return authed_db.user_device_add(UserDevice(user.id, device.id, None, expires_at))
+
+    return _assign
 
 
 def _login(client, username="alice", password="secret"):
@@ -446,6 +496,148 @@ def test_me_returns_authenticated_user_public_info(authed_client, make_authed_us
     assert payload["is_active"] is True
     assert "password_hash" not in payload
     assert "password" not in payload
+
+
+# ---------------------------------------------------------------------------
+# /api/v1/auth/ota
+# ---------------------------------------------------------------------------
+
+
+def _ota_request(client, token, device_uuid, project="smart_fan", download_vs="2.0.0"):
+    return client.post(
+        "/api/v1/auth/ota",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "device_id": device_uuid,
+            "project": project,
+            "download_vs": download_vs,
+        },
+    )
+
+
+def test_ota_authorize_issues_token_for_assigned_device(
+    authed_client,
+    make_authed_user,
+    make_authed_project,
+    make_authed_device,
+    assign_authed_user_device,
+):
+    user = make_authed_user(role="operator")
+    project = make_authed_project(created_by=user.id)
+    device = make_authed_device(project_id=project.id)
+    assign_authed_user_device(user, device)
+    token = _access_token(authed_client)
+
+    response = _ota_request(authed_client, token, device.uuid, project=project.name)
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["payload"]["sub"] == device.uuid
+    assert payload["payload"]["project"] == project.name
+    assert isinstance(payload["token"], str) and payload["token"]
+
+
+def test_ota_authorize_rejects_unassigned_device(
+    authed_client,
+    make_authed_user,
+    make_authed_project,
+    make_authed_device,
+):
+    user = make_authed_user(role="operator")
+    project = make_authed_project(created_by=user.id)
+    device = make_authed_device(project_id=project.id)
+    token = _access_token(authed_client)
+
+    response = _ota_request(authed_client, token, device.uuid, project=project.name)
+
+    assert response.status_code == 403
+
+
+def test_ota_authorize_rejects_expired_assignment(
+    authed_client,
+    make_authed_user,
+    make_authed_project,
+    make_authed_device,
+    assign_authed_user_device,
+):
+    from datetime import UTC, datetime, timedelta
+
+    user = make_authed_user(role="operator")
+    project = make_authed_project(created_by=user.id)
+    device = make_authed_device(project_id=project.id)
+    assign_authed_user_device(user, device, expires_at=datetime.now(UTC) - timedelta(days=1))
+    token = _access_token(authed_client)
+
+    response = _ota_request(authed_client, token, device.uuid, project=project.name)
+
+    assert response.status_code == 403
+
+
+def test_ota_authorize_rejects_unknown_device(authed_client, make_authed_user):
+    make_authed_user(role="operator")
+    token = _access_token(authed_client)
+
+    response = _ota_request(authed_client, token, "does-not-exist", project="smart_fan")
+
+    assert response.status_code == 404
+
+
+def test_ota_authorize_forbidden_for_role_without_device_ota_permission(
+    authed_client,
+    make_authed_user,
+    make_authed_project,
+    make_authed_device,
+    assign_authed_user_device,
+):
+    user = make_authed_user(role="viewer")
+    project = make_authed_project(created_by=user.id)
+    device = make_authed_device(project_id=project.id)
+    assign_authed_user_device(user, device)
+    token = _access_token(authed_client)
+
+    response = _ota_request(authed_client, token, device.uuid, project=project.name)
+
+    assert response.status_code == 403
+
+
+def test_ota_authorize_requires_authentication(authed_client):
+    response = authed_client.post(
+        "/api/v1/auth/ota",
+        json={"device_id": "some-device", "project": "smart_fan", "download_vs": "2.0.0"},
+    )
+
+    assert response.status_code == 401
+
+
+def test_ota_authorize_logs_admin_activity(
+    authed_app,
+    authed_client,
+    make_authed_user,
+    make_authed_project,
+    make_authed_device,
+    assign_authed_user_device,
+):
+    from unittest.mock import MagicMock
+
+    admin_activity_logger = MagicMock()
+    authed_app.extensions["admin_activity_logger"] = admin_activity_logger
+
+    user = make_authed_user(role="operator")
+    project = make_authed_project(created_by=user.id)
+    device = make_authed_device(project_id=project.id)
+    assign_authed_user_device(user, device)
+    token = _access_token(authed_client)
+
+    response = _ota_request(authed_client, token, device.uuid, project=project.name)
+
+    assert response.status_code == 200
+    admin_activity_logger.log_activity.assert_called_once()
+    kwargs = admin_activity_logger.log_activity.call_args.kwargs
+    assert kwargs["outcome"] == "success"
+    assert kwargs["target"]["device_id"] == device.uuid
+    assert kwargs["target"]["project"] == project.name
+    assert kwargs["target"]["user_id"] == user.id
+
 
 
 def test_me_without_authentication_returns_401(authed_client):
