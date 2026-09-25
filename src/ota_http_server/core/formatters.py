@@ -443,6 +443,12 @@ class FirmwareFormatter:
         channel = firmware.channel if firmware.channel else "-"
         status = "active" if firmware.is_active else "disabled"
 
+        release_notes = (
+            firmware.release_notes
+            if firmware.release_notes
+            else "-"
+        )
+
         created = (
             firmware.created_at.strftime("%Y-%m-%d %H:%M:%S")
             if firmware.created_at
@@ -463,7 +469,7 @@ class FirmwareFormatter:
             filename,
             file_size,
             firmware.checksum,
-            firmware.release_notes,
+            release_notes,
             channel,
             status,
             created,
