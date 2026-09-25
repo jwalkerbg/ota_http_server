@@ -3,7 +3,7 @@
 import re
 from pathlib import Path
 from datetime import datetime, timezone, UTC
-from flask import Flask, Response, send_file, request, abort, jsonify
+from flask import Flask, Response, send_file, request, abort, jsonify, g
 from packaging import version
 
 from .data_models import Device, Firmware
@@ -113,7 +113,6 @@ def create_app(cfg: Config) -> Flask:
 
         route_action = {
             "firmware": "download",
-            "latest_firmware": "latest",
             "list_versions": "versions",
         }.get(endpoint, "download")
 
@@ -149,12 +148,12 @@ def create_app(cfg: Config) -> Flask:
     @app.after_request
     def log_ota_request_response(response: Response) -> Response:
         endpoint = request.endpoint
-        if endpoint not in {"firmware", "latest_firmware", "list_versions"}:
+        if endpoint not in {"firmware", "list_versions"}:
             return response
 
         view_args = request.view_args or {}
-        project = view_args.get("project")
-        version = view_args.get("version")
+        project = getattr(g, "ota_download_project", view_args.get("project"))
+        version = getattr(g, "ota_download_version", view_args.get("version"))
         status_code = response.status_code
         outcome = "success" if 200 <= status_code < 400 else "failed"
         log_ota_download_request(
@@ -170,21 +169,35 @@ def create_app(cfg: Config) -> Flask:
     #                          ROUTES
     # ---------------------------------------------------------------
 
-    def resolve_device(project: str, project_id: int) -> Device:
-        """Resolve the authenticated JWT subject to a registered device."""
-        payload = authservice.verify_token(project, verify_sub=True)
-        device_id = payload["sub"]
+    def resolve_ota_request() -> tuple[str, str, Device, int]:
+        """Resolve the authorized project, version, and device from the OTA JWT."""
+        payload = authservice.verify_token(verify_sub=False)
+        project = payload.get("project")
+        fw_version = payload.get("download_vs")
+        device_uuid = payload.get("sub")
+        if not isinstance(project, str) or not project:
+            abort(403, "Token missing 'project' claim")
+        if not isinstance(fw_version, str) or not fw_version:
+            abort(403, "Token missing 'download_vs' claim")
+        if not isinstance(device_uuid, str) or not device_uuid:
+            abort(403, "Token missing 'sub' claim for device identity")
 
-        # Resolve device UUID to device record
-        device_rec = dbservice.device_get_by_name(device_id)
-        if device_rec is None or device_rec.project_id != project_id:
+        project_rec = dbservice.project_get_by_name(project)
+        if project_rec is None:
+            abort(404, "Project not found")
+        if not project_rec.is_active:
+            abort(403, "Project is disabled")
+
+        # The JWT subject is the device UUID, not the devices table's numeric ID.
+        device_rec = dbservice.device_get_by_name(device_uuid)
+        if device_rec is None or device_rec.project_id != project_rec.id:
             abort(403, "Device not registered for project")
-
-        # Check device permission
         if not device_rec.is_active:
             abort(403, "Device not allowed to download firmware")
 
-        return device_rec
+        g.ota_download_project = project
+        g.ota_download_version = fw_version
+        return project, fw_version, device_rec, project_rec.id
 
     def get_firmware_metadata(project_id: int, fw_version: str, device: Device) -> Firmware | None:
         """Get firmware by project, version, and target.
@@ -198,61 +211,35 @@ def create_app(cfg: Config) -> Flask:
             target_id=device.target_id,
         )
 
-    @app.route(f'/{url_firmware}/<project>/<version>')
-    def firmware(project:str, version:str) -> Response:
-        project_rec = dbservice.project_get_by_name(project)
-        if project_rec is None:
-            abort(404, "Project not found")
-        if not project_rec.is_active:
-            abort(403, "Project is disabled")
-
-        device_rec = resolve_device(project, project_rec.id)
-
-        firmware_rec = get_firmware_metadata(
-            project_id=project_rec.id,
-            fw_version=version,
-            device=device_rec,
-        )
-        if firmware_rec is None:
-            abort(404, "Firmware metadata not found")
-        if not firmware_rec.is_active:
-            abort(403, "Firmware is disabled")
+    @app.route(f'/{url_firmware}')
+    def firmware() -> Response:
+        project, fw_version, device_rec, project_id = resolve_ota_request()
+        if fw_version == "latest":
+            firmware_records = [
+                fw for fw in dbservice.firmware_get_record()
+                if fw.project_id == project_id
+                and fw.target_id == device_rec.target_id
+                and fw.is_active
+            ]
+            if not firmware_records:
+                abort(404, "No firmware metadata found for project and target")
+            firmware_rec = max(firmware_records, key=lambda fw: version.parse(fw.version))
+        else:
+            firmware_rec = get_firmware_metadata(
+                project_id=project_id,
+                fw_version=fw_version,
+                device=device_rec,
+            )
+            if firmware_rec is None:
+                abort(404, "Firmware metadata not found")
+            if not firmware_rec.is_active:
+                abort(403, "Firmware is disabled")
 
         file_path = get_firmware_file_path(project, firmware_rec.filename)
 
         logger.info("Serving firmware from: %s", file_path)
         if not file_path.is_file():
             abort(404, "Firmware file not found")
-        return send_file(file_path, conditional=True)
-
-    @app.route(f'/{url_firmware}/<project>/latest')
-    def latest_firmware(project:str) -> Response:
-        project_rec = dbservice.project_get_by_name(project)
-        if project_rec is None:
-            abort(404, "Project not found")
-        if not project_rec.is_active:
-            abort(403, "Project is disabled")
-
-        device_rec = resolve_device(project, project_rec.id)
-
-        # Get all firmware records for this project and target
-        firmware_records = [
-            fw for fw in dbservice.firmware_get_record()
-            if fw.project_id == project_rec.id and fw.target_id == device_rec.target_id
-        ]
-        if not firmware_records:
-            abort(404, "No firmware metadata found for project and target")
-
-        latest_firmware_rec = max(firmware_records, key=lambda fw: fw.version)
-        if not latest_firmware_rec.is_active:
-            abort(403, "Latest firmware is disabled")
-
-        file_path = get_firmware_file_path(project, latest_firmware_rec.filename)
-
-        logger.info("Serving firmware from: %s", file_path)
-        if not file_path.is_file():
-            abort(404, "Firmware file not found")
-
         return send_file(file_path, conditional=True)
 
     @app.route(f'/{url_firmware}/<project>/versions')
@@ -263,7 +250,9 @@ def create_app(cfg: Config) -> Flask:
         if not project_rec.is_active:
             abort(403, "Project is disabled")
 
-        authservice.verify_token(project, verify_sub=False)
+        payload = authservice.verify_token(verify_sub=False)
+        if payload.get("project") != project:
+            abort(403, "Token not valid for this project")
 
         firmware_records = [
             fw for fw in dbservice.firmware_get_record()

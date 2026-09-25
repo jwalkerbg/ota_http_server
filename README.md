@@ -103,7 +103,7 @@ Supports **JWT-based authentication** and can run in two modes:
                       v
  +-------------------------------------------+
  | Firmware Files (www/<project>/<bin file>) |
- |   url path /firmware/<project>/<version>  |
+ |   URL path /firmware                      |
  +-------------------------------------------+
 ```
 
@@ -509,27 +509,22 @@ Default Hardcoded  → fallback values
 
 ## Structure of OTA URL
 
-This is an example URL:
+The firmware image is selected from the OTA JWT, so the download URL has no
+project or version path components:
 
-`https://ota.mycompany.com:8070/firmware/projectA/01.00.02?token=<JWT>`
+`https://ota.mycompany.com:8070/firmware?token=<JWT>`
 
-Use `/<url_firmware>/<project>/<version>` as the canonical request format.
+Use `/<url_firmware>` as the canonical firmware download path.
 
-`https://ota.mycompany.com:8070/firmware/projectA/projectA-01.00.02.bin?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...`
 
 The server root directory is `www` by default, relative to the directory where OTA server is started. It can be changed in `config.toml` with the parameter `www_dir` or with the CLI option `--www-dir`.
 
 Next level directory must present below `www` that is a container for the firmware files for all projects. By default it is `firmware`. It corresponds to te first element in URL after the domain and port.
 The directory name in the file system can be changed by `firmware_dir` parameter (`--firmware-dir` option). The first element in the URL path can be changed / renamed by `url_firmware` parameter (`--url-firmware`).
 
-Next element in the URL is the project name. If JWT is used it must be the same with the value of `project` field in JWT.
-
-After the project name firmware version follows. The server resolves the
-version to the real binary image file name using firmware metadata in the
-database. With JWT enabled, selection uses the authenticated device target
-and matches firmware by `(project, version, target)`.
-
-An eventual JWT is at the end.
+The project and firmware version are not included in the download URL. The
+server resolves the requested version to the real binary image name using
+firmware metadata and matches by `(project, version, device target)`.
 
 ## Standalone Mode
 
@@ -630,7 +625,7 @@ ProxyPassReverse "/" "balancer://flaskcluster/"
 JWT authentication is required. Clients can pass JWT in the header or as an URL parameter.
 
 ```
-GET /firmware/projectA/01.00.02?token=<JWT>
+GET /firmware?token=<JWT>
 ```
 
 ## JWT-Based Authentication for OTA Access
@@ -639,17 +634,16 @@ The OTA server requires JWT-based access control for firmware downloads and vers
 
 The current implementation enforces the token on the OTA endpoints that serve firmware and metadata:
 
-- `/firmware/<project>/<version>`
-- `/firmware/<project>/latest`
+- `/firmware` (firmware selection is read from the JWT)
 - `/firmware/<project>/versions`
 
 The security model is intentionally strict:
 
 - the token must be valid and unexpired
-- the token must match the requested project
+- the token must include the `project`, `download_vs`, and `sub` claims
+- `sub` contains the device UUID and resolves to an active device registered for the project
 - the token must have the required roles (`device`, `fw_download`)
 - the audience and issuer must match the configured values
-- the token subject (`sub`) must match the client identity (`X-Device-ID` header or `?device_id=` query parameter)
 
 ### Token format and trust model
 
@@ -706,7 +700,7 @@ Fields in the request body:
 - `device_id` — UUID for the device that will use the token; must be a device registered in the database and assigned to the caller via `users_devices`
 - `project` — Target project name, must match the OTA project
 - `expires_seconds` — Optional, token lifetime in seconds; the server caps it by `jwt_max_expiry`
-- `current_vs` — Optional current device firmware version; accepted by the API but not included in the token payload in the current implementation
+- `current_vs` — Optional current device firmware version included in the token payload
 - `download_vs` — Required; this is the firmware version the token authorizes the device to download
 
 The server currently enforces a minimum validation set:
@@ -768,7 +762,7 @@ The current code verifies and relies on these claims:
 | `jti` | Unique identifier of the generated token |
 | `project` | Project name the token is valid for |
 | `roles` | Must contain both `device` and `fw_download` |
-| `sub` | Device identity; must match the `X-Device-ID` header or `device_id` query parameter |
+| `sub` | Device UUID; used to resolve the device record and its target |
 | `current_vs` | Device firmware version at token creation time |
 | `download_vs` | Version the token authorizes the device to download |
 
@@ -782,9 +776,9 @@ When a request reaches an OTA endpoint, the server does the following:
 2. Verifies the signature and expiry using the configured secret and algorithm
 3. Checks the `aud` claim against `jwt_audience`
 4. Checks the `iss` claim against `jwt_issuer`
-5. Confirms the token is for the requested project
+5. Reads the project and download version from the verified token
 6. Enforces required roles: `device`, `fw_download`
-7. Verifies the `sub` claim matches the device identifier supplied by the client
+7. Resolves the device UUID from `sub` and requires an active device registered for the project
 8. Allows the request only if the device is registered for that project and active
 
 ### Token usage by devices
@@ -792,15 +786,14 @@ When a request reaches an OTA endpoint, the server does the following:
 A device should send the token as a bearer token in the HTTP header when possible:
 
 ```http
-GET /firmware/projectA/1.2.0
+GET /firmware
 Authorization: Bearer <jwt>
-X-Device-ID: e6f87d77-4216-4be1-ab83-b5fa6792b747
 ```
 
 For `GET` and `HEAD` requests, a query-string token is also accepted:
 
 ```http
-GET /firmware/projectA/1.2.0?token=<jwt>&device_id=e6f87d77-4216-4be1-ab83-b5fa6792b747
+GET /firmware?token=<jwt>
 ```
 
 The server does not permit query string tokens for non-safe methods.
@@ -810,7 +803,6 @@ The server does not permit query string tokens for non-safe methods.
 The server exposes project metadata endpoints that can also be protected by JWT verification:
 
 ```http
-GET /firmware/projectA/latest
 GET /firmware/projectA/versions
 ```
 
@@ -821,12 +813,12 @@ The `/versions` endpoint verifies the token with `verify_sub=False`, which means
 Token generation is logged for traceability through the same admin activity logger used by CLI admin commands.
 On success the server records an event with `interface=http`, `entity=token`, `action=generate`, and target details (IP, device, project, expiration).
 
-Firmware download requests are logged to a separate rotatable log file, `ota_download.log`, using the same JSON event format and rotation policy as the admin activity log. The OTA request logger records the project, version, route, IP address, HTTP status code, and outcome for `/firmware/<project>/<version>`, `/firmware/<project>/latest`, and `/firmware/<project>/versions` requests.
+Firmware download requests are logged to a separate rotatable log file, `ota_download.log`, using the same JSON event format and rotation policy as the admin activity log. The OTA request logger records the project, version, route, IP address, HTTP status code, and outcome for `/firmware` and `/firmware/<project>/versions` requests.
 
 Example log entry:
 
 ```json
-{"action":"download","entity":"firmware","interface":"http","outcome":"success","target":{"ip":"127.0.0.1","path":"/firmware/smart_fan/2.0.0","project":"smart_fan","status_code":200,"version":"2.0.0"},"timestamp":"2026-08-19T14:00:00+00:00"}
+{"action":"download","entity":"firmware","interface":"http","outcome":"success","target":{"ip":"127.0.0.1","path":"/firmware","project":"smart_fan","status_code":200,"version":"2.0.0"},"timestamp":"2026-08-19T14:00:00+00:00"}
 ```
 
 ### Security notes
@@ -1063,12 +1055,12 @@ Browsers usually cache this file, so it will only be requested once. Devices ini
 
 With token
 ```bash
-https://mycompany.com/firmware/projectA/01.00.02?token=<JWT>
+https://mycompany.com/firmware?token=<JWT>
 ```
 
 Without token
 ```bash
-https://mycompany.com/firmware/projectA/01.00.02
+https://mycompany.com/firmware
 ```
 
 ## Code Quality and Static Analysis

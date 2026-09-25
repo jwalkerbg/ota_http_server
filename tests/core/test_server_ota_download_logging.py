@@ -75,8 +75,12 @@ def test_server_download_routes_log_ota_download_requests(tmp_path, monkeypatch)
             return FakeFirmwareRecord()
 
     class FakeAuthService:
-        def verify_token(self, project, verify_sub=True):
-            return {"sub": "device-1", "project": project}
+        def verify_token(self, verify_sub=True):
+            return {
+                "sub": "device-1",
+                "project": "project-1",
+                "download_vs": "1.0.0",
+            }
 
     monkeypatch.setattr(server_module, "DatabaseService", lambda cfg: FakeDBService())
     monkeypatch.setattr(server_module, "AuthService", lambda **kwargs: FakeAuthService())
@@ -112,7 +116,7 @@ def test_server_download_routes_log_ota_download_requests(tmp_path, monkeypatch)
 
     app = create_app(cfg)
     client = app.test_client()
-    response = client.get("/firmware/project-1/1.0.0", headers={"Authorization": "Bearer test-token"})
+    response = client.get("/firmware", headers={"Authorization": "Bearer test-token"})
 
     assert response.status_code == 200
     ota_download_logger.log_download.assert_called_once()

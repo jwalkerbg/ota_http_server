@@ -15,7 +15,7 @@ from ota_http_server.firmware.firmware_service import FirmwareService
 from ota_http_server.user.user_service import UserService
 
 
-def _device_token() -> str:
+def _device_token(download_vs: str = "1.2.3") -> str:
     now = int(time.time())
     return jwt.encode(
         {
@@ -24,6 +24,7 @@ def _device_token() -> str:
             "iat": now,
             "iss": "issuer",
             "project": "proj",
+            "download_vs": download_vs,
             "roles": ["device", "fw_download"],
             "sub": "device-1",
         },
@@ -196,11 +197,129 @@ def test_firmware_route_rejects_unsafe_stored_filename(tmp_path, monkeypatch):
     }
 
     app = create_app(cfg)
-    response = app.test_client().get(
-        f"/firmware/proj/1.2.3?device_id=device-1&token={_device_token()}"
-    )
+    response = app.test_client().get(f"/firmware?token={_device_token()}")
 
     assert response.status_code == 404
+
+
+def test_latest_firmware_route_uses_token_project_and_device_target(tmp_path, monkeypatch):
+    pytest.importorskip("flask")
+
+    from ota_http_server.core import server as server_module
+    from ota_http_server.core.server import create_app
+
+    project_dir = tmp_path / "proj"
+    project_dir.mkdir()
+    (project_dir / "firmware-1.10.0.bin").write_bytes(b"latest-firmware")
+
+    db_service = MagicMock()
+    db_service.project_get_by_name.return_value = Project(
+        id=12,
+        name="proj",
+        display_name="Proj",
+        description="",
+        created_by=1,
+        is_active=True,
+        created_at=None,
+        updated_at=None,
+    )
+    db_service.device_get_by_name.return_value = Device(
+        id=1,
+        uuid="device-1",
+        project_id=12,
+        target_id=1,
+        model="test",
+        serial_number="sn",
+        current_version="1.0.0",
+        last_seen=None,
+        is_active=True,
+        created_at=None,
+        updated_at=None,
+    )
+    db_service.firmware_get_record.return_value = [
+        Firmware(
+            id=1,
+            project_id=12,
+            target_id=1,
+            version="1.9.0",
+            filename="firmware-1.9.0.bin",
+            file_size=1,
+            checksum="old",
+            release_notes="",
+            channel="stable",
+            is_active=True,
+            created_at=None,
+            updated_at=None,
+        ),
+        Firmware(
+            id=2,
+            project_id=12,
+            target_id=1,
+            version="1.10.0",
+            filename="firmware-1.10.0.bin",
+            file_size=15,
+            checksum="latest",
+            release_notes="",
+            channel="stable",
+            is_active=True,
+            created_at=None,
+            updated_at=None,
+        ),
+        Firmware(
+            id=3,
+            project_id=12,
+            target_id=2,
+            version="9.0.0",
+            filename="wrong-target.bin",
+            file_size=1,
+            checksum="wrong-target",
+            release_notes="",
+            channel="stable",
+            is_active=True,
+            created_at=None,
+            updated_at=None,
+        ),
+        Firmware(
+            id=4,
+            project_id=12,
+            target_id=1,
+            version="2.0.0",
+            filename="inactive.bin",
+            file_size=1,
+            checksum="inactive",
+            release_notes="",
+            channel="stable",
+            is_active=False,
+            created_at=None,
+            updated_at=None,
+        ),
+    ]
+    monkeypatch.setattr(server_module, "DatabaseService", lambda cfg: db_service)
+
+    cfg = SimpleNamespace()
+    cfg.config = {
+        "parameters": {
+            "www_dir": str(tmp_path),
+            "firmware_dir": "firmware",
+            "url_firmware": "firmware",
+            "jwt_alg": "HS256",
+            "jwt_expiry": 60,
+            "jwt_max_expiry": 120,
+            "jwt_secret": "secret",
+            "jwt_issuer": "issuer",
+            "jwt_audience": "audience",
+            "admin_secret": "admin-secret",
+            "app_paths": SimpleNamespace(project_dir=lambda project_name: project_dir, logs_dir=tmp_path),
+        }
+    }
+
+    response = create_app(cfg).test_client().get(
+        f"/firmware?token={_device_token(download_vs='latest')}"
+    )
+
+    assert response.status_code == 200
+    assert response.data == b"latest-firmware"
+    db_service.device_get_by_name.assert_called_once_with("device-1")
 
 
 def test_latest_firmware_route_rejects_unsafe_stored_filename(tmp_path, monkeypatch):
@@ -274,7 +393,7 @@ def test_latest_firmware_route_rejects_unsafe_stored_filename(tmp_path, monkeypa
 
     app = create_app(cfg)
     response = app.test_client().get(
-        f"/firmware/proj/latest?device_id=device-1&token={_device_token()}"
+        f"/firmware?token={_device_token(download_vs='latest')}"
     )
 
     assert response.status_code == 404

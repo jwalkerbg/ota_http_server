@@ -533,6 +533,7 @@ def test_ota_authorize_issues_token_for_assigned_device(
     assert response.status_code == 200
     payload = response.get_json()
     assert payload["payload"]["sub"] == device.uuid
+    assert "device_id" not in payload["payload"]
     assert payload["payload"]["project"] == project.name
     assert isinstance(payload["token"], str) and payload["token"]
 

@@ -22,7 +22,7 @@ class AuthService:
         self.jwt_expiry = jwt_expiry
         self.jwt_max_expiry = jwt_max_expiry
 
-    def verify_token(self, project:str|None=None, verify_sub:bool=True) -> Dict[str, Any]:
+    def verify_token(self, verify_sub:bool=True) -> Dict[str, Any]:
         """Verifies JWT from Authorization header or ?token= query param.
         Allows query param only for safe (GET, HEAD) requests.
         Example token:
@@ -73,10 +73,10 @@ class AuthService:
         except jwt.InvalidTokenError:
             abort(401, "Invalid token")
 
-        # 5️⃣ Verify project match
+        # 5️⃣ Verify project claim
         token_project = payload.get("project")
-        if not project or not hmac.compare_digest(token_project, project):
-            abort(403, "Token not valid for this project or project not given")
+        if not isinstance(token_project, str) or not token_project:
+            abort(403, "Token missing 'project' claim")
 
         # 5️⃣.1️⃣ Verify "roles" claim contains "device" and "fw_download"
         roles = payload.get("roles", [])
