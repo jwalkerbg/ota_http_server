@@ -630,12 +630,11 @@ GET /firmware?token=<JWT>
 
 ## JWT-Based Authentication for OTA Access
 
-The OTA server requires JWT-based access control for firmware downloads and version lookups.
+The OTA server requires JWT-based access control for firmware downloads.
 
-The current implementation enforces the token on the OTA endpoints that serve firmware and metadata:
+The current implementation enforces the token on the OTA endpoint that serves firmware:
 
 - `/firmware` (firmware selection is read from the JWT)
-- `/firmware/<project>/versions`
 
 The security model is intentionally strict:
 
@@ -798,22 +797,12 @@ GET /firmware?token=<jwt>
 
 The server does not permit query string tokens for non-safe methods.
 
-### Version metadata endpoints
-
-The server exposes project metadata endpoints that can also be protected by JWT verification:
-
-```http
-GET /firmware/projectA/versions
-```
-
-The `/versions` endpoint verifies the token with `verify_sub=False`, which means a valid token can be used to read the available versions, but the device identity is not required for that specific call.
-
 ### Audit logging
 
 Token generation is logged for traceability through the same admin activity logger used by CLI admin commands.
 On success the server records an event with `interface=http`, `entity=token`, `action=generate`, and target details (IP, device, project, expiration).
 
-Firmware download requests are logged to a separate rotatable log file, `ota_download.log`, using the same JSON event format and rotation policy as the admin activity log. The OTA request logger records the project, version, route, IP address, HTTP status code, and outcome for `/firmware` and `/firmware/<project>/versions` requests.
+Firmware download requests are logged to a separate rotatable log file, `ota_download.log`, using the same JSON event format and rotation policy as the admin activity log. The OTA request logger records the project, version, route, IP address, HTTP status code, and outcome for `/firmware` requests.
 
 Example log entry:
 

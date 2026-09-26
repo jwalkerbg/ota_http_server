@@ -1,6 +1,5 @@
 # core/server.py
 
-import re
 from pathlib import Path
 from datetime import datetime, timezone, UTC
 from flask import Flask, Response, send_file, request, abort, jsonify, g
@@ -29,8 +28,6 @@ def create_app(cfg: Config) -> Flask:
     for name, value in locals().items():
         logger.info(f" %s = %r", name, value)
 
-    www_dir=cfg.config['parameters']['www_dir']
-    firmware_dir=cfg.config['parameters']['firmware_dir']
     url_firmware=cfg.config['parameters']['url_firmware']
     jwt_algorithm=cfg.config['parameters']['jwt_alg']
     jwt_expiry=int(cfg.config['parameters']['jwt_expiry'])
@@ -81,39 +78,12 @@ def create_app(cfg: Config) -> Flask:
     #                       HELPER FUNCTIONS
     # ---------------------------------------------------------------
 
-    def get_sorted_versions(project:str) -> tuple[str, list[str], list[tuple[str, str]]]:
-        """Return sorted list of versions for a given project."""
-
-        project_path = (Path(www_dir) / firmware_dir / project).resolve()
-        if not project_path.is_dir():
-            abort(404, "Project not found")
-
-        pattern = re.compile(r"(\d+\.\d+\.\d+)")
-        versions = []
-        version_files = []
-
-        for file_path in project_path.iterdir():
-            if file_path.is_file() and file_path.suffix == ".json":
-                match = pattern.search(file_path.name)
-                if match:
-                    ver = match.group(1)
-                    versions.append(ver)
-                    version_files.append((file_path.name, ver))
-
-        if not versions:
-            abort(404, "No versions found")
-
-        version_files.sort(key=lambda x: version.parse(x[1]))
-        sorted_versions = [v for _, v in version_files]
-        return str(project_path), sorted_versions, version_files
-
     def log_ota_download_request(*, project: str | None, version: str | None, endpoint: str, outcome: str, status_code: int | None = None, error: str | None = None) -> None:
         if ota_download_logger is None:
             return
 
         route_action = {
             "firmware": "download",
-            "list_versions": "versions",
         }.get(endpoint, "download")
 
         target: dict[str, object] = {
@@ -148,7 +118,7 @@ def create_app(cfg: Config) -> Flask:
     @app.after_request
     def log_ota_request_response(response: Response) -> Response:
         endpoint = request.endpoint
-        if endpoint not in {"firmware", "list_versions"}:
+        if endpoint != "firmware":
             return response
 
         view_args = request.view_args or {}
@@ -241,32 +211,6 @@ def create_app(cfg: Config) -> Flask:
         if not file_path.is_file():
             abort(404, "Firmware file not found")
         return send_file(file_path, conditional=True)
-
-    @app.route(f'/{url_firmware}/<project>/versions')
-    def list_versions(project:str) -> Response:
-        project_rec = dbservice.project_get_by_name(project)
-        if project_rec is None:
-            abort(404, "Project not found")
-        if not project_rec.is_active:
-            abort(403, "Project is disabled")
-
-        payload = authservice.verify_token(verify_sub=False)
-        if payload.get("project") != project:
-            abort(403, "Token not valid for this project")
-
-        firmware_records = [
-            fw for fw in dbservice.firmware_get_record()
-            if fw.project_id == project_rec.id
-        ]
-        if not firmware_records:
-            abort(404, "No firmware metadata found for project")
-
-        versions = sorted(fw.version for fw in firmware_records)
-        return jsonify({
-            "versions": versions,
-            "count": len(versions),
-            "latest": versions[-1]
-        })
 
     @app.route("/status")
     def status() -> Response:
