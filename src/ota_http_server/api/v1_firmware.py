@@ -83,10 +83,43 @@ def _store_firmware_file(upload, project_dir: Path, *, overwrite_path: Path | No
 @api_v1_firmware.route("/", methods=["GET"])
 @require_permission(FIRMWARE_READ)
 def list_firmware():
-    """List firmware versions, optionally filtered by ?projectid= and ?state=."""
-    firmware = get_db().firmware_get_list(
+    """List firmware versions with optional project, target, state, and channel filters."""
+    db = get_db()
+    raw_project_id = request.args.get("project_id")
+    project_name = request.args.get("project_name")
+    if raw_project_id is not None and project_name is not None:
+        return error_response(400, "'project_id' and 'project_name' cannot be combined")
+    project_id = parse_int_query_param("project_id")
+
+    if project_name is not None:
+        project = db.project_get_by_name(project_name)
+        if project is None:
+            return error_response(400, f"Project with name '{project_name}' does not exist")
+        project_id = project.id
+
+    raw_target_id = request.args.get("target_id")
+    target_name = request.args.get("target_name")
+    if raw_target_id is not None and target_name is not None:
+        return error_response(400, "'target_id' and 'target_name' cannot be combined")
+    target_id = parse_int_query_param("target_id")
+
+    if target_name is not None:
+        target = db.target_get_by_name(target_name)
+        if target is None:
+            return error_response(400, f"Target with name '{target_name}' does not exist")
+        target_id = target.id
+
+    channel = request.args.get("channel")
+    if channel is not None and channel not in FIRMWARE_CHANNELS:
+        return error_response(
+            400, f"Invalid 'channel' filter: expected one of: {', '.join(FIRMWARE_CHANNELS)}"
+        )
+
+    firmware = db.firmware_get_list(
         is_active=parse_state_filter(),
-        project_id=parse_int_query_param("projectid"),
+        project_id=project_id,
+        target_id=target_id,
+        channel=channel,
     )
     return jsonify({"firmware": [firmware_list_item_to_dict(f) for f in firmware]}), 200
 

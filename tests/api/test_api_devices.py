@@ -157,13 +157,13 @@ def test_list_devices_filters(client, make_user, make_project, make_device):
     make_device(uuid="d2", project_id=first.id, is_active=False)
     make_device(uuid="d3", project_id=second.id)
 
-    response = client.get(f"/api/v1/devices?projectid={first.id}")
+    response = client.get(f"/api/v1/devices?project_id={first.id}")
     assert {d["uuid"] for d in response.get_json()["devices"]} == {"d1", "d2"}
 
     response = client.get("/api/v1/devices?state=disabled")
     assert {d["uuid"] for d in response.get_json()["devices"]} == {"d2"}
 
-    response = client.get(f"/api/v1/devices?projectid={first.id}&state=enabled")
+    response = client.get(f"/api/v1/devices?project_id={first.id}&state=enabled")
     assert {d["uuid"] for d in response.get_json()["devices"]} == {"d1"}
 
     response = client.get("/api/v1/devices")
@@ -175,7 +175,7 @@ def test_list_devices_filters(client, make_user, make_project, make_device):
     assert "target" in item
 
 
-def test_list_devices_invalid_projectid(client):
-    response = client.get("/api/v1/devices?projectid=abc")
+def test_list_devices_invalid_project_id(client):
+    response = client.get("/api/v1/devices?project_id=abc")
 
     assert response.status_code == 400

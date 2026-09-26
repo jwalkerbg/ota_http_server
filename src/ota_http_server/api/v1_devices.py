@@ -56,10 +56,10 @@ def _resolve_target_id(target_id: int | None) -> int:
 @api_v1_devices.route("/", methods=["GET"])
 @require_permission(DEVICES_READ)
 def list_devices():
-    """List devices, optionally filtered by ?projectid= and ?state=."""
+    """List devices, optionally filtered by ?project_id= and ?state=."""
     devices = get_db().device_get_list(
         is_active=parse_state_filter(),
-        project_id=parse_int_query_param("projectid"),
+        project_id=parse_int_query_param("project_id"),
     )
     return jsonify({"devices": [device_list_item_to_dict(d) for d in devices]}), 200
 

@@ -976,7 +976,7 @@ The limits can also be set in the `[parameters]` section of `config.toml`. Empty
 | Method | Endpoint | Description |
 | --- | --- | --- |
 | `GET` | `/api/v1/devices?state=enabled\|disabled` | List devices, optionally filtered by state. |
-| `GET` | `/api/v1/devices?projectid=<id>` | Filter devices by project ID. |
+| `GET` | `/api/v1/devices?project_id=<id>` | Filter devices by project ID. |
 | `POST` | `/api/v1/devices` | Create a device. Required JSON fields: `uuid`, `project_id`. Optional fields: `target_id`, `model`, `serial_number`, `current_version`. |
 | `GET` | `/api/v1/devices/<id>` | Get a device. |
 | `PATCH` | `/api/v1/devices/<id>` | Update one or more of `project_id`, `target_id`, `model`, `serial_number`, and `current_version`. |
@@ -1011,7 +1011,10 @@ curl -X POST http://localhost:8070/api/v1/userdevices \
 | Method | Endpoint | Description |
 | --- | --- | --- |
 | `GET` | `/api/v1/firmware?state=enabled\|disabled` | List firmware, optionally filtered by state. |
-| `GET` | `/api/v1/firmware?projectid=<id>` | Filter firmware by project ID. |
+| `GET` | `/api/v1/firmware?project_id=<id>` | Filter firmware by project ID. |
+| `GET` | `/api/v1/firmware?project_name=<name>` | Filter firmware by project name. Cannot be combined with `project_id`. |
+| `GET` | `/api/v1/firmware?target_id=<id>\|target_name=<name>` | Filter firmware by target ID or name. These parameters cannot be combined. |
+| `GET` | `/api/v1/firmware?channel=<stable\|beta\|dev>` | Filter firmware by channel. |
 | `POST` | `/api/v1/firmware` | Upload firmware using `multipart/form-data`. Required fields: `file`, `project_id`, `version`. Optional fields: `target_id`, `channel`, `release_notes`. |
 | `GET` | `/api/v1/firmware/<id>` | Get firmware metadata. |
 | `PATCH` | `/api/v1/firmware/<id>` | Update one or more of `version`, `release_notes`, `channel`, and `target_id`. |

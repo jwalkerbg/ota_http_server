@@ -276,13 +276,13 @@ def test_list_firmware_filters(client, make_user, make_project, make_firmware):
     make_firmware(first, version="1.1.0", is_active=False)
     make_firmware(second, version="3.0.0")
 
-    response = client.get(f"/api/v1/firmware?projectid={first.id}")
+    response = client.get(f"/api/v1/firmware?project_id={first.id}")
     assert {f["version"] for f in response.get_json()["firmware"]} == {"1.0.0", "1.1.0"}
 
     response = client.get("/api/v1/firmware?state=disabled")
     assert {f["version"] for f in response.get_json()["firmware"]} == {"1.1.0"}
 
-    response = client.get(f"/api/v1/firmware?projectid={first.id}&state=enabled")
+    response = client.get(f"/api/v1/firmware?project_id={first.id}&state=enabled")
     assert {f["version"] for f in response.get_json()["firmware"]} == {"1.0.0"}
 
     response = client.get("/api/v1/firmware")
@@ -291,7 +291,7 @@ def test_list_firmware_filters(client, make_user, make_project, make_firmware):
     assert all("is_active" in item for item in items)
 
 
-def test_list_firmware_invalid_projectid(client):
-    response = client.get("/api/v1/firmware?projectid=abc")
+def test_list_firmware_invalid_project_id(client):
+    response = client.get("/api/v1/firmware?project_id=abc")
 
     assert response.status_code == 400

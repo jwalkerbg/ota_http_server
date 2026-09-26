@@ -321,8 +321,15 @@ class DatabaseService:
         self,
         is_active: bool | None = None,
         project_id: int | None = None,
+        target_id: int | None = None,
+        channel: str | None = None,
     ) -> list[FirmwareListItem]:
-        return self._database.firmware_get_list(is_active=is_active, project_id=project_id)
+        return self._database.firmware_get_list(
+            is_active=is_active,
+            project_id=project_id,
+            target_id=target_id,
+            channel=channel,
+        )
 
     def firmware_update_by_id(
         self,
