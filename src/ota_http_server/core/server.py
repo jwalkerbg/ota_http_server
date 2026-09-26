@@ -1,8 +1,7 @@
 # core/server.py
 
 from pathlib import Path
-from datetime import datetime, timezone, UTC
-from flask import Flask, Response, send_file, request, abort, jsonify, g
+from flask import Flask, Response, send_file, request, abort, g
 from packaging import version
 
 from .data_models import Device, Firmware
@@ -211,12 +210,5 @@ def create_app(cfg: Config) -> Flask:
         if not file_path.is_file():
             abort(404, "Firmware file not found")
         return send_file(file_path, conditional=True)
-
-    @app.route("/status")
-    def status() -> Response:
-        return jsonify({
-            "status": "ok",
-            "time": datetime.now(UTC).isoformat()
-        })
 
     return app

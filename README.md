@@ -902,7 +902,7 @@ Login and `/auth/me` are available to every role. Authorization does not trust a
 | Method | Endpoint | Description |
 | --- | --- | --- |
 | `GET` | `/api/v1` | Returns API version, status, and route links. |
-| `GET` | `/api/v1/status` | Returns `{"status": "ok", "time": "..."}`. |
+| `GET` | `/api/v1/status` | Returns `{"status": "ok", "time": "..."}`. This is the supported status endpoint; the unversioned `/status` route is not available. |
 
 ### REST API users
 

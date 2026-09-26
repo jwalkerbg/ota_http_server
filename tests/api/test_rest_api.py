@@ -42,7 +42,7 @@ def test_api_root_returns_version_metadata():
     assert payload["status"] == "ok"
 
 
-def test_api_status_matches_legacy_status_shape():
+def test_api_status_returns_expected_shape():
     app = _build_app()
 
     response = app.test_client().get("/api/v1/status")
@@ -52,6 +52,14 @@ def test_api_status_matches_legacy_status_shape():
     payload = response.get_json()
     assert payload["status"] == "ok"
     assert "time" in payload
+
+
+def test_unversioned_status_route_is_not_available():
+    app = _build_app()
+
+    response = app.test_client().get("/status")
+
+    assert response.status_code == 404
 
 
 def test_api_errors_are_returned_as_json():
