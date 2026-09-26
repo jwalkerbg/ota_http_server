@@ -1,12 +1,17 @@
 from types import SimpleNamespace
+from tempfile import mkdtemp
 
+from ota_http_server.core.data_models import AppPaths, User
+from ota_http_server.core.passwords import Passwords
 from ota_http_server.core.server import create_app
 
 
 def _build_app():
+    app_directory = mkdtemp()
     cfg = SimpleNamespace()
     cfg.config = {
         "parameters": {
+            "app_directory": app_directory,
             "www_dir": ".",
             "firmware_dir": "firmware",
             "url_firmware": "firmware",
@@ -17,23 +22,48 @@ def _build_app():
             "jwt_issuer": "issuer",
             "jwt_audience": "audience",
             "admin_secret": "admin-secret",
-            "app_paths": SimpleNamespace(project_dir=lambda project_name: SimpleNamespace(), logs_dir="."),
+            "trace_sql": False,
+            "init_db_migrate": True,
+            "migrate_dry_run": False,
         },
         "database": {
             "dbtype": "sqlite",
             "sqlite": {
-                "db_file": ":memory:",
+                "db_file": "test.db",
                 "migrations_dir": "src/ota_http_server/database/migrations/sqlite",
             },
         },
     }
-    return create_app(cfg)
+    cfg.config["parameters"]["app_paths"] = AppPaths(cfg)
+    app = create_app(cfg)
+    app.extensions["db_service"].init_db()
+    app.extensions["db_service"].user_add(
+        User(
+            id=None,
+            username="api-auth-user",
+            password_hash=Passwords.hash("secret"),
+            email="api-auth-user@example.com",
+            role="admin",
+            is_active=True,
+            created_at=None,
+            updated_at=None,
+        )
+    )
+    return app
+
+
+def _authenticated_client(app):
+    client = app.test_client()
+    user = app.extensions["db_service"].user_get_by_username("api-auth-user")
+    token = app.extensions["user_auth_service"].create_access_token(user)
+    client.environ_base["HTTP_AUTHORIZATION"] = f"Bearer {token.token}"
+    return client
 
 
 def test_api_root_returns_version_metadata():
     app = _build_app()
 
-    response = app.test_client().get("/api/v1/")
+    response = _authenticated_client(app).get("/api/v1/")
 
     assert response.status_code == 200
     assert response.is_json
@@ -45,7 +75,7 @@ def test_api_root_returns_version_metadata():
 def test_api_status_returns_expected_shape():
     app = _build_app()
 
-    response = app.test_client().get("/api/v1/status")
+    response = _authenticated_client(app).get("/api/v1/status")
 
     assert response.status_code == 200
     assert response.is_json
@@ -65,7 +95,7 @@ def test_unversioned_status_route_is_not_available():
 def test_api_errors_are_returned_as_json():
     app = _build_app()
 
-    response = app.test_client().get("/api/v1/not-found")
+    response = _authenticated_client(app).get("/api/v1/not-found")
 
     assert response.status_code == 404
     assert response.is_json
@@ -81,7 +111,7 @@ def test_api_exception_handler_returns_json_error():
     def boom():
         raise RuntimeError("broken")
 
-    response = app.test_client().get("/api/v1/boom")
+    response = _authenticated_client(app).get("/api/v1/boom")
 
     assert response.status_code == 500
     assert response.is_json

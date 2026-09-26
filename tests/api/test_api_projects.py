@@ -1,5 +1,12 @@
 """Tests for the /api/v1/projects routes."""
 
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def authenticate_projects_client(authenticated_client):
+    """Authenticate every project API request in this module."""
+
 
 def test_list_projects_empty(client):
     response = client.get("/api/v1/projects")

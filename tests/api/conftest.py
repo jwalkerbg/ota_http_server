@@ -60,8 +60,9 @@ def client(app):
 
 
 @pytest.fixture()
-def authenticated_client(app, client, user):
-    token = app.extensions["user_auth_service"].create_access_token(user)
+def authenticated_client(app, client, make_user):
+    auth_user = make_user(username="api-auth-user")
+    token = app.extensions["user_auth_service"].create_access_token(auth_user)
     client.environ_base["HTTP_AUTHORIZATION"] = f"Bearer {token.token}"
     return client
 

@@ -1,6 +1,13 @@
 """Tests for the /api/v1/devices routes."""
 
+import pytest
+
 from ota_http_server.core.data_models import Target
+
+
+@pytest.fixture(autouse=True)
+def authenticate_devices_client(authenticated_client):
+    """Authenticate every device API request in this module."""
 
 
 def test_list_devices_empty(authenticated_client):

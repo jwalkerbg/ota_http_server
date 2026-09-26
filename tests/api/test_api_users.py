@@ -1,13 +1,22 @@
 """Tests for the /api/v1/users routes."""
 
+import pytest
+
 from ota_http_server.core.passwords import Passwords
+
+
+@pytest.fixture(autouse=True)
+def authenticate_users_client(authenticated_client):
+    """Authenticate every user API request in this module."""
 
 
 def test_list_users_empty(client):
     response = client.get("/api/v1/users")
 
     assert response.status_code == 200
-    assert response.get_json() == {"users": []}
+    payload = response.get_json()
+    assert len(payload["users"]) == 1
+    assert payload["users"][0]["username"] == "api-auth-user"
 
 
 def test_create_user(client, db):
@@ -258,7 +267,7 @@ def test_list_users_state_filter(client, make_user):
     response = client.get("/api/v1/users?state=enabled")
     assert response.status_code == 200
     usernames = {u["username"] for u in response.get_json()["users"]}
-    assert usernames == {"active1", "active2"}
+    assert usernames == {"active1", "active2", "api-auth-user"}
 
     response = client.get("/api/v1/users?state=disabled")
     assert response.status_code == 200
@@ -266,7 +275,7 @@ def test_list_users_state_filter(client, make_user):
     assert usernames == {"disabled1", "disabled2"}
 
     response = client.get("/api/v1/users")
-    assert len(response.get_json()["users"]) == 4
+    assert len(response.get_json()["users"]) == 5
 
 
 def test_list_users_invalid_state(client):

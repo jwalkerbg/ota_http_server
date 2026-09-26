@@ -1,5 +1,12 @@
 """Tests for the /api/v1/userdevices routes."""
 
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def authenticate_userdevices_client(authenticated_client):
+    """Authenticate every user-device API request in this module."""
+
 
 def test_create_user_device_by_id(client, user, device, db):
     response = client.post(

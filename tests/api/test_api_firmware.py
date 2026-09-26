@@ -3,6 +3,13 @@
 import hashlib
 import io
 
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def authenticate_firmware_client(authenticated_client):
+    """Authenticate every firmware API request in this module."""
+
 
 def test_list_firmware_empty(client):
     response = client.get("/api/v1/firmware")

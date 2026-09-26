@@ -1,10 +1,24 @@
 """Tests for centralized REST API authorization."""
 
+import pytest
+
 from ota_http_server.api.authorization import PERMISSIONS, ROLE_PERMISSIONS, has_permission
 
 
-def test_viewer_can_read_but_cannot_write(client, set_api_role):
-    set_api_role("viewer")
+@pytest.fixture()
+def role_client(app, make_user):
+    def _make_client(role):
+        role_user = make_user(username=f"{role}-user", role=role)
+        client = app.test_client()
+        token = app.extensions["user_auth_service"].create_access_token(role_user)
+        client.environ_base["HTTP_AUTHORIZATION"] = f"Bearer {token.token}"
+        return client
+
+    return _make_client
+
+
+def test_viewer_can_read_but_cannot_write(role_client):
+    client = role_client("viewer")
 
     assert client.get("/api/v1/status").status_code == 200
     assert client.get("/api/v1/projects").status_code == 200
@@ -15,8 +29,8 @@ def test_viewer_can_read_but_cannot_write(client, set_api_role):
     assert client.post("/api/v1/firmware").status_code == 403
 
 
-def test_operator_can_manage_assigned_resources_but_not_delete(client, set_api_role, user):
-    set_api_role("operator")
+def test_operator_can_manage_assigned_resources_but_not_delete(role_client, user):
+    client = role_client("operator")
 
     response = client.post("/api/v1/projects", json={"name": "operator-project", "created_by": user.id})
 
@@ -25,8 +39,8 @@ def test_operator_can_manage_assigned_resources_but_not_delete(client, set_api_r
     assert client.get("/api/v1/users").status_code == 403
 
 
-def test_admin_has_every_defined_permission(client, set_api_role):
-    set_api_role("admin")
+def test_admin_has_every_defined_permission(role_client):
+    client = role_client("admin")
 
     assert ROLE_PERMISSIONS["admin"] == PERMISSIONS
     assert all(has_permission("admin", permission) for permission in PERMISSIONS)
