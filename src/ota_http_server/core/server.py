@@ -181,6 +181,7 @@ def create_app(cfg: Config) -> Flask:
         )
 
     @app.route(f'/{url_firmware}')
+    @app.route(f'/{url_firmware}/')
     def firmware() -> Response:
         project, fw_version, device_rec, project_id = resolve_ota_request()
         if fw_version == "latest":
