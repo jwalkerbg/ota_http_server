@@ -1287,6 +1287,8 @@ class DatabaseMySQLService:
         self,
         is_active: bool | None = None,
         project_id: int | None = None,
+        target_id: int | None = None,
+        current_version: str | None = None,
     ) -> tuple[str, tuple[object, ...]]:
         filters: list[str] = []
         params: list[object] = []
@@ -1296,6 +1298,12 @@ class DatabaseMySQLService:
         if project_id is not None:
             filters.append("devices.project_id = %s")
             params.append(project_id)
+        if target_id is not None:
+            filters.append("devices.target_id = %s")
+            params.append(target_id)
+        if current_version is not None:
+            filters.append("devices.current_version = %s")
+            params.append(current_version)
         where_clause = ""
         if filters:
             where_clause = " WHERE " + " AND ".join(filters)
@@ -1341,12 +1349,16 @@ class DatabaseMySQLService:
         self,
         is_active: bool | None = None,
         project_id: int | None = None,
+        target_id: int | None = None,
+        current_version: str | None = None,
     ) -> list[DeviceListItem]:
         try:
             with self._connect() as conn:
                 where_clause, params = self._build_device_filters(
                     is_active=is_active,
                     project_id=project_id,
+                    target_id=target_id,
+                    current_version=current_version,
                 )
                 cursor = conn.cursor(dictionary=True)
                 cursor.execute(

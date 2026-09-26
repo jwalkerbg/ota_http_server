@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from flask import Blueprint, jsonify
+from flask import Blueprint, jsonify, request
 
 from ota_http_server.core.data_models import Device
 from ota_http_server.target.target_service import DEFAULT_TARGET_NAME
@@ -56,10 +56,37 @@ def _resolve_target_id(target_id: int | None) -> int:
 @api_v1_devices.route("/", methods=["GET"])
 @require_permission(DEVICES_READ)
 def list_devices():
-    """List devices, optionally filtered by ?project_id= and ?state=."""
-    devices = get_db().device_get_list(
+    """List devices, optionally filtered by project, target, version, and state."""
+    db = get_db()
+    raw_project_id = request.args.get("project_id")
+    project_name = request.args.get("project_name")
+    if raw_project_id is not None and project_name is not None:
+        return error_response(400, "'project_id' and 'project_name' cannot be combined")
+    project_id = parse_int_query_param("project_id")
+
+    if project_name is not None:
+        project = db.project_get_by_name(project_name)
+        if project is None:
+            return error_response(400, f"Project with name '{project_name}' does not exist")
+        project_id = project.id
+
+    raw_target_id = request.args.get("target_id")
+    target_name = request.args.get("target_name")
+    if raw_target_id is not None and target_name is not None:
+        return error_response(400, "'target_id' and 'target_name' cannot be combined")
+    target_id = parse_int_query_param("target_id")
+
+    if target_name is not None:
+        target = db.target_get_by_name(target_name)
+        if target is None:
+            return error_response(400, f"Target with name '{target_name}' does not exist")
+        target_id = target.id
+
+    devices = db.device_get_list(
         is_active=parse_state_filter(),
-        project_id=parse_int_query_param("project_id"),
+        project_id=project_id,
+        target_id=target_id,
+        current_version=request.args.get("current_version"),
     )
     return jsonify({"devices": [device_list_item_to_dict(d) for d in devices]}), 200
 

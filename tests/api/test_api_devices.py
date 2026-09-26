@@ -1,8 +1,10 @@
 """Tests for the /api/v1/devices routes."""
 
+from ota_http_server.core.data_models import Target
 
-def test_list_devices_empty(client):
-    response = client.get("/api/v1/devices")
+
+def test_list_devices_empty(authenticated_client):
+    response = authenticated_client.get("/api/v1/devices")
 
     assert response.status_code == 200
     assert response.get_json() == {"devices": []}
@@ -149,7 +151,7 @@ def test_deactivate_device_not_found(client):
     assert response.status_code == 404
 
 
-def test_list_devices_filters(client, make_user, make_project, make_device):
+def test_list_devices_filters(authenticated_client, make_user, make_project, make_device):
     owner = make_user(username="owner")
     first = make_project(name="first", created_by=owner.id)
     second = make_project(name="second", created_by=owner.id)
@@ -157,16 +159,16 @@ def test_list_devices_filters(client, make_user, make_project, make_device):
     make_device(uuid="d2", project_id=first.id, is_active=False)
     make_device(uuid="d3", project_id=second.id)
 
-    response = client.get(f"/api/v1/devices?project_id={first.id}")
+    response = authenticated_client.get(f"/api/v1/devices?project_id={first.id}")
     assert {d["uuid"] for d in response.get_json()["devices"]} == {"d1", "d2"}
 
-    response = client.get("/api/v1/devices?state=disabled")
+    response = authenticated_client.get("/api/v1/devices?state=disabled")
     assert {d["uuid"] for d in response.get_json()["devices"]} == {"d2"}
 
-    response = client.get(f"/api/v1/devices?project_id={first.id}&state=enabled")
+    response = authenticated_client.get(f"/api/v1/devices?project_id={first.id}&state=enabled")
     assert {d["uuid"] for d in response.get_json()["devices"]} == {"d1"}
 
-    response = client.get("/api/v1/devices")
+    response = authenticated_client.get("/api/v1/devices")
     assert len(response.get_json()["devices"]) == 3
 
     # list items expose the project and target names
@@ -175,7 +177,95 @@ def test_list_devices_filters(client, make_user, make_project, make_device):
     assert "target" in item
 
 
-def test_list_devices_invalid_project_id(client):
-    response = client.get("/api/v1/devices?project_id=abc")
+def test_list_devices_invalid_project_id(authenticated_client):
+    response = authenticated_client.get("/api/v1/devices?project_id=abc")
 
     assert response.status_code == 400
+
+
+def test_list_devices_filters_by_project_name_target_and_current_version(
+    authenticated_client, db, make_user, make_project, make_device
+):
+    owner = make_user(username="filter-owner")
+    project = make_project(name="filtered-project", created_by=owner.id)
+    other_project = make_project(name="other-project", created_by=owner.id)
+    target = db.target_add(Target(id=None, name="filtered-target"))
+    matching = make_device(
+        uuid="matching",
+        project_id=project.id,
+        target_id=target.id,
+        current_version="2.0.0",
+    )
+    make_device(
+        uuid="wrong-target",
+        project_id=project.id,
+        current_version="2.0.0",
+    )
+    make_device(
+        uuid="wrong-project",
+        project_id=other_project.id,
+        target_id=target.id,
+        current_version="2.0.0",
+    )
+    make_device(
+        uuid="wrong-version",
+        project_id=project.id,
+        target_id=target.id,
+        current_version="1.0.0",
+    )
+
+    response = authenticated_client.get(
+        "/api/v1/devices",
+        query_string={
+            "project_name": project.name,
+            "target_name": target.name,
+            "current_version": "2.0.0",
+        },
+    )
+
+    assert response.status_code == 200
+    assert [device["uuid"] for device in response.get_json()["devices"]] == [matching.uuid]
+
+
+def test_list_devices_filters_by_target_id(authenticated_client, db, make_project, make_device, user):
+    project = make_project(created_by=user.id)
+    target = db.target_add(Target(id=None, name="target-by-id"))
+    matching = make_device(uuid="target-match", project_id=project.id, target_id=target.id)
+    make_device(uuid="other-target", project_id=project.id)
+
+    response = authenticated_client.get(
+        "/api/v1/devices",
+        query_string={"target_id": target.id},
+    )
+
+    assert response.status_code == 200
+    assert [device["uuid"] for device in response.get_json()["devices"]] == [matching.uuid]
+
+
+def test_list_devices_rejects_conflicting_project_filters(authenticated_client, project):
+    response = authenticated_client.get(
+        "/api/v1/devices",
+        query_string={"project_id": project.id, "project_name": project.name},
+    )
+
+    assert response.status_code == 400
+    assert "cannot be combined" in response.get_json()["error"]["message"]
+
+
+def test_list_devices_rejects_conflicting_target_filters(authenticated_client, db):
+    target = db.target_get_by_name("Not defined")
+    response = authenticated_client.get(
+        "/api/v1/devices",
+        query_string={"target_id": target.id, "target_name": target.name},
+    )
+
+    assert response.status_code == 400
+    assert "cannot be combined" in response.get_json()["error"]["message"]
+
+
+def test_list_devices_rejects_unknown_project_or_target_name(authenticated_client):
+    project_response = authenticated_client.get("/api/v1/devices?project_name=missing")
+    target_response = authenticated_client.get("/api/v1/devices?target_name=missing")
+
+    assert project_response.status_code == 400
+    assert target_response.status_code == 400

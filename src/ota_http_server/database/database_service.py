@@ -208,10 +208,14 @@ class DatabaseService:
         self,
         is_active: bool | None = None,
         project_id: int | None = None,
+        target_id: int | None = None,
+        current_version: str | None = None,
     ) -> list[DeviceListItem]:
         return self._database.device_get_list(
             is_active=is_active,
             project_id=project_id,
+            target_id=target_id,
+            current_version=current_version,
         )
 
     def device_update_by_id(

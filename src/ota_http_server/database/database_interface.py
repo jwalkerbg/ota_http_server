@@ -162,6 +162,8 @@ class DatabaseInterface(Protocol):
         self,
         is_active: bool | None = None,
         project_id: int | None = None,
+        target_id: int | None = None,
+        current_version: str | None = None,
     ) -> list[DeviceListItem]:
         ...
 

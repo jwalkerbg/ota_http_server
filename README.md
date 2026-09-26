@@ -966,6 +966,10 @@ The limits can also be set in the `[parameters]` section of `config.toml`. Empty
 | --- | --- | --- |
 | `GET` | `/api/v1/devices?state=enabled\|disabled` | List devices, optionally filtered by state. |
 | `GET` | `/api/v1/devices?project_id=<id>` | Filter devices by project ID. |
+| `GET` | `/api/v1/devices?project_name=<name>` | Filter devices by project name. Cannot be combined with `project_id`. |
+| `GET` | `/api/v1/devices?target_id=<id>` | Filter devices by target ID. Cannot be combined with `target_name`. |
+| `GET` | `/api/v1/devices?target_name=<name>` | Filter devices by target name. Cannot be combined with `target_id`. |
+| `GET` | `/api/v1/devices?current_version=<version>` | Filter devices by exact current-version string. |
 | `POST` | `/api/v1/devices` | Create a device. Required JSON fields: `uuid`, `project_id`. Optional fields: `target_id`, `model`, `serial_number`, `current_version`. |
 | `GET` | `/api/v1/devices/<id>` | Get a device. |
 | `PATCH` | `/api/v1/devices/<id>` | Update one or more of `project_id`, `target_id`, `model`, `serial_number`, and `current_version`. |
@@ -974,6 +978,7 @@ The limits can also be set in the `[parameters]` section of `config.toml`. Empty
 | `POST` | `/api/v1/devices/<id>/deactivate` | Deactivate a device. |
 
 If `target_id` is omitted when creating a device, the default `Not defined` target is assigned.
+Device list filters can be combined; `project_id` and `project_name` are mutually exclusive, as are `target_id` and `target_name`.
 
 ### REST API user-device assignments
 

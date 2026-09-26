@@ -60,6 +60,13 @@ def client(app):
 
 
 @pytest.fixture()
+def authenticated_client(app, client, user):
+    token = app.extensions["user_auth_service"].create_access_token(user)
+    client.environ_base["HTTP_AUTHORIZATION"] = f"Bearer {token.token}"
+    return client
+
+
+@pytest.fixture()
 def set_api_role(app):
     def _set_api_role(role: str) -> None:
         app.extensions["api_authenticated_user_loader"] = lambda: SimpleNamespace(role=role)
@@ -122,17 +129,26 @@ def project(make_project, user):
 
 @pytest.fixture()
 def make_device(db):
-    def _make(uuid="uuid-1", project_id=None, serial_number=None, is_active=True):
-        target = db.target_get_by_name("Not defined")
+    def _make(
+        uuid="uuid-1",
+        project_id=None,
+        serial_number=None,
+        is_active=True,
+        target_id=None,
+        current_version="1.0.0",
+    ):
+        if target_id is None:
+            target = db.target_get_by_name("Not defined")
+            target_id = target.id
         return db.device_add(
             Device(
                 id=None,
                 uuid=uuid,
                 project_id=project_id,
-                target_id=target.id,
+                target_id=target_id,
                 model="ESP32S3",
                 serial_number=serial_number,
-                current_version="1.0.0",
+                current_version=current_version,
                 last_seen=None,
                 is_active=is_active,
                 created_at=None,
