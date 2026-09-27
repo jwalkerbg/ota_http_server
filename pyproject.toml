@@ -52,6 +52,7 @@ colorama = ">=0.4.6"
 mypy = "^1.18.2"  # Static type checker
 pathlib = ">=1.0"
 pylint = "^4.0"
+requests = ">=2.34"
 
 # Test dependencies
 [tool.poetry.group.test.dependencies]
