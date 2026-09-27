@@ -1293,6 +1293,7 @@ For use behind a reverse proxy with SSL termination, you can disable certificate
     add_firmware_parser.add_argument("--target-id", dest="target_id", type=int, required=False, help="ID of the target the firmware is related to")
     add_firmware_parser.add_argument("--target-name", dest="target_name", type=str, required=False, help="Name of the target the firmware is related to. --target-id takes precedence.")
     change_target_firmware_parser = firmware_subparsers.add_parser("change-target", help="Change firmware target")
+    # firmware change-target
     change_target_firmware_parser.add_argument("--id", dest="firmware_id", type=int, required=False, help="ID of the firmware whose target will be changed")
     change_target_firmware_parser.add_argument("--pid", dest="firmware_pid", type=int, required=False, help="ID of the project the firmware is related to")
     change_target_firmware_parser.add_argument("--version", dest="firmware_version", type=str, required=False, help="Version of the firmware whose target will be changed")
