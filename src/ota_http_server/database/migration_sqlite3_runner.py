@@ -50,6 +50,10 @@ class MigrationRunner:
 
     def migrate_up(self):
         logger.verbose("migrate_up start")
+        migration_files = sorted(self.migrations_dir.glob("*.py"))
+        if self.cfg.config["parameters"]["init_db_migrate"] and not migration_files:
+            raise MigrationError(f"No SQLite migration files found in {self.migrations_dir}")
+
         with self._connect() as conn:
             self._init_schema_table(conn)
             if not self.cfg.config["parameters"]["init_db_migrate"]:
@@ -58,7 +62,7 @@ class MigrationRunner:
             overall_start = time.perf_counter()
             current_version = self._get_current_version(conn)
             logger.verbose(f"Current database version = %d",current_version)
-            for path in sorted(self.migrations_dir.glob("*.py")):
+            for path in migration_files:
                 version = int(path.stem.split("_")[0])
 
                 if version <= current_version:

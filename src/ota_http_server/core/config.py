@@ -2,6 +2,7 @@
 
 import os
 import sys
+from pathlib import Path
 from typing import Dict, Any, Mapping, TypedDict
 import argparse
 from jsonschema import validate, ValidationError
@@ -122,6 +123,7 @@ class ConfigDict(TypedDict):
 # config CLI validation, API authorization) so there is a single source
 # of truth for what roles exist.
 USER_ROLES = frozenset({"admin", "manager", "viewer", "operator"})
+_MIGRATIONS_DIR = Path(__file__).resolve().parent.parent / "database" / "migrations"
 
 class Config:
     def __init__(self) -> None:
@@ -214,11 +216,11 @@ class Config:
                 'dbpassword': "ota_password",
                 'dbpool_size': 10,
                 'dbecho': False,
-                "migrations_dir": "src/ota_http_server/database/migrations/mysql"
+                "migrations_dir": str(_MIGRATIONS_DIR / "mysql")
             },
             "sqlite": {
                 "db_file": "ota_db.sqlite",
-                "migrations_dir": "src/ota_http_server/database/migrations/sqlite"
+                "migrations_dir": str(_MIGRATIONS_DIR / "sqlite")
             },
         }
     }

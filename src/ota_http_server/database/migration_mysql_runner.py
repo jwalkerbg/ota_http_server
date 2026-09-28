@@ -87,6 +87,10 @@ class MigrationMySQLRunner:
 
     def migrate_up(self) -> None:
         logger.verbose("migrate_up start (mysql)")
+        migration_files = sorted(self.migrations_dir.glob("*.py"))
+        if self.cfg.config["parameters"]["init_db_migrate"] and not migration_files:
+            raise MigrationError(f"No MySQL migration files found in {self.migrations_dir}")
+
         conn = self._connect()
         try:
             self._init_schema_table(conn)
@@ -98,7 +102,7 @@ class MigrationMySQLRunner:
             logger.verbose("Current database version = %d", current_version)
 
             migration_conn = MySQLMigrationConnection(conn)
-            for path in sorted(self.migrations_dir.glob("*.py")):
+            for path in migration_files:
                 version = int(path.stem.split("_")[0])
                 if version <= current_version:
                     continue

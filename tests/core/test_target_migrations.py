@@ -4,7 +4,49 @@ from types import SimpleNamespace
 
 import pytest
 
+from ota_http_server.core.config import Config
+from ota_http_server.database.migration_mysql_runner import MigrationMySQLRunner, MigrationError
+from ota_http_server.database.migration_sqlite3_runner import MigrationError as SQLiteMigrationError
 from ota_http_server.database.migration_sqlite3_runner import MigrationRunner
+
+
+def test_default_migration_paths_resolve_from_package_outside_repository(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    cfg = Config().config
+
+    for backend in ("mysql", "sqlite"):
+        migrations_dir = Path(cfg["database"][backend]["migrations_dir"])
+        assert migrations_dir.is_dir()
+        assert len(list(migrations_dir.glob("[0-9]*.py"))) == 8
+
+
+def test_mysql_migration_runner_rejects_empty_migration_directory(tmp_path):
+    cfg = SimpleNamespace(
+        config={
+            "database": {"mysql": {"migrations_dir": str(tmp_path)}},
+            "parameters": {"init_db_migrate": True},
+        }
+    )
+    runner = MigrationMySQLRunner(cfg)
+
+    with pytest.raises(MigrationError, match="No MySQL migration files found"):
+        runner.migrate_up()
+
+
+def test_sqlite_migration_runner_rejects_empty_migration_directory(tmp_path):
+    cfg = SimpleNamespace(
+        config={
+            "database": {"sqlite": {"migrations_dir": str(tmp_path)}},
+            "parameters": {
+                "app_paths": SimpleNamespace(database_sqlite=tmp_path / "ota.sqlite"),
+                "init_db_migrate": True,
+            },
+        }
+    )
+    runner = MigrationRunner(cfg)
+
+    with pytest.raises(SQLiteMigrationError, match="No SQLite migration files found"):
+        runner.migrate_up()
 
 
 def test_sqlite_migration_creates_targets_and_target_foreign_keys(tmp_path):
