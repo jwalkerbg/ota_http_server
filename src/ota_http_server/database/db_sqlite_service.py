@@ -1,6 +1,7 @@
 # db_sqlite_service.py
 
 import sqlite3
+from contextlib import contextmanager
 from pathlib import Path
 from datetime import datetime, UTC
 
@@ -84,13 +85,18 @@ class DatabaseSqliteService:
         self.migration_runner = MigrationRunner(cfg)
         self.app_paths:AppPaths = self.cfg.config['parameters']['app_paths']
 
+    @contextmanager
     def _connect(self):
         conn = sqlite3.connect(self.app_paths.database_sqlite)
-        conn.execute("PRAGMA foreign_keys = ON;")
-        if self.cfg.config["parameters"]["trace_sql"]:
-            conn.set_trace_callback(lambda sql: logger.debug("SQL: %s", sql))
-        conn.row_factory = sqlite3.Row
-        return conn
+        try:
+            conn.execute("PRAGMA foreign_keys = ON;")
+            if self.cfg.config["parameters"]["trace_sql"]:
+                conn.set_trace_callback(lambda sql: logger.debug("SQL: %s", sql))
+            conn.row_factory = sqlite3.Row
+            with conn:
+                yield conn
+        finally:
+            conn.close()
 
     def init_db(self):
         self.migration_runner.migrate_up()

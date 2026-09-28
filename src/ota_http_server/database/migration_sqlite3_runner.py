@@ -3,6 +3,7 @@
 import time
 import sqlite3
 import importlib.util
+from contextlib import contextmanager
 from pathlib import Path
 
 from ota_http_server.core.config import Config
@@ -21,12 +22,17 @@ class MigrationRunner:
         self.migrations_dir = Path(migrations_dir).expanduser().resolve()
         self.app_paths:AppPaths = self.cfg.config['parameters']['app_paths']
 
+    @contextmanager
     def _connect(self):
         conn = sqlite3.connect(self.app_paths.database_sqlite)
-        conn.execute("PRAGMA foreign_keys = ON;")
-        if  self.cfg.config["parameters"]["trace_sql"]:
-            conn.set_trace_callback(lambda sql: logger.debug("SQL: %s", sql))
-        return conn
+        try:
+            conn.execute("PRAGMA foreign_keys = ON;")
+            if self.cfg.config["parameters"]["trace_sql"]:
+                conn.set_trace_callback(lambda sql: logger.debug("SQL: %s", sql))
+            with conn:
+                yield conn
+        finally:
+            conn.close()
 
     def _init_schema_table(self, conn):
         conn.execute("""

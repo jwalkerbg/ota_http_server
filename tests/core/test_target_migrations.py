@@ -8,6 +8,7 @@ from ota_http_server.core.config import Config
 from ota_http_server.database.migration_mysql_runner import MigrationMySQLRunner, MigrationError
 from ota_http_server.database.migration_sqlite3_runner import MigrationError as SQLiteMigrationError
 from ota_http_server.database.migration_sqlite3_runner import MigrationRunner
+from ota_http_server.database.db_sqlite_service import DatabaseSqliteService
 
 
 def test_default_migration_paths_resolve_from_package_outside_repository(tmp_path, monkeypatch):
@@ -47,6 +48,26 @@ def test_sqlite_migration_runner_rejects_empty_migration_directory(tmp_path):
 
     with pytest.raises(SQLiteMigrationError, match="No SQLite migration files found"):
         runner.migrate_up()
+
+
+def test_sqlite_connection_helpers_close_connections_on_exit(tmp_path):
+    cfg = SimpleNamespace(
+        config={
+            "database": {"sqlite": {"migrations_dir": str(tmp_path)}},
+            "parameters": {
+                "app_paths": SimpleNamespace(database_sqlite=tmp_path / "ota.sqlite"),
+                "trace_sql": False,
+            },
+        }
+    )
+    runners = (MigrationRunner(cfg), DatabaseSqliteService(cfg))
+
+    for runner in runners:
+        with runner._connect() as connection:
+            assert connection.execute("SELECT 1").fetchone()[0] == 1
+
+        with pytest.raises(sqlite3.ProgrammingError, match="closed database"):
+            connection.execute("SELECT 1")
 
 
 def test_sqlite_migration_creates_targets_and_target_foreign_keys(tmp_path):
