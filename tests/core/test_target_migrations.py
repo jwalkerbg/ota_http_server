@@ -1,4 +1,5 @@
 import sqlite3
+from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -9,6 +10,43 @@ from ota_http_server.database.migration_mysql_runner import MigrationMySQLRunner
 from ota_http_server.database.migration_sqlite3_runner import MigrationError as SQLiteMigrationError
 from ota_http_server.database.migration_sqlite3_runner import MigrationRunner
 from ota_http_server.database.db_sqlite_service import DatabaseSqliteService
+
+
+def test_mysql_005_renames_device_column_with_change_column_compatibility():
+    migration_path = (
+        Path(__file__).parents[2]
+        / "src"
+        / "ota_http_server"
+        / "database"
+        / "migrations"
+        / "mysql"
+        / "005_rename_device_id_to_uuid.py"
+    )
+    spec = spec_from_file_location("migration_005_mysql", migration_path)
+    assert spec is not None and spec.loader is not None
+    module = module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    class RecordingConnection:
+        statements: list[str]
+
+        def __init__(self):
+            self.statements = []
+
+        def execute(self, sql, params=None):
+            self.statements.append(" ".join(sql.split()))
+
+    conn = RecordingConnection()
+    module.migration.up(conn)
+    assert conn.statements == [
+        "ALTER TABLE devices CHANGE COLUMN device_id uuid VARCHAR(255) NOT NULL"
+    ]
+
+    conn.statements.clear()
+    module.migration.down(conn)
+    assert conn.statements == [
+        "ALTER TABLE devices CHANGE COLUMN uuid device_id VARCHAR(255) NOT NULL"
+    ]
 
 
 def test_default_migration_paths_resolve_from_package_outside_repository(tmp_path, monkeypatch):

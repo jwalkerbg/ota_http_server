@@ -80,8 +80,8 @@ def run_app(cfg:Config) -> None:
         logger.verbose("config = %s",str(cfg.config))
         try:
             db_service.db_command_handler()
-        except:
-            logger.error("%s", str(e), exc_info=cfg.config['logging']['exc_full_stack'])
+        except Exception as error:
+            logger.error("%s", str(error), exc_info=cfg.config['logging']['exc_full_stack'])
         finally:
             logger.info("Exiting db CLI")
     elif cfg.config['command'] == 'user':

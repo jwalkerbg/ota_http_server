@@ -9,18 +9,12 @@ class Migration_005(Migration):
 
     def up(self, conn: typing.Any) -> None:
         conn.execute(
-            """
-            ALTER TABLE devices
-            RENAME COLUMN device_id TO uuid
-            """
+            "ALTER TABLE devices CHANGE COLUMN device_id uuid VARCHAR(255) NOT NULL"
         )
 
     def down(self, conn: typing.Any) -> None:
         conn.execute(
-            """
-            ALTER TABLE devices
-            RENAME COLUMN uuid TO device_id
-            """
+            "ALTER TABLE devices CHANGE COLUMN uuid device_id VARCHAR(255) NOT NULL"
         )
 
 
