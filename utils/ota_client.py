@@ -4,13 +4,59 @@ import sys
 import requests
 
 
-BASE_URL = "http://127.0.0.1:8071"
+BASE_URL = "https://example.com:8070"
 
 USERNAME = "imc"
 PASSWORD = "azsxdcfv"
 
 OTA_EXPIRES_SECONDS = 1800
 OUTPUT_FILE = "firmware.bin"
+
+
+def print_request(response, show_body=False):
+    """Print request and response information for verbose mode."""
+
+    request = response.request
+
+    print()
+    print("============================================================")
+    print("REQUEST")
+    print("============================================================")
+    print(f"{request.method} {request.url}")
+
+    print("\nRequest headers:")
+    for name, value in request.headers.items():
+        # Never print credentials/tokens in clear text.
+        if name.lower() == "authorization":
+            value = "Bearer <redacted>"
+
+        print(f"  {name}: {value}")
+
+    if request.body:
+        body = request.body
+
+        if isinstance(body, bytes):
+            body = body.decode("utf-8", errors="replace")
+
+        print("\nRequest body:")
+        print(body)
+
+    print()
+    print("============================================================")
+    print("RESPONSE")
+    print("============================================================")
+    print(f"HTTP {response.status_code} {response.reason}")
+
+    print("\nResponse headers:")
+    for name, value in response.headers.items():
+        print(f"  {name}: {value}")
+
+    if show_body:
+        print("\nResponse body:")
+        print(response.text)
+
+    print("============================================================")
+    print()
 
 
 def main():
@@ -47,18 +93,17 @@ def main():
         help="CA certificate PEM file used to verify the HTTPS server",
     )
 
+    parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Print HTTP requests and responses",
+    )
+
     args = parser.parse_args()
 
     # ------------------------------------------------------------
     # Configure certificate verification
     # ------------------------------------------------------------
-    #
-    # If --cert is specified, requests uses that certificate/CA
-    # file to verify the HTTPS server.
-    #
-    # If --cert is not specified, requests uses its normal
-    # certificate verification behavior.
-    #
     verify = args.cert if args.cert else True
 
     # ------------------------------------------------------------
@@ -81,6 +126,9 @@ def main():
             timeout=30,
             verify=verify,
         )
+
+        if args.verbose:
+            print_request(response, show_body=True)
 
         response.raise_for_status()
 
@@ -110,6 +158,9 @@ def main():
             verify=verify,
         )
 
+        if args.verbose:
+            print_request(response, show_body=True)
+
         response.raise_for_status()
 
         ota_data = response.json()
@@ -135,6 +186,10 @@ def main():
             timeout=60,
             verify=verify,
         )
+
+        if args.verbose:
+            # Do not print the binary response body.
+            print_request(response, show_body=False)
 
         response.raise_for_status()
 
@@ -188,4 +243,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
