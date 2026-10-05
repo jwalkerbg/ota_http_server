@@ -134,7 +134,7 @@ def send_mqtt_ota_command(
     payload = {
         "cid": MQTT_CID,
         "client": client_uuid,
-        "command": "OT",
+        "command": "OV",
         "data": {
             "v0": ota_jwt,
         },
