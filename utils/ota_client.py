@@ -27,12 +27,15 @@ MQTT_PORT = 1883
 MQTT_CID = 23051
 MQTT_QOS = 1
 
+# How long to wait for each ESP32 response
+MQTT_TIMEOUT = 120
+
 
 # ============================================================
 # HTTP helpers
 # ============================================================
 
-def login(session):
+def login(session, verify):
     url = f"{BASE_URL}/api/v1/auth/login"
 
     response = session.post(
@@ -41,6 +44,7 @@ def login(session):
             "username": USERNAME,
             "password": PASSWORD,
         },
+        verify=verify,
     )
 
     response.raise_for_status()
@@ -50,7 +54,9 @@ def login(session):
     try:
         return data["access_token"]
     except KeyError:
-        raise RuntimeError(f"Login response does not contain access_token: {data}")
+        raise RuntimeError(
+            f"Login response does not contain access_token: {data}"
+        )
 
 
 def request_ota_token(
@@ -60,6 +66,7 @@ def request_ota_token(
     project,
     current_vs,
     download_vs,
+    verify,
 ):
     url = f"{BASE_URL}/api/v1/auth/ota"
 
@@ -80,6 +87,7 @@ def request_ota_token(
         url,
         headers=headers,
         json=payload,
+        verify=verify,
     )
 
     response.raise_for_status()
@@ -89,10 +97,17 @@ def request_ota_token(
     try:
         return data["token"]
     except KeyError:
-        raise RuntimeError(f"OTA response does not contain token: {data}")
+        raise RuntimeError(
+            f"OTA response does not contain token: {data}"
+        )
 
 
-def download_firmware(session, ota_jwt, output_file, verify):
+def download_firmware(
+    session,
+    ota_jwt,
+    output_file,
+    verify,
+):
     url = f"{BASE_URL}/firmware"
 
     headers = {
@@ -109,7 +124,9 @@ def download_firmware(session, ota_jwt, output_file, verify):
     response.raise_for_status()
 
     with open(output_file, "wb") as f:
-        for chunk in response.iter_content(chunk_size=1024 * 1024):
+        for chunk in response.iter_content(
+            chunk_size=1024 * 1024
+        ):
             if chunk:
                 f.write(chunk)
 
@@ -117,8 +134,171 @@ def download_firmware(session, ota_jwt, output_file, verify):
 
 
 # ============================================================
-# MQTT
+# MQTT OTA
 # ============================================================
+
+class MqttOtaHandler:
+    def __init__(
+        self,
+        device_id,
+        expected_cid,
+        timeout,
+        verbose=False,
+    ):
+        self.device_id = device_id
+        self.expected_cid = expected_cid
+        self.timeout = timeout
+        self.verbose = verbose
+
+        self.response_received = False
+        self.ota_result_received = False
+
+        self.response_payload = None
+        self.ota_result_payload = None
+
+        self.response_error = None
+        self.ota_result = None
+
+    @property
+    def response_topic(self):
+        return f"@/{self.device_id}/RSP/JSON"
+
+    @property
+    def unsolicited_topic(self):
+        return f"@/{self.device_id}/USL/JSON"
+
+    def on_connect(self, client, userdata, flags, reason_code, properties):
+        if reason_code != 0:
+            self.response_error = (
+                f"MQTT connection failed: {reason_code}"
+            )
+            return
+
+        if self.verbose:
+            print("MQTT connected.")
+
+        result1, _ = client.subscribe(
+            self.response_topic,
+            qos=MQTT_QOS,
+        )
+
+        result2, _ = client.subscribe(
+            self.unsolicited_topic,
+            qos=MQTT_QOS,
+        )
+
+        if result1 != mqtt.MQTT_ERR_SUCCESS:
+            self.response_error = (
+                f"Failed to subscribe to {self.response_topic}: "
+                f"{result1}"
+            )
+            return
+
+        if result2 != mqtt.MQTT_ERR_SUCCESS:
+            self.response_error = (
+                f"Failed to subscribe to {self.unsolicited_topic}: "
+                f"{result2}"
+            )
+            return
+
+        if self.verbose:
+            print(f"Subscribed: {self.response_topic}")
+            print(f"Subscribed: {self.unsolicited_topic}")
+
+    def on_message(self, client, userdata, message):
+        try:
+            payload_text = message.payload.decode("utf-8")
+
+            if self.verbose:
+                print()
+                print("MQTT message received:")
+                print(f"Topic:   {message.topic}")
+                print(f"Payload: {payload_text}")
+
+            payload = json.loads(payload_text)
+
+        except Exception as e:
+            if self.verbose:
+                print(
+                    f"Could not decode MQTT message: {e}"
+                )
+            return
+
+        # ----------------------------------------------------
+        # Command acknowledgement
+        # ----------------------------------------------------
+
+        if message.topic == self.response_topic:
+
+            cid = payload.get("cid")
+            response = payload.get("response")
+
+            # Ignore acknowledgements belonging to another command.
+            if cid != self.expected_cid:
+                if self.verbose:
+                    print(
+                        f"Ignoring RSP with cid={cid}, "
+                        f"expected {self.expected_cid}"
+                    )
+                return
+
+            self.response_payload = payload
+            self.response_received = True
+
+            if response != "OK":
+                self.response_error = (
+                    f"ESP32 rejected OTA command: {response}"
+                )
+
+            if self.verbose:
+                print(
+                    f"OTA command acknowledgement received "
+                    f"(cid={cid}, response={response})."
+                )
+
+            return
+
+        # ----------------------------------------------------
+        # Unsolicited OTA result
+        # ----------------------------------------------------
+
+        if message.topic == self.unsolicited_topic:
+
+            message_type = payload.get("type")
+            message_src = payload.get("src")
+
+            # We are interested specifically in:
+            #
+            # {
+            #   "type": "finished",
+            #   ...
+            #   "data": {
+            #       "result": 1
+            #   }
+            # }
+            #
+            if message_type != "finished" or message_src != "ota":
+                if self.verbose:
+                    print(
+                        f"Ignoring USL message with type="
+                        f"{message_type}"
+                        f"and source="
+                        f"{message_src}"
+                    )
+                return
+
+            data = payload.get("data", {})
+            result = data.get("result")
+
+            self.ota_result_payload = payload
+            self.ota_result = result
+            self.ota_result_received = True
+
+            if self.verbose:
+                print(
+                    f"OTA result received: result={result}"
+                )
+
 
 def send_mqtt_ota_command(
     ota_jwt,
@@ -127,9 +307,10 @@ def send_mqtt_ota_command(
     broker,
     port,
     qos,
+    timeout,
     verbose=False,
 ):
-    topic = f"@/{device_id}/CMD/JSON"
+    command_topic = f"@/{device_id}/CMD/JSON"
 
     payload = {
         "cid": MQTT_CID,
@@ -146,7 +327,9 @@ def send_mqtt_ota_command(
         print()
         print("MQTT")
         print(f"Broker: {broker}:{port}")
-        print(f"Topic:  {topic}")
+        print(f"Command topic: {command_topic}")
+        print(f"Response topic: @{device_id}/RSP/JSON")
+        print(f"Unsolicited topic: @{device_id}/USL/JSON")
         print("Payload:")
         print(
             json.dumps(
@@ -160,14 +343,31 @@ def send_mqtt_ota_command(
             )
         )
 
+    handler = MqttOtaHandler(
+        device_id=device_id,
+        expected_cid=MQTT_CID,
+        timeout=timeout,
+        verbose=verbose,
+    )
+
     mqtt_client = mqtt.Client(
         mqtt.CallbackAPIVersion.VERSION2,
         client_id=str(uuid.uuid4()),
     )
 
+    mqtt_client.on_connect = handler.on_connect
+    mqtt_client.on_message = handler.on_message
+
     try:
+        # ----------------------------------------------------
+        # Connect
+        # ----------------------------------------------------
+
         if verbose:
-            print(f"Connecting to MQTT broker {broker}:{port}...")
+            print(
+                f"Connecting to MQTT broker "
+                f"{broker}:{port}..."
+            )
 
         mqtt_client.connect(
             broker,
@@ -175,10 +375,55 @@ def send_mqtt_ota_command(
             keepalive=30,
         )
 
+        # ----------------------------------------------------
+        # Start MQTT network processing.
+        #
+        # on_connect will subscribe to both topics.
+        # ----------------------------------------------------
+
         mqtt_client.loop_start()
 
+        # Give on_connect/subscriptions a moment to complete.
+        # loop_start() runs asynchronously.
+        import time
+
+        subscription_wait = 0.1
+        deadline = time.monotonic() + timeout
+
+        while (
+            handler.response_error is None
+            and time.monotonic() < deadline
+        ):
+            # paho doesn't expose a simple "subscriptions ready"
+            # flag, so wait briefly for on_connect to execute.
+            if mqtt_client.is_connected():
+                break
+
+            time.sleep(subscription_wait)
+
+        if not mqtt_client.is_connected():
+            raise RuntimeError(
+                "MQTT connection was not established."
+            )
+
+        # ----------------------------------------------------
+        # Make sure on_connect has had time to subscribe.
+        # ----------------------------------------------------
+
+        time.sleep(0.2)
+
+        if handler.response_error:
+            raise RuntimeError(handler.response_error)
+
+        # ----------------------------------------------------
+        # Publish OTA command
+        # ----------------------------------------------------
+
+        if verbose:
+            print("Publishing OTA command...")
+
         info = mqtt_client.publish(
-            topic,
+            command_topic,
             payload_json,
             qos=qos,
             retain=False,
@@ -192,11 +437,83 @@ def send_mqtt_ota_command(
             )
 
         if verbose:
-            print("MQTT command published successfully.")
+            print("OTA command published successfully.")
+
+        # ----------------------------------------------------
+        # Wait for command acknowledgement
+        # ----------------------------------------------------
+
+        if verbose:
+            print(
+                f"Waiting up to {timeout} seconds "
+                f"for command acknowledgement..."
+            )
+
+        deadline = time.monotonic() + timeout
+
+        while (
+            not handler.response_received
+            and handler.response_error is None
+            and time.monotonic() < deadline
+        ):
+            time.sleep(0.1)
+
+        if handler.response_error:
+            raise RuntimeError(handler.response_error)
+
+        if not handler.response_received:
+            raise TimeoutError(
+                "Timeout waiting for ESP32 OTA command "
+                "acknowledgement."
+            )
+
+        print("ESP32 acknowledged OTA command.")
+
+        # ----------------------------------------------------
+        # Wait for OTA finished notification
+        # ----------------------------------------------------
+
+        if verbose:
+            print(
+                f"Waiting up to {timeout} seconds "
+                f"for OTA result..."
+            )
+
+        deadline = time.monotonic() + timeout
+
+        while (
+            not handler.ota_result_received
+            and time.monotonic() < deadline
+        ):
+            time.sleep(0.1)
+
+        if not handler.ota_result_received:
+            raise TimeoutError(
+                "Timeout waiting for ESP32 OTA result."
+            )
+
+        # ----------------------------------------------------
+        # Interpret OTA result
+        # ----------------------------------------------------
+
+        if handler.ota_result == 1:
+            print("ESP32 OTA completed successfully.")
+            return True
+
+        print(
+            f"ESP32 OTA failed. "
+            f"Result code: {handler.ota_result}"
+        )
+
+        return False
 
     finally:
         mqtt_client.loop_stop()
-        mqtt_client.disconnect()
+
+        try:
+            mqtt_client.disconnect()
+        except Exception:
+            pass
 
 
 # ============================================================
@@ -209,7 +526,6 @@ def setup_http_logging():
         format="%(asctime)s %(levelname)s %(message)s",
     )
 
-    # Prevent requests/urllib3 from dumping Authorization headers.
     logging.getLogger("urllib3").setLevel(logging.DEBUG)
 
 
@@ -219,7 +535,10 @@ def setup_http_logging():
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Request an OTA JWT and either download firmware or send an MQTT OTA command."
+        description=(
+            "Request an OTA JWT and either download firmware "
+            "or send an MQTT OTA command."
+        )
     )
 
     parser.add_argument(
@@ -260,20 +579,29 @@ def main():
     parser.add_argument(
         "--mqtt",
         action="store_true",
-        help="Send OTA command to ESP32 via MQTT instead of downloading firmware",
+        help=(
+            "Send OTA command to ESP32 via MQTT "
+            "instead of downloading firmware"
+        ),
     )
 
     parser.add_argument(
         "--mqtt-broker",
         default=MQTT_BROKER,
-        help=f"MQTT broker hostname (default: {MQTT_BROKER})",
+        help=(
+            f"MQTT broker hostname "
+            f"(default: {MQTT_BROKER})"
+        ),
     )
 
     parser.add_argument(
         "--mqtt-port",
         type=int,
         default=MQTT_PORT,
-        help=f"MQTT broker port (default: {MQTT_PORT})",
+        help=(
+            f"MQTT broker port "
+            f"(default: {MQTT_PORT})"
+        ),
     )
 
     parser.add_argument(
@@ -286,7 +614,20 @@ def main():
         type=int,
         choices=[0, 1, 2],
         default=MQTT_QOS,
-        help=f"MQTT QoS level (default: {MQTT_QOS})",
+        help=(
+            f"MQTT QoS level "
+            f"(default: {MQTT_QOS})"
+        ),
+    )
+
+    parser.add_argument(
+        "--mqtt-timeout",
+        type=int,
+        default=MQTT_TIMEOUT,
+        help=(
+            f"Timeout in seconds for each ESP32 MQTT response "
+            f"(default: {MQTT_TIMEOUT})"
+        ),
     )
 
     args = parser.parse_args()
@@ -294,7 +635,6 @@ def main():
     if args.verbose:
         setup_http_logging()
 
-    # --mqtt-client is required when MQTT mode is selected.
     if args.mqtt and not args.mqtt_client:
         parser.error(
             "--mqtt-client is required when --mqtt is specified"
@@ -311,7 +651,10 @@ def main():
 
         print("Logging in...")
 
-        user_jwt = login(session)
+        user_jwt = login(
+            session,
+            verify,
+        )
 
         if args.verbose:
             print("USER_JWT received.")
@@ -329,31 +672,36 @@ def main():
             project=args.project,
             current_vs=args.current_vs,
             download_vs=args.download_vs,
+            verify=verify,
         )
 
         if args.verbose:
             print("OTA_JWT received.")
 
         # ----------------------------------------------------
-        # 3. Either MQTT command OR HTTP firmware download
+        # 3. MQTT OR HTTP
         # ----------------------------------------------------
 
         if args.mqtt:
+
             print("Sending OTA command via MQTT...")
 
-            send_mqtt_ota_command(
+            success = send_mqtt_ota_command(
                 ota_jwt=ota_jwt,
                 device_id=args.device_id,
                 client_uuid=args.mqtt_client,
                 broker=args.mqtt_broker,
                 port=args.mqtt_port,
                 qos=args.mqtt_qos,
+                timeout=args.mqtt_timeout,
                 verbose=args.verbose,
             )
 
-            print("OTA command sent successfully.")
+            if not success:
+                sys.exit(1)
 
         else:
+
             print("Downloading firmware...")
 
             response = download_firmware(
@@ -364,7 +712,8 @@ def main():
             )
 
             print(
-                f"Firmware downloaded successfully: {OUTPUT_FILE}"
+                f"Firmware downloaded successfully: "
+                f"{OUTPUT_FILE}"
             )
 
             if args.verbose:
@@ -387,10 +736,12 @@ def main():
 
                 if content_disposition:
                     print(
-                        f"Content-Disposition: {content_disposition}"
+                        f"Content-Disposition: "
+                        f"{content_disposition}"
                     )
 
     except requests.HTTPError as e:
+
         print(
             f"HTTP error: {e}",
             file=sys.stderr,
@@ -407,7 +758,17 @@ def main():
 
         sys.exit(1)
 
+    except TimeoutError as e:
+
+        print(
+            f"Timeout: {e}",
+            file=sys.stderr,
+        )
+
+        sys.exit(1)
+
     except Exception as e:
+
         print(
             f"Error: {e}",
             file=sys.stderr,
@@ -418,4 +779,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-    
