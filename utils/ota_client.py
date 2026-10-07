@@ -12,10 +12,10 @@ import paho.mqtt.client as mqtt
 # Configuration
 # ============================================================
 
-BASE_URL = "https://okto7.com:8070"
+BASE_URL = "https://ota.company.com:8070"
 
-USERNAME = "imc"
-PASSWORD = "azsxdcfv"
+USERNAME = "xyz"
+PASSWORD = "12345678"
 
 OTA_EXPIRES_SECONDS = 1800
 
