@@ -1,0 +1,129 @@
+# Release Notes - Version 3.5.0
+
+**Release Date:** 2026-10-08
+**Redmine Task:** #446
+
+## Overview
+
+Version 3.5.0 adds user-device permission management through the CLI and REST API, strengthens JWT-based authorization for administrative and OTA authorization flows, and expands API filtering and deletion capabilities. It also improves the OTA client examples with SSL and MQTT response support and includes database migration and connection-handling fixes.
+
+---
+
+## Major Features
+
+### 1. User-Device Permissions (RT #426, RT #427)
+
+Added management of user-to-device assignments, including expiration information.
+
+**Highlights:**
+- Added the users-devices permissions table and database migrations for SQLite and MySQL.
+- Added CLI operations to create, inspect, check expiration, update expiration, and delete assignments.
+- Added REST API endpoints under `/api/v1/userdevices` for the same operations.
+- Added dedicated `userdevices.*` permissions for authorized roles.
+
+### 2. JWT and OTA Authorization Updates (RT #429, RT #432, RT #433)
+
+Standardized protected administrative and device-token operations around authenticated API requests.
+
+**Highlights:**
+- Added network requirements for protected administrative routes.
+- Removed options that disabled JWT authentication.
+- Replaced `POST /admin/generate_token` with `POST /api/v1/auth/ota`.
+- Authorizes OTA token generation using the REST API JWT, the `device.ota` permission, and a non-expired user-device assignment.
+- Removed the obsolete admin-secret configuration, environment variable, and CLI option.
+
+### 3. REST API Improvements (RT #435, RT #436, RT #437, RT #439, RT #440)
+
+- Added a placeholder when firmware release notes are missing.
+- Simplified the OTA firmware download route.
+- Added filters to firmware and device collection endpoints.
+- Removed the obsolete firmware versions route and duplicate status route.
+- Added support for firmware requests with a trailing slash.
+
+### 4. User, Project, and Device Deletion (RT #441)
+
+Added deletion operations for users, projects, and devices.
+
+**Highlights:**
+- Added CLI delete commands with mutually exclusive selectors.
+- Implemented permanent deletion through the REST API.
+- Added database service support and tests for SQLite and MySQL.
+
+### 5. OTA Client Utilities
+
+Expanded the OTA client examples and supporting utilities.
+
+**Highlights:**
+- Added SSL support and a bundled CA certificate for client examples.
+- Added support for MQTT responses from devices.
+- Added a verbose option and updated the OTA command from `OT` to `OV`.
+- Added utility scripts for downloading OTA images through the server procedure.
+
+---
+
+## Improvements and Fixes
+
+### Database and Migration Reliability (RT #442, RT #443, RT #444)
+
+- Fixed packaged database migration discovery.
+- Ensured SQLite connections are closed after transactions.
+- Fixed MySQL migration `005` compatibility.
+
+### Maintenance
+
+- Updated project dependencies and added `requests` as a development dependency for the OTA client utility.
+- Removed obsolete versions and retired tests for deprecated behavior.
+
+---
+
+## Upgrade Notes
+
+- JWT authentication can no longer be disabled. Update configuration and scripts that relied on JWT-disable options.
+- Replace calls to `POST /admin/generate_token` and the admin-secret header/configuration with authenticated calls to `POST /api/v1/auth/ota`.
+- OTA token generation now requires the caller to have the `device.ota` permission and a non-expired assignment for the requested device.
+- Database migrations run through the existing migration process and create the user-device permissions table.
+
+---
+
+## Testing
+
+This release adds or expands coverage for:
+
+- User-device permission CLI operations, REST API endpoints, role permissions, and migrations.
+- REST API authentication, OTA token authorization, filters, and delete operations.
+- MySQL and SQLite user, project, and device deletion.
+- Database migration discovery and SQLite transaction connection cleanup.
+
+---
+
+## Code Changes Summary
+
+Changes from commit `468e38f4f48de1e5b4324a57241a2cd46c6b3499` (exclusive) through `745f6ce5c7a8329bb16f665a9fe65f611044702b` (inclusive):
+
+- **Files changed:** 61
+- **Lines added:** 4,059
+- **Lines removed:** 1,104
+- **Net change:** +2,955 lines
+
+---
+
+## Known Issues
+
+None identified for this release.
+
+---
+
+## Contributors
+
+- imc (lead developer)
+- Ivan Cenov (release coordination)
+
+---
+
+## Version History
+
+- **3.5.0** - Current Release
+- **3.4.0** - Previous Release
+
+For detailed commit history, see:
+`git log 468e38f4f48de1e5b4324a57241a2cd46c6b3499..745f6ce5c7a8329bb16f665a9fe65f611044702b`
