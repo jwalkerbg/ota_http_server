@@ -27,6 +27,7 @@ from .common import (
     USER_ALREADY_DISABLED,
     USER_ALREADY_ENABLED,
     USER_ALREADY_EXISTS,
+    USER_HAS_PROJECTS,
     USER_NOT_FOUND,
     error_response,
     get_db,
@@ -167,9 +168,15 @@ def _set_user_active(user_id: int, active: bool) -> tuple[object, int]:
 
 @api_v1_users.route("/<int:user_id>", methods=["DELETE"])
 @require_permission(USERS_DELETE)
-def deactivate_user(user_id: int):
-    """DELETE deactivates the user; the account and its audit history are kept."""
-    return _set_user_active(user_id, False)
+def delete_user(user_id: int):
+    """DELETE permanently removes the user; users that still own projects cannot be deleted."""
+    try:
+        get_db().user_delete_by_id(user_id)
+    except USER_NOT_FOUND as exc:
+        return error_response(404, str(exc))
+    except USER_HAS_PROJECTS as exc:
+        return error_response(409, str(exc))
+    return jsonify({"id": user_id, "message": "User deleted"}), 200
 
 
 @api_v1_users.route("/<int:user_id>/activate", methods=["POST"])

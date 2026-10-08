@@ -294,6 +294,7 @@ ota_http_server user list --enabled
 ota_http_server user get --username admin
 ota_http_server user enable --user-id 1
 ota_http_server user disable --username admin
+ota_http_server user delete --user-id 1   # or --username admin (not both)
 ota_http_server user password-change --username john
 ota_http_server user password-change --user-id 2
 ```
@@ -310,6 +311,7 @@ ota_http_server project list --record
 ota_http_server project get --name smart_home
 ota_http_server project enable --id 1
 ota_http_server project disable --name smart_home
+ota_http_server project delete --id 1   # or --name smart_home (not both)
 ```
 
 Projects group firmware and devices, and each project can be enabled or disabled independently.
@@ -333,6 +335,7 @@ ota_http_server device get --uuid 11111111-2222-3333-4444-555555666666
 ota_http_server device change-target --uuid 11111111-2222-3333-4444-555555666666 --target-name ESP32
 ota_http_server device enable --id 1
 ota_http_server device disable --uuid 11111111-2222-3333-4444-555555666666
+ota_http_server device delete --id 1   # or --uuid <uuid> (not both)
 ```
 
 Devices are associated with a project and target and maintain their current firmware version and last-seen status.
@@ -912,7 +915,7 @@ Login and `/auth/me` are available to every role. Authorization does not trust a
 | `POST` | `/api/v1/users` | Create a user. Required JSON fields: `username`, `password`, `email`, `role`. |
 | `GET` | `/api/v1/users/<id>` | Get a user. Password hashes are never returned. |
 | `PATCH` | `/api/v1/users/<id>` | Update one or more of `username`, `email`, and `role`. |
-| `DELETE` | `/api/v1/users/<id>` | Deactivate a user without deleting its record. |
+| `DELETE` | `/api/v1/users/<id>` | Permanently delete a user. Returns `409` if the user still owns projects. |
 | `POST` | `/api/v1/users/<id>/activate` | Activate a user. |
 | `POST` | `/api/v1/users/<id>/deactivate` | Deactivate a user. |
 | `POST` | `/api/v1/users/me/password` | Self-service password change. JSON body: `{"current_password": "old-secret", "new_password": "new-secret", "confirm_password": "new-secret"}`. Requires the current password. |
@@ -956,7 +959,7 @@ The limits can also be set in the `[parameters]` section of `config.toml`. Empty
 | `POST` | `/api/v1/projects` | Create a project. Required JSON fields: `name`, `created_by`; optional fields: `display_name`, `description`. |
 | `GET` | `/api/v1/projects/<id>` | Get a project. |
 | `PATCH` | `/api/v1/projects/<id>` | Update one or more of `name`, `display_name`, and `description`. |
-| `DELETE` | `/api/v1/projects/<id>` | Deactivate a project without deleting its record. |
+| `DELETE` | `/api/v1/projects/<id>` | Permanently delete a project. Returns `409` if devices or firmware still reference it. |
 | `POST` | `/api/v1/projects/<id>/activate` | Activate a project. |
 | `POST` | `/api/v1/projects/<id>/deactivate` | Deactivate a project. |
 
@@ -973,7 +976,7 @@ The limits can also be set in the `[parameters]` section of `config.toml`. Empty
 | `POST` | `/api/v1/devices` | Create a device. Required JSON fields: `uuid`, `project_id`. Optional fields: `target_id`, `model`, `serial_number`, `current_version`. |
 | `GET` | `/api/v1/devices/<id>` | Get a device. |
 | `PATCH` | `/api/v1/devices/<id>` | Update one or more of `project_id`, `target_id`, `model`, `serial_number`, and `current_version`. |
-| `DELETE` | `/api/v1/devices/<id>` | Deactivate a device without deleting its record. |
+| `DELETE` | `/api/v1/devices/<id>` | Permanently delete a device and its user assignments. |
 | `POST` | `/api/v1/devices/<id>/activate` | Activate a device. |
 | `POST` | `/api/v1/devices/<id>/deactivate` | Deactivate a device. |
 

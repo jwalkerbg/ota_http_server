@@ -25,6 +25,7 @@ class ProjectService:
             "add": self._add_project,
             "enable": self._enable_project,
             "disable": self._disable_project,
+            "delete": self._delete_project,
             "get": self._get_project,
             "list": self._list_projects
         }
@@ -93,6 +94,23 @@ class ProjectService:
             return
         if project_name is not None:
             db_service.project_disable_by_name(project_name)
+            return
+
+        raise ValueError(
+            "Project id or name must be provided"
+        )
+
+    def _delete_project(self) -> None:
+        db_service: DatabaseService = self.cfg.config["db_service"]
+        project_id = self.cfg.config["parameters"]['project_id']
+        project_name = self.cfg.config['parameters']['project_name']
+        if project_id is not None and project_name is not None:
+            raise ValueError("Give either project id or name, not both")
+        if project_id is not None:
+            db_service.project_delete_by_id(project_id)
+            return
+        if project_name is not None:
+            db_service.project_delete_by_name(project_name)
             return
 
         raise ValueError(

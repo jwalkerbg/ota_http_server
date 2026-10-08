@@ -34,6 +34,9 @@ class ProjectAlreadyExistsError(Exception):
 class ProjectNotFoundError(Exception):
     pass
 
+class ProjectInUseError(Exception):
+    pass
+
 class ProjectAlreadyEnabledError(Exception):
     pass
 
@@ -262,6 +265,33 @@ class DatabaseSqliteService:
 
     def user_disable_by_username(self, username: str) -> None:
         return self._user_enable_disable("username", username, False)
+
+    def _user_delete(self, column: str, parameter: int | str) -> None:
+        if column not in ("id", "username"):
+            raise ValueError(f"Invalid column '{column}'")
+
+        try:
+            with self._connect() as conn:
+                cursor = conn.execute(
+                    f"DELETE FROM users WHERE {column} = ?",
+                    (parameter,),
+                )
+                if cursor.rowcount == 0:
+                    raise UserNotFoundError(f"User {column}={parameter} not found")
+        except sqlite3.IntegrityError as e:
+            raise UserHasProjectsError(
+                f"User {column}={parameter} cannot be deleted because projects reference it"
+            ) from e
+        except sqlite3.Error as e:
+            raise DatabaseError(
+                f"Database error deleting user {column}={parameter}"
+            ) from e
+
+    def user_delete_by_id(self, user_id: int) -> None:
+        return self._user_delete("id", user_id)
+
+    def user_delete_by_username(self, username: str) -> None:
+        return self._user_delete("username", username)
 
     def _row_to_user(self, row: sqlite3.Row) -> User:
 
@@ -643,6 +673,33 @@ class DatabaseSqliteService:
 
     def project_disable_by_name(self, name: str) -> Project |None:
         return self._project_enable_disable("name", name, False)
+
+    def _project_delete(self, column: str, parameter: int | str) -> None:
+        if column not in ("id", "name"):
+            raise ValueError(f"Invalid column '{column}'")
+
+        try:
+            with self._connect() as conn:
+                cursor = conn.execute(
+                    f"DELETE FROM projects WHERE {column} = ?",
+                    (parameter,),
+                )
+                if cursor.rowcount == 0:
+                    raise ProjectNotFoundError(f"Project {column}={parameter} not found")
+        except sqlite3.IntegrityError as e:
+            raise ProjectInUseError(
+                f"Project {column}={parameter} cannot be deleted because devices or firmware reference it"
+            ) from e
+        except sqlite3.Error as e:
+            raise DatabaseError(
+                f"Database error deleting project {column}={parameter}"
+            ) from e
+
+    def project_delete_by_id(self, id: int) -> None:
+        return self._project_delete("id", id)
+
+    def project_delete_by_name(self, name: str) -> None:
+        return self._project_delete("name", name)
 
     def _project_get(self, column: str, parameter: int | str) -> Project | None:
 
@@ -1145,6 +1202,29 @@ class DatabaseSqliteService:
 
     def device_disable_by_name(self, name: str) -> None:
         return self._device_enable_disable("uuid", name, False)
+
+    def _device_delete(self, column: str, parameter: int | str) -> None:
+        if column not in ("id", "uuid"):
+            raise ValueError(f"Invalid column '{column}'")
+
+        try:
+            with self._connect() as conn:
+                cursor = conn.execute(
+                    f"DELETE FROM devices WHERE {column} = ?",
+                    (parameter,),
+                )
+                if cursor.rowcount == 0:
+                    raise DeviceNotFoundError(f"Device {column}={parameter} not found")
+        except sqlite3.Error as e:
+            raise DatabaseError(
+                f"Database error deleting device {column}={parameter}"
+            ) from e
+
+    def device_delete_by_id(self, id: int) -> None:
+        return self._device_delete("id", id)
+
+    def device_delete_by_name(self, name: str) -> None:
+        return self._device_delete("uuid", name)
 
     def _device_change_target(self, column: str, parameter: int | str, target_id: int) -> None:
         if column not in ("id", "uuid"):

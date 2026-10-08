@@ -56,6 +56,12 @@ class DatabaseService:
     def user_disable_by_username(self, username: str) -> None:
         self._database.user_disable_by_username(username)
 
+    def user_delete_by_id(self, user_id: int) -> None:
+        self._database.user_delete_by_id(user_id)
+
+    def user_delete_by_username(self, username: str) -> None:
+        self._database.user_delete_by_username(username)
+
     def user_get_by_id(self, user_id: int) -> User | None:
         return self._database.user_get_by_id(user_id)
 
@@ -103,6 +109,12 @@ class DatabaseService:
 
     def project_disable_by_name(self, name: str) -> None:
         return self._database.project_disable_by_name(name)
+
+    def project_delete_by_id(self, id: int) -> None:
+        return self._database.project_delete_by_id(id)
+
+    def project_delete_by_name(self, name: str) -> None:
+        return self._database.project_delete_by_name(name)
 
     def project_get_by_id(self, id: int) -> Project | None:
         return self._database.project_get_by_id(id)
@@ -184,6 +196,12 @@ class DatabaseService:
 
     def device_disable_by_name(self, name: str) -> None:
         return self._database.device_disable_by_name(name=name)
+
+    def device_delete_by_id(self, id: int) -> None:
+        return self._database.device_delete_by_id(id=id)
+
+    def device_delete_by_name(self, name: str) -> None:
+        return self._database.device_delete_by_name(name=name)
 
     def device_get_by_id(self, id: int) -> Device | None:
         return self._database.device_get_by_id(id=id)

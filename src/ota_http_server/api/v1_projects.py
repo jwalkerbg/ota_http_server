@@ -17,6 +17,7 @@ from .common import (
     PROJECT_ALREADY_DISABLED,
     PROJECT_ALREADY_ENABLED,
     PROJECT_ALREADY_EXISTS,
+    PROJECT_IN_USE,
     PROJECT_NOT_FOUND,
     USER_NOT_FOUND,
     error_response,
@@ -143,9 +144,15 @@ def _set_project_active(project_id: int, active: bool) -> tuple[object, int]:
 
 @api_v1_projects.route("/<int:project_id>", methods=["DELETE"])
 @require_permission(PROJECTS_DELETE)
-def deactivate_project(project_id: int):
-    """DELETE deactivates the project; the record and its audit history are kept."""
-    return _set_project_active(project_id, False)
+def delete_project(project_id: int):
+    """DELETE permanently removes the project; projects with devices or firmware cannot be deleted."""
+    try:
+        get_db().project_delete_by_id(project_id)
+    except PROJECT_NOT_FOUND as exc:
+        return error_response(404, str(exc))
+    except PROJECT_IN_USE as exc:
+        return error_response(409, str(exc))
+    return jsonify({"id": project_id, "message": "Project deleted"}), 200
 
 
 @api_v1_projects.route("/<int:project_id>/activate", methods=["POST"])

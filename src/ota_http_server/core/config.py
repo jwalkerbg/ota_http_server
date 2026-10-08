@@ -760,6 +760,12 @@ class Config:
                         self.config["parameters"]["user_id"] = config_cli.user_id
                     if config_cli.username is not None:
                         self.config["parameters"]["username"] = config_cli.username
+                # delete
+                if config_cli.user_command == 'delete':
+                    if config_cli.user_id is not None:
+                        self.config["parameters"]["user_id"] = config_cli.user_id
+                    if config_cli.username is not None:
+                        self.config["parameters"]["username"] = config_cli.username
                 # get
                 if config_cli.user_command == 'get':
                     if config_cli.user_id is not None:
@@ -804,6 +810,12 @@ class Config:
                         self.config["parameters"]["project_name"] = config_cli.project_name
                 # disable
                 if config_cli.project_command == "disable":
+                    if config_cli.project_id is not None:
+                        self.config["parameters"]["project_id"] = config_cli.project_id
+                    if config_cli.project_name is not None:
+                        self.config["parameters"]["project_name"] = config_cli.project_name
+                # delete
+                if config_cli.project_command == "delete":
                     if config_cli.project_id is not None:
                         self.config["parameters"]["project_id"] = config_cli.project_id
                     if config_cli.project_name is not None:
@@ -870,6 +882,12 @@ class Config:
                         self.config["parameters"]["device_uuid"] = config_cli.device_uuid
                 # disable
                 if config_cli.device_command == "disable":
+                    if config_cli.device_id is not None:
+                        self.config["parameters"]["device_id"] = config_cli.device_id
+                    if config_cli.device_uuid is not None:
+                        self.config["parameters"]["device_uuid"] = config_cli.device_uuid
+                # delete
+                if config_cli.device_command == "delete":
                     if config_cli.device_id is not None:
                         self.config["parameters"]["device_id"] = config_cli.device_id
                     if config_cli.device_uuid is not None:
@@ -1170,6 +1188,11 @@ For use behind a reverse proxy with SSL termination, you can disable certificate
     disable_user_parser = user_subparsers.add_parser(name="disable", help="Disable user")
     disable_user_parser.add_argument("--user-id", dest="user_id", type=int, required=False, help="ID of the user to be disabled")
     disable_user_parser.add_argument("--username", dest="username", type=str, required=False, help="Username of the user to be disabled. Give --user-id or --username. --user-id takes precedence.")
+    # user delete
+    delete_user_parser = user_subparsers.add_parser(name="delete", help="Permanently delete user")
+    delete_user_group = delete_user_parser.add_mutually_exclusive_group(required=True)
+    delete_user_group.add_argument("--user-id", dest="user_id", type=int, help="ID of the user to be deleted")
+    delete_user_group.add_argument("--username", dest="username", type=str, help="Username of the user to be deleted")
     # user get
     get_user_parser = user_subparsers.add_parser(name="get", help="Get user information")
     get_user_parser.add_argument("--user-id", dest="user_id", type=int, required=False, help="ID of the user to be retrieved")
@@ -1202,6 +1225,11 @@ For use behind a reverse proxy with SSL termination, you can disable certificate
     disable_project_parser = project_subparsers.add_parser(name="disable", help="Disable project")
     disable_project_parser.add_argument("--id", dest="project_id", type=int, required=False, help="ID of the project to be disabled")
     disable_project_parser.add_argument("--name", dest="project_name", type=str, required=False, help="Name of the project to be disabled. Give --id or --name. --id takes precedence.")
+    # project delete
+    delete_project_parser = project_subparsers.add_parser(name="delete", help="Permanently delete project")
+    delete_project_group = delete_project_parser.add_mutually_exclusive_group(required=True)
+    delete_project_group.add_argument("--id", dest="project_id", type=int, help="ID of the project to be deleted")
+    delete_project_group.add_argument("--name", dest="project_name", type=str, help="Name of the project to be deleted")
     # project get
     get_project_parser = project_subparsers.add_parser(name="get", help="Get project information")
     get_project_parser.add_argument("--id", dest="project_id", type=int, required=False, help="ID of the project to be retrieved")
@@ -1245,6 +1273,11 @@ For use behind a reverse proxy with SSL termination, you can disable certificate
     disable_device_parser = device_subparsers.add_parser(name="disable", help="Disable device")
     disable_device_parser.add_argument("--id", dest="device_id", type=int, required=False, help="ID of the device to be disabled")
     disable_device_parser.add_argument("--uuid", dest="device_uuid", type=str, required=False, help="UUIDv4 of the device to be disabled")
+    # device delete
+    delete_device_parser = device_subparsers.add_parser(name="delete", help="Permanently delete device")
+    delete_device_group = delete_device_parser.add_mutually_exclusive_group(required=True)
+    delete_device_group.add_argument("--id", dest="device_id", type=int, help="ID of the device to be deleted")
+    delete_device_group.add_argument("--uuid", dest="device_uuid", type=str, help="UUIDv4 of the device to be deleted")
     # device get
     get_device_parser = device_subparsers.add_parser(name="get", help="Retrieve device information")
     get_device_parser.add_argument("--id", dest="device_id", type=int, required=False, help="ID of the device to be retrieved")

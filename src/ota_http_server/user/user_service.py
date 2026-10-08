@@ -46,6 +46,7 @@ class UserService:
             "add": self._add_user,
             "enable": self._enable_user,
             "disable": self._disable_user,
+            "delete": self._delete_user,
             "get": self._get_user,
             "list": self._list_users,
             "password-change": self._change_user_password
@@ -115,6 +116,23 @@ class UserService:
             return
         if username is not None:
             db_service.user_disable_by_username(username)
+            return
+
+        raise ValueError(
+            "User id or username must be provided"
+        )
+
+    def _delete_user(self) -> None:
+        db_service: DatabaseService = self.cfg.config["db_service"]
+        user_id = self.cfg.config["parameters"]['user_id']
+        username = self.cfg.config['parameters']['username']
+        if user_id is not None and username is not None:
+            raise ValueError("Give either user id or username, not both")
+        if user_id is not None:
+            db_service.user_delete_by_id(user_id)
+            return
+        if username is not None:
+            db_service.user_delete_by_username(username)
             return
 
         raise ValueError(

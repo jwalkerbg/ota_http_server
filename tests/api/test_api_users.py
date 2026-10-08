@@ -151,20 +151,25 @@ def test_patch_user_conflict(client, user, make_user):
     assert response.status_code == 409
 
 
-def test_delete_user_deactivates(client, user, db):
-    response = client.delete(f"/api/v1/users/{user.id}")
+def test_delete_user(client, make_user, db):
+    other = make_user(username="bob")
+
+    response = client.delete(f"/api/v1/users/{other.id}")
 
     assert response.status_code == 200
-    assert response.get_json()["is_active"] is False
-    assert db.user_get_by_id(user.id).is_active is False
+    assert response.get_json() == {"id": other.id, "message": "User deleted"}
+    assert db.user_get_by_id(other.id) is None
 
 
-def test_delete_user_twice_conflicts(client, user):
-    assert client.delete(f"/api/v1/users/{user.id}").status_code == 200
+def test_delete_user_not_found(client):
+    assert client.delete("/api/v1/users/999").status_code == 404
 
-    response = client.delete(f"/api/v1/users/{user.id}")
+
+def test_delete_user_with_projects_conflicts(client, project, db):
+    response = client.delete(f"/api/v1/users/{project.created_by}")
 
     assert response.status_code == 409
+    assert db.user_get_by_id(project.created_by) is not None
 
 
 def test_activate_user(client, user, db):

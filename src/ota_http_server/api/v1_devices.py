@@ -196,9 +196,13 @@ def _set_device_active(device_id: int, active: bool) -> tuple[object, int]:
 
 @api_v1_devices.route("/<int:device_id>", methods=["DELETE"])
 @require_permission(DEVICES_DELETE)
-def deactivate_device(device_id: int):
-    """DELETE deactivates the device; the record and its audit history are kept."""
-    return _set_device_active(device_id, False)
+def delete_device(device_id: int):
+    """DELETE permanently removes the device and its user assignments."""
+    try:
+        get_db().device_delete_by_id(device_id)
+    except DEVICE_NOT_FOUND as exc:
+        return error_response(404, str(exc))
+    return jsonify({"id": device_id, "message": "Device deleted"}), 200
 
 
 @api_v1_devices.route("/<int:device_id>/activate", methods=["POST"])

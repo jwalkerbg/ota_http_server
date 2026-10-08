@@ -41,6 +41,14 @@ USER_ALREADY_DISABLED = (
     db_sqlite_service.UserAlreadyDisabledError,
     db_mysql_service.UserAlreadyDisabledError,
 )
+USER_HAS_PROJECTS = (
+    db_sqlite_service.UserHasProjectsError,
+    db_mysql_service.UserHasProjectsError,
+)
+PROJECT_IN_USE = (
+    db_sqlite_service.ProjectInUseError,
+    db_mysql_service.ProjectInUseError,
+)
 PROJECT_NOT_FOUND = (
     db_sqlite_service.ProjectNotFoundError,
     db_mysql_service.ProjectNotFoundError,

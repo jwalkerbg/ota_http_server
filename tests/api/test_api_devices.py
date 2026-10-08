@@ -126,20 +126,16 @@ def test_patch_device_unknown_target(client, device):
     assert response.status_code == 400
 
 
-def test_delete_device_deactivates(client, device, db):
+def test_delete_device(client, device, db):
     response = client.delete(f"/api/v1/devices/{device.id}")
 
     assert response.status_code == 200
-    assert response.get_json()["is_active"] is False
-    assert db.device_get_by_id(device.id).is_active is False
+    assert response.get_json() == {"id": device.id, "message": "Device deleted"}
+    assert db.device_get_by_id(device.id) is None
 
 
-def test_delete_device_twice_conflicts(client, device):
-    assert client.delete(f"/api/v1/devices/{device.id}").status_code == 200
-
-    response = client.delete(f"/api/v1/devices/{device.id}")
-
-    assert response.status_code == 409
+def test_delete_device_not_found(client):
+    assert client.delete("/api/v1/devices/999").status_code == 404
 
 
 def test_activate_device(client, device, db):

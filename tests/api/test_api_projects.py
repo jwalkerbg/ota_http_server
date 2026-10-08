@@ -119,20 +119,23 @@ def test_patch_project_name_conflict(client, make_project, user):
     assert response.status_code == 409
 
 
-def test_delete_project_deactivates(client, project, db):
+def test_delete_project(client, project, db):
     response = client.delete(f"/api/v1/projects/{project.id}")
 
     assert response.status_code == 200
-    assert response.get_json()["is_active"] is False
-    assert db.project_get_by_id(project.id).is_active is False
+    assert response.get_json() == {"id": project.id, "message": "Project deleted"}
+    assert db.project_get_by_id(project.id) is None
 
 
-def test_delete_project_twice_conflicts(client, project):
-    assert client.delete(f"/api/v1/projects/{project.id}").status_code == 200
+def test_delete_project_not_found(client):
+    assert client.delete("/api/v1/projects/999").status_code == 404
 
-    response = client.delete(f"/api/v1/projects/{project.id}")
+
+def test_delete_project_with_device_conflicts(client, device, db):
+    response = client.delete(f"/api/v1/projects/{device.project_id}")
 
     assert response.status_code == 409
+    assert db.project_get_by_id(device.project_id) is not None
 
 
 def test_activate_project(client, project, db):

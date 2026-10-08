@@ -27,6 +27,7 @@ class DeviceService:
             "change-target": self._change_target,
             "enable": self._enable_device,
             "disable": self._disable_device,
+            "delete": self._delete_device,
             "get": self._get_device,
             "list": self._list_devices
         }
@@ -162,6 +163,25 @@ class DeviceService:
             return
         if uuid is not None:
             db_service.device_disable_by_name(uuid)
+            return
+
+        raise ValueError(
+            "Device id or uuid must be provided"
+        )
+
+    def _delete_device(self) -> None:
+        id = self.cfg.config["parameters"]["device_id"]
+        uuid = self.cfg.config["parameters"]["device_uuid"]
+
+        db_service: DatabaseService = self.cfg.config["db_service"]
+
+        if id is not None and uuid is not None:
+            raise ValueError("Give either device id or uuid, not both")
+        if id is not None:
+            db_service.device_delete_by_id(id)
+            return
+        if uuid is not None:
+            db_service.device_delete_by_name(uuid)
             return
 
         raise ValueError(
