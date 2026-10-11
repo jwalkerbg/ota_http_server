@@ -29,11 +29,11 @@ verbose = 3
 dbtype = "sqlite"
 
 [database.mysql]
-dbhost = "localhost"
-dbport = 3306
-database = "ota_db"
-dbuser = "ota_user"
-dbpassword = "SlavaUkraini"
+myhost = "localhost"
+myport = 3306
+mydatabase = "ota_db"
+myuser = "ota_user"
+mypassword = "SlavaUkraini"
 
 [database.postgresql]
 pghost = "localhost"

@@ -20,23 +20,23 @@ MIGRATIONS_DIR = (
 )
 
 _ENV = {
-    "dbhost": os.environ.get("OTA_TEST_MYSQL_HOST"),
-    "dbport": int(os.environ.get("OTA_TEST_MYSQL_PORT", "3306")),
-    "database": os.environ.get("OTA_TEST_MYSQL_DB"),
-    "dbuser": os.environ.get("OTA_TEST_MYSQL_USER"),
-    "dbpassword": os.environ.get("OTA_TEST_MYSQL_PASSWORD"),
+    "myhost": os.environ.get("OTA_TEST_MYSQL_HOST"),
+    "myport": int(os.environ.get("OTA_TEST_MYSQL_PORT", "3306")),
+    "mydatabase": os.environ.get("OTA_TEST_MYSQL_DB"),
+    "myuser": os.environ.get("OTA_TEST_MYSQL_USER"),
+    "mypassword": os.environ.get("OTA_TEST_MYSQL_PASSWORD"),
 }
 
 pytestmark = pytest.mark.skipif(
-    not all(_ENV[k] for k in ("dbhost", "database", "dbuser", "dbpassword")),
+    not all(_ENV[k] for k in ("myhost", "mydatabase", "myuser", "mypassword")),
     reason="OTA_TEST_MYSQL_* environment variables are not set",
 )
 
 
 def _drop_all_tables() -> None:
     conn = mysql.connector.connect(
-        host=_ENV["dbhost"], port=_ENV["dbport"], database=_ENV["database"],
-        user=_ENV["dbuser"], password=_ENV["dbpassword"],
+        host=_ENV["myhost"], port=_ENV["myport"], database=_ENV["mydatabase"],
+        user=_ENV["myuser"], password=_ENV["mypassword"],
     )
     try:
         cursor = conn.cursor()
@@ -52,11 +52,11 @@ def _drop_all_tables() -> None:
 
 @pytest.fixture()
 def db():
-    assert _ENV["database"].endswith("_test"), "refusing to wipe a non-test database"
+    assert _ENV["mydatabase"].endswith("_test"), "refusing to wipe a non-test database"
     _drop_all_tables()
     cfg = SimpleNamespace(config={
         "parameters": {"trace_sql": False, "init_db_migrate": True, "migrate_dry_run": False},
-        "database": {"mysql": {**_ENV, "dbecho": False, "migrations_dir": str(MIGRATIONS_DIR)}},
+        "database": {"mysql": {**_ENV, "myecho": False, "migrations_dir": str(MIGRATIONS_DIR)}},
     })
     service = m.DatabaseMySQLService(cfg)
     service.init_db()

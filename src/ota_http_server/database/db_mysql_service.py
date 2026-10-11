@@ -126,16 +126,16 @@ class DatabaseMySQLService:
     def _connect(self):
         db_config = self.cfg.config["database"]["mysql"]
         conn = mysql.connector.connect(
-            host=db_config["dbhost"],
-            port=db_config["dbport"],
-            database=db_config["database"],
-            user=db_config["dbuser"],
-            password=db_config["dbpassword"],
+            host=db_config["myhost"],
+            port=db_config["myport"],
+            database=db_config["mydatabase"],
+            user=db_config["myuser"],
+            password=db_config["mypassword"],
             autocommit=False,
         )
         sql_trace_enabled = is_sql_tracing_enabled(
             self.cfg.config["parameters"]["trace_sql"],
-            db_config["dbecho"],
+            db_config["myecho"],
         )
         return with_mysql_sql_tracing(conn, logger, sql_trace_enabled)
 
