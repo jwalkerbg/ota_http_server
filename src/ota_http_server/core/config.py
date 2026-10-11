@@ -108,10 +108,21 @@ class databaseSQLiteConfig(TypedDict, total=False):
     db_file: str
     migrations_dir: str
 
+class DatabasePostgreSQLConfig(TypedDict, total=False):
+    pghost: str
+    pgport: int
+    pgdatabase: str
+    pguser: str
+    pgpassword: str
+    pgpool_size: int
+    pgecho: bool
+    migrations_dir: str
+
 class DatabaseConfig(TypedDict, total=False):
     dbtype: str
     mysql: DatabaseMySQLConfig
     sqlite: databaseSQLiteConfig
+    postgresql: DatabasePostgreSQLConfig
 
 class ConfigDict(TypedDict):
     template: TemplateConfig
@@ -222,6 +233,16 @@ class Config:
                 "db_file": "ota_db.sqlite",
                 "migrations_dir": str(_MIGRATIONS_DIR / "sqlite")
             },
+            "postgresql": {
+                "pghost": "localhost",
+                "pgport": 5432,
+                "pgdatabase": "ota_db",
+                "pguser": "ota_user",
+                "pgpassword": "ota_password",
+                "pgpool_size": 10,
+                "pgecho": False,
+                "migrations_dir": str(_MIGRATIONS_DIR / "postgresql")
+            }
         }
     }
 
@@ -498,6 +519,36 @@ class Config:
                             }
                         },
                         "additionalProperties": False
+                    },
+                    "postgresql": {
+                        "type": "object",
+                        "properties": {
+                            "pghost": {
+                                "type": "string"
+                            },
+                            "pgport": {
+                                "type": "number"
+                            },
+                            "pgdatabase": {
+                                "type": "string"
+                            },
+                            "pguser": {
+                                "type": "string"
+                            },
+                            "pgpassword": {
+                                "type": "string"
+                            },
+                            "pgpool_size": {
+                                "type": "number"
+                            },
+                            "pgecho": {
+                                "type": "boolean"
+                            },
+                            "migrations_dir": {
+                                "type": "string"
+                            }
+                        },
+                        "additionalProperties": False
                     }
                 },
                 "additionalProperties": False
@@ -615,6 +666,15 @@ class Config:
                 },
                 "sqlite": {
                     "dbfile": os.getenv("OTA_DB_FILE")
+                },
+                "postgresql": {
+                    "pghost": os.getenv("OTA_DB_HOST"),
+                    "pgport": os.getenv("OTA_DB_PORT"),
+                    "pgdatabase": os.getenv("OTA_DB"),
+                    "pguser": os.getenv("OTA_DB_USER"),
+                    "pgpassword": os.getenv("OTA_DB_PASSWORD"),
+                    "pgpool_size": os.getenv("OTA_DB_POOL_SIZE"),
+                    "pgecho": os.getenv("OTA_DB_ECHO")
                 }
             }
         }
@@ -679,9 +739,28 @@ class Config:
                 self.config['database']['mysql']['dbpool_size'] = config_cli.dbpool_size
             if config_cli.dbecho is not None:
                 self.config['database']['mysql']['dbecho'] = config_cli.dbecho
+
             # SQLite database options
             if config_cli.dbfile is not None:
                 self.config['database']['sqlite']['dbfile'] = config_cli.dbfile
+
+            # PostgreSQL database options
+            if config_cli.pghost is not None:
+                self.config['database']['postgresql']['dbhost'] = config_cli.pghost
+            if config_cli.pgport is not None:
+                self.config['database']['postgresql']['dbport'] = config_cli.pgport
+            if config_cli.pgdatabase is not None:
+                self.config['database']['postgresql']['database'] = config_cli.pgdatabase
+            if config_cli.pguser is not None:
+                self.config['database']['postgresql']['dbuser'] = config_cli.pguser
+            if config_cli.pgpassword is not None:
+                self.config['database']['postgresql']['dbpassword'] = config_cli.pgpassword
+            if config_cli.pgpool_size is not None:
+                self.config['database']['postgresql']['dbpool_size'] = config_cli.pgpool_size
+            if config_cli.pgecho is not None:
+                self.config['database']['postgresql']['dbecho'] = config_cli.pgecho
+
+            # trace sql
             if config_cli.trace_sql is not None:
                 self.config["parameters"]["trace_sql"] = config_cli.trace_sql
 
@@ -1104,7 +1183,7 @@ For use behind a reverse proxy with SSL termination, you can disable certificate
 
     # database options
     db_group = parser.add_argument_group("Database")
-    db_group.add_argument("--dbtype", dest="dbtype", type=str, choices=["mysql", "sqlite"], required=False, help="Database type (mysql or sqlite), overrides OTA_DB_TYPE environment variable")
+    db_group.add_argument("--dbtype", dest="dbtype", type=str, choices=["mysql", "sqlite", "postgresql"], required=False, help="Database type (mysql, sqlite, or postgresql), overrides OTA_DB_TYPE environment variable")
     # MySQL options
     db_group.add_argument("--dbhost", dest="dbhost", type=str, help="Database host (default 'localhost'), overrides OTA_DB_HOST environment variable")
     db_group.add_argument("--dbport", dest="dbport", type=int, help="Database port (default 3306), overrides OTA_DB_PORT environment variable")
@@ -1117,6 +1196,18 @@ For use behind a reverse proxy with SSL termination, you can disable certificate
     dbecho_group.add_argument("--no-dbecho", dest="dbecho", action="store_const", const=False, help="Disable database echo (default False), overrides OTA_DB_ECHO environment variable")
     # SQLite options
     db_group.add_argument("--dbfile", dest="dbfile", type=str, help="Path to the SQLite database file (default 'ota_db.sqlite'), overrides OTA_DB_FILE environment variable")
+    # PostgreSQL options
+    db_group.add_argument("--pghost", dest="pghost", type=str, help="PostgreSQL host (default 'localhost'), overrides OTA_PG_HOST environment variable")
+    db_group.add_argument("--pgport", dest="pgport", type=int, help="PostgreSQL port (default 5432), overrides OTA_PG_PORT environment variable")
+    db_group.add_argument("--pgdatabase", dest="pgdatabase", type=str, help="PostgreSQL database name (default 'ota_db'), overrides OTA_PG_DATABASE environment variable")
+    db_group.add_argument("--pguser", dest="pguser", type=str, help="PostgreSQL user (default 'ota_user'), overrides OTA_PG_USER environment variable")
+    db_group.add_argument("--pgpassword", dest="pgpassword", type=str, help="PostgreSQL password, overrides OTA_PG_PASSWORD environment variable")
+    db_group.add_argument("--pgpool-size", dest="pgpool_size", type=int, help="PostgreSQL connection pool size (default 10), overrides OTA_PG_POOL_SIZE environment variable")
+    pgecho_group = db_group.add_mutually_exclusive_group()
+    pgecho_group.add_argument("--pgecho", dest="pgecho", action="store_const", const=True, help="Enable PostgreSQL echo (default False), overrides OTA_PG_ECHO environment variable")
+    pgecho_group.add_argument("--no-pgecho", dest="pgecho", action="store_const", const=False, help="Disable PostgreSQL echo (default False), overrides OTA_PG_ECHO environment variable")
+
+    # trace SQL
     trace_sql_group = parser.add_mutually_exclusive_group()
     trace_sql_group.add_argument("--trace-sql", dest="trace_sql", action="store_const", const=True, help="Activates SQL tracing")
     trace_sql_group.add_argument("--no-trace-sql", dest="trace_sql", action="store_const", const=False, help="De-activates SQL tracing")
