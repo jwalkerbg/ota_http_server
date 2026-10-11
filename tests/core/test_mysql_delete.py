@@ -56,7 +56,7 @@ def db():
     _drop_all_tables()
     cfg = SimpleNamespace(config={
         "parameters": {"trace_sql": False, "init_db_migrate": True, "migrate_dry_run": False},
-        "database": {"mysql": {**_ENV, "myecho": False, "migrations_dir": str(MIGRATIONS_DIR)}},
+        "database": {"mysql": {**_ENV, "myecho": False, "mypool_size": 2, "migrations_dir": str(MIGRATIONS_DIR)}},
     })
     service = m.DatabaseMySQLService(cfg)
     service.init_db()
