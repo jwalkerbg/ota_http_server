@@ -38,7 +38,7 @@ dbpassword = "SlavaUkraini"
 [database.postgres]
 pghost = "localhost"
 pgport = 5432
-pgtabase = "ota_db"
+pgdatabase = "ota_db"
 pguser = "ota_user"
 pgpassword = "SlavaUkraini"
 
