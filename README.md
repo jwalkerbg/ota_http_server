@@ -151,7 +151,7 @@ ota_http_server --help
 
 ## Database
 
-The application keeps firmware and metadata in a relational database. By default it uses SQLite (`ota_db.sqlite`), but the project also supports a MySQL backend through the `database` configuration section. The database model is centered around four main entities: users, projects, devices, and firmware records.
+The application keeps firmware and metadata in a relational database. By default it uses SQLite (`ota_db.sqlite`), but the project also supports MySQL and PostgreSQL backends through the `database` configuration section. The database model is centered around four main entities: users, projects, devices, and firmware records.
 
 ### Users
 
@@ -228,7 +228,7 @@ The table contains a unique constraint on `(project_id, version, channel)` so a 
 
 ## Database Migrations
 
-The database schema is versioned through Python migration scripts located in `src/ota_http_server/database/migrations/sqlite` (and the MySQL migration directory for MySQL deployments).
+The database schema is versioned through Python migration scripts located in `src/ota_http_server/database/migrations/sqlite` (and the `mysql` / `postgresql` migration directories for MySQL / PostgreSQL deployments). The PostgreSQL migrations mirror the MySQL ones, using native PostgreSQL types: `BIGINT GENERATED ALWAYS AS IDENTITY` keys, `BOOLEAN` flags and `TIMESTAMPTZ` timestamps. Because PostgreSQL supports transactional DDL, each migration is applied atomically.
 
 Migration files follow the naming convention:
 
@@ -272,8 +272,30 @@ ota_http_server --help
 ota_http_server runserver --help
 ```
 
-Server configuration options include host, port, certificate settings, JWT flags, and database connection parameters. The database can be selected with `--dbtype` (`sqlite` or `mysql`), while SQLite file path is controlled with `--dbfile`.
-To print executed SQL statements in logs for both SQLite and MySQL, enable SQL tracing with `--trace-sql` (or `--dbecho` for MySQL compatibility) and set logging verbosity to debug (`--verbose 6`).
+Server configuration options include host, port, certificate settings, JWT flags, and database connection parameters. The database can be selected with `--dbtype` (`sqlite`, `mysql` or `postgresql`), while SQLite file path is controlled with `--dbfile`.
+To print executed SQL statements in logs for SQLite, MySQL and PostgreSQL, enable SQL tracing with `--trace-sql` (or `--dbecho` / `--pgecho` for MySQL / PostgreSQL compatibility) and set logging verbosity to debug (`--verbose 6`).
+
+#### PostgreSQL
+
+PostgreSQL parameters use the `pg` prefix to distinguish them from the MySQL ones:
+
+| CLI option | Environment variable | `config.toml` key (`[database.postgresql]`) | Default |
+|---|---|---|---|
+| `--pghost` | `OTA_PG_HOST` | `pghost` | `localhost` |
+| `--pgport` | `OTA_PG_PORT` | `pgport` | `5432` |
+| `--pgdatabase` | `OTA_PG_DATABASE` | `pgdatabase` | `ota_db` |
+| `--pguser` | `OTA_PG_USER` | `pguser` | `ota_user` |
+| `--pgpassword` | `OTA_PG_PASSWORD` | `pgpassword` | `ota_password` |
+| `--pgpool-size` | `OTA_PG_POOL_SIZE` | `pgpool_size` | `10` (accepted for configuration compatibility; a connection is opened per operation) |
+| `--pgecho` / `--no-pgecho` | `OTA_PG_ECHO` | `pgecho` | `false` |
+
+Example:
+
+```bash
+ota_http_server --dbtype postgresql --pghost localhost --pgdatabase ota_db --pguser ota_user --pgpassword <password> db init-db --migrate
+```
+
+Tests against a real PostgreSQL server (`tests/core/test_postgres_service.py`) are skipped unless `OTA_TEST_PG_HOST`, `OTA_TEST_PG_DB`, `OTA_TEST_PG_USER` and `OTA_TEST_PG_PASSWORD` are set (`OTA_TEST_PG_PORT` is optional). Each test runs in its own temporary schema, which is dropped afterwards.
 
 ### Database operations
 

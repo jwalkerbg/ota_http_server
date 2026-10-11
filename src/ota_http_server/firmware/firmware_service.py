@@ -8,6 +8,7 @@ from ota_http_server.core.config import Config
 from ota_http_server.core.data_models import Firmware, AppPaths
 from ota_http_server.database.database_service import DatabaseService
 from ota_http_server.database.db_mysql_service import FirmwareNotFoundError as MySQLFirmwareNotFoundError
+from ota_http_server.database.db_postgres_service import FirmwareNotFoundError as PostgreSQLFirmwareNotFoundError
 from ota_http_server.database.db_sqlite_service import FirmwareNotFoundError as SqliteFirmwareNotFoundError
 from ota_http_server.core.formatters import FirmwareFormatter, FirmwareListItemFormatter
 from ota_http_server.firmware.filename_validation import validate_firmware_filename
@@ -268,7 +269,7 @@ class FirmwareService:
                 )
             else:
                 raise ValueError("Firmware id or project id plus version must be provided")
-        except (SqliteFirmwareNotFoundError, MySQLFirmwareNotFoundError):
+        except (SqliteFirmwareNotFoundError, MySQLFirmwareNotFoundError, PostgreSQLFirmwareNotFoundError):
             if firmware_id is not None:
                 logger.info("No uploaded firmware found for firmware_id=%s. Nothing to delete.", firmware_id)
             else:

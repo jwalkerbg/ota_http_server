@@ -18,7 +18,7 @@ from ota_http_server.core.data_models import (
     User,
     UserDevice,
 )
-from ota_http_server.database import db_mysql_service, db_sqlite_service
+from ota_http_server.database import db_mysql_service, db_postgres_service, db_sqlite_service
 from ota_http_server.database.database_service import DatabaseService
 
 from .v1 import _error_payload
@@ -28,82 +28,102 @@ from .v1 import _error_payload
 USER_NOT_FOUND = (
     db_sqlite_service.UserNotFoundError,
     db_mysql_service.UserNotFoundError,
+    db_postgres_service.UserNotFoundError,
 )
 USER_ALREADY_EXISTS = (
     db_sqlite_service.UserAlreadyExistsError,
     db_mysql_service.UserAlreadyExistsError,
+    db_postgres_service.UserAlreadyExistsError,
 )
 USER_ALREADY_ENABLED = (
     db_sqlite_service.UserAlreadyEnabledError,
     db_mysql_service.UserAlreadyEnabledError,
+    db_postgres_service.UserAlreadyEnabledError,
 )
 USER_ALREADY_DISABLED = (
     db_sqlite_service.UserAlreadyDisabledError,
     db_mysql_service.UserAlreadyDisabledError,
+    db_postgres_service.UserAlreadyDisabledError,
 )
 USER_HAS_PROJECTS = (
     db_sqlite_service.UserHasProjectsError,
     db_mysql_service.UserHasProjectsError,
+    db_postgres_service.UserHasProjectsError,
 )
 PROJECT_IN_USE = (
     db_sqlite_service.ProjectInUseError,
     db_mysql_service.ProjectInUseError,
+    db_postgres_service.ProjectInUseError,
 )
 PROJECT_NOT_FOUND = (
     db_sqlite_service.ProjectNotFoundError,
     db_mysql_service.ProjectNotFoundError,
+    db_postgres_service.ProjectNotFoundError,
 )
 PROJECT_ALREADY_EXISTS = (
     db_sqlite_service.ProjectAlreadyExistsError,
     db_mysql_service.ProjectAlreadyExistsError,
+    db_postgres_service.ProjectAlreadyExistsError,
 )
 PROJECT_ALREADY_ENABLED = (
     db_sqlite_service.ProjectAlreadyEnabledError,
     db_mysql_service.ProjectAlreadyEnabledError,
+    db_postgres_service.ProjectAlreadyEnabledError,
 )
 PROJECT_ALREADY_DISABLED = (
     db_sqlite_service.ProjectAlreadyDisabledError,
     db_mysql_service.ProjectAlreadyDisabledError,
+    db_postgres_service.ProjectAlreadyDisabledError,
 )
 TARGET_NOT_FOUND = (
     db_sqlite_service.TargetNotFoundError,
     db_mysql_service.TargetNotFoundError,
+    db_postgres_service.TargetNotFoundError,
 )
 DEVICE_NOT_FOUND = (
     db_sqlite_service.DeviceNotFoundError,
     db_mysql_service.DeviceNotFoundError,
+    db_postgres_service.DeviceNotFoundError,
 )
 DEVICE_ALREADY_EXISTS = (
     db_sqlite_service.DeviceAlreadyExistsError,
     db_mysql_service.DeviceAlreadyExistsError,
+    db_postgres_service.DeviceAlreadyExistsError,
 )
 DEVICE_ALREADY_ENABLED = (
     db_sqlite_service.DeviceAlreadyEnabledError,
     db_mysql_service.DeviceAlreadyEnabledError,
+    db_postgres_service.DeviceAlreadyEnabledError,
 )
 DEVICE_ALREADY_DISABLED = (
     db_sqlite_service.DeviceAlreadyDisabledError,
     db_mysql_service.DeviceAlreadyDisabledError,
+    db_postgres_service.DeviceAlreadyDisabledError,
 )
 USER_DEVICE_NOT_FOUND = (
     db_sqlite_service.UserDeviceNotFoundError,
     db_mysql_service.UserDeviceNotFoundError,
+    db_postgres_service.UserDeviceNotFoundError,
 )
 USER_DEVICE_ALREADY_EXISTS = (
     db_sqlite_service.UserDeviceAlreadyExistsError,
     db_mysql_service.UserDeviceAlreadyExistsError,
+    db_postgres_service.UserDeviceAlreadyExistsError,
 )
 FIRMWARE_NOT_FOUND = (
     db_sqlite_service.FirmwareNotFoundError,
     db_mysql_service.FirmwareNotFoundError,
+    db_postgres_service.FirmwareNotFoundError,
 )
 FIRMWARE_ALREADY_EXISTS = (
     db_sqlite_service.FirmwareAlreadyExistsError,
     db_mysql_service.FirmwareAlreadyExistsError,
+    db_postgres_service.FirmwareAlreadyExistsError,
 )
 DATABASE_ERROR = (
     db_sqlite_service.DatabaseError,
     db_mysql_service.DatabaseError,
+    db_postgres_service.DatabaseError,
 )
 
 

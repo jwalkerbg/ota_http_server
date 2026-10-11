@@ -18,6 +18,9 @@ class DatabaseService:
         elif self.cfg.config['database']['dbtype'] == 'mysql':
             from ota_http_server.database.db_mysql_service import DatabaseMySQLService
             self._database: DatabaseInterface = DatabaseMySQLService(cfg)
+        elif self.cfg.config['database']['dbtype'] == 'postgresql':
+            from ota_http_server.database.db_postgres_service import DatabasePostgreSQLService
+            self._database: DatabaseInterface = DatabasePostgreSQLService(cfg)
         else:
             raise ValueError(f"Unsupported database type: {self.cfg.config['database']['dbtype']}")
 

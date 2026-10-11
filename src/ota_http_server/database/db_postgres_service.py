@@ -1,0 +1,2214 @@
+# database/db_postgres_service.py
+
+from datetime import UTC, datetime
+from typing import Any, NoReturn
+
+import psycopg
+from psycopg import Error as PgError
+from psycopg.errors import UniqueViolation
+from psycopg.rows import dict_row
+
+from ota_http_server.core.config import Config
+from ota_http_server.core.data_models import (
+    Device,
+    DeviceListItem,
+    UserDevice,
+    Firmware,
+    FirmwareDeleteInfo,
+    FirmwareListItem,
+    Project,
+    ProjectListItem,
+    Target,
+    User,
+)
+from ota_http_server.database.mysql_sql_tracing import (
+    is_sql_tracing_enabled,
+    with_mysql_sql_tracing,
+)
+from ota_http_server.database.migration_postgres_runner import MigrationPostgreSQLRunner
+from ota_http_server.logger import get_app_logger
+
+logger = get_app_logger(__name__)
+
+
+class UserHasProjectsError(Exception):
+    pass
+
+
+class UserNotFoundError(Exception):
+    pass
+
+
+class UserAlreadyEnabledError(Exception):
+    pass
+
+
+class UserAlreadyDisabledError(Exception):
+    pass
+
+
+class UserAlreadyExistsError(Exception):
+    pass
+
+
+class ProjectAlreadyExistsError(Exception):
+    pass
+
+
+class ProjectNotFoundError(Exception):
+    pass
+
+
+class ProjectInUseError(Exception):
+    pass
+
+
+class ProjectAlreadyEnabledError(Exception):
+    pass
+
+
+class ProjectAlreadyDisabledError(Exception):
+    pass
+
+
+class TargetAlreadyExistsError(Exception):
+    pass
+
+
+class TargetNotFoundError(Exception):
+    pass
+
+
+class DeviceAlreadyExistsError(Exception):
+    pass
+
+
+class DeviceNotFoundError(Exception):
+    pass
+
+
+class DeviceAlreadyEnabledError(Exception):
+    pass
+
+
+class DeviceAlreadyDisabledError(Exception):
+    pass
+
+
+class FirmwareAlreadyExistsError(Exception):
+    pass
+
+
+class FirmwareNotFoundError(Exception):
+    pass
+
+
+class FirmwareAlreadyEnabledError(Exception):
+    pass
+
+
+class FirmwareAlreadyDisabledError(Exception):
+    pass
+
+class UserDeviceAlreadyExistsError(Exception):
+    pass
+
+class UserDeviceNotFoundError(Exception):
+    pass
+
+class DatabaseError(Exception):
+    pass
+
+
+class DatabasePostgreSQLService:
+    def __init__(self, cfg: Config):
+        self.cfg = cfg
+        self.migration_runner = MigrationPostgreSQLRunner(cfg)
+
+    def _connect(self):
+        db_config = self.cfg.config["database"]["postgresql"]
+        conn = psycopg.connect(
+            host=db_config["pghost"],
+            port=db_config["pgport"],
+            dbname=db_config["pgdatabase"],
+            user=db_config["pguser"],
+            password=db_config["pgpassword"],
+            autocommit=False,
+        )
+        sql_trace_enabled = is_sql_tracing_enabled(
+            self.cfg.config["parameters"]["trace_sql"],
+            db_config["pgecho"],
+        )
+        return with_mysql_sql_tracing(conn, logger, sql_trace_enabled)
+
+    @staticmethod
+    def _as_datetime(value: Any) -> datetime | None:
+        if value is None:
+            return None
+        if isinstance(value, datetime):
+            return value
+        return datetime.fromisoformat(str(value))
+
+    def _unsupported(self, action: str) -> NoReturn:
+        raise NotImplementedError(
+            f"PostgreSQL database support is not implemented for {action}"
+        )
+
+    def init_db(self) -> None:
+        self.migration_runner.migrate_up()
+
+    def migrate(self) -> None:
+        self.migration_runner.migrate_up()
+
+    def rollback(self) -> None:
+        self.migration_runner.migrate_down()
+
+    def _row_to_user(self, row: dict[str, Any]) -> User:
+        return User(
+            id=row["id"],
+            username=row["username"],
+            password_hash=row["password_hash"],
+            email=row["email"],
+            role=row["role"],
+            is_active=bool(row["is_active"]),
+            created_at=self._as_datetime(row["created_at"]),
+            updated_at=self._as_datetime(row["updated_at"]),
+        )
+
+    def user_add(self, user: User) -> User:
+        sql = """
+            INSERT INTO users (
+                username,
+                password_hash,
+                email,
+                role,
+                is_active,
+                created_at,
+                updated_at
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            RETURNING id
+        """
+
+        now = datetime.now(UTC)
+
+        try:
+            with self._connect() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    sql,
+                    (
+                        user.username,
+                        user.password_hash,
+                        user.email,
+                        user.role,
+                        bool(user.is_active),
+                        now.isoformat(),
+                        now.isoformat(),
+                    ),
+                )
+                user.id = cursor.fetchone()[0]
+                user.created_at = now
+                user.updated_at = now
+                conn.commit()
+                return user
+        except psycopg.IntegrityError as e:
+            message = str(e)
+            if "users.username" in message or "username" in message:
+                raise UserAlreadyExistsError(
+                    f"Username '{user.username}' already exists"
+                ) from e
+            if "users.email" in message or "email" in message:
+                raise UserAlreadyExistsError(
+                    f"Email '{user.email}' already exists"
+                ) from e
+            raise DatabaseError(
+                f"Database integrity error while adding user: {message}"
+            ) from e
+        except PgError as e:
+            raise DatabaseError(
+                f"Database error while adding user '{user.username}'"
+            ) from e
+
+    def _user_enable_disable(self, column: str, parameter: int | str, op: bool):
+        if column not in ("id", "username"):
+            raise ValueError(f"Invalid column '{column}'")
+
+        new_state = op
+        old_state = not op
+        now = datetime.now(UTC)
+
+        try:
+            with self._connect() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    f"""
+                    UPDATE users
+                    SET
+                        is_active = %s,
+                        updated_at = %s
+                    WHERE {column} = %s
+                    AND is_active = %s
+                    """,
+                    (new_state, now.isoformat(), parameter, old_state),
+                )
+
+                if cursor.rowcount == 1:
+                    conn.commit()
+                    return
+
+                cursor = conn.cursor(row_factory=dict_row)
+                cursor.execute(
+                    f"SELECT is_active FROM users WHERE {column} = %s",
+                    (parameter,),
+                )
+                row = cursor.fetchone()
+
+                if row is None:
+                    raise UserNotFoundError(f"User {column}={parameter} not found")
+
+            if op:
+                raise UserAlreadyEnabledError(f"User {column}={parameter} is already enabled")
+            raise UserAlreadyDisabledError(f"User {column}={parameter} is already disabled")
+
+        except PgError as e:
+            if op:
+                raise DatabaseError(
+                    f"Database error enabling user {column}={parameter}"
+                ) from e
+            raise DatabaseError(
+                f"Database error disabling user {column}={parameter}"
+            ) from e
+
+    def user_enable_by_id(self, user_id: int) -> None:
+        return self._user_enable_disable("id", user_id, True)
+
+    def user_enable_by_username(self, username: str) -> None:
+        return self._user_enable_disable("username", username, True)
+
+    def user_disable_by_id(self, user_id: int) -> None:
+        return self._user_enable_disable("id", user_id, False)
+
+    def user_disable_by_username(self, username: str) -> None:
+        return self._user_enable_disable("username", username, False)
+
+    def _user_delete(self, column: str, parameter: int | str) -> None:
+        if column not in ("id", "username"):
+            raise ValueError(f"Invalid column '{column}'")
+
+        try:
+            with self._connect() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    f"DELETE FROM users WHERE {column} = %s",
+                    (parameter,),
+                )
+                if cursor.rowcount == 0:
+                    raise UserNotFoundError(f"User {column}={parameter} not found")
+                conn.commit()
+        except psycopg.IntegrityError as e:
+            raise UserHasProjectsError(
+                f"User {column}={parameter} cannot be deleted because projects reference it"
+            ) from e
+        except PgError as e:
+            raise DatabaseError(
+                f"Database error deleting user {column}={parameter}"
+            ) from e
+
+    def user_delete_by_id(self, user_id: int) -> None:
+        return self._user_delete("id", user_id)
+
+    def user_delete_by_username(self, username: str) -> None:
+        return self._user_delete("username", username)
+
+    def _user_get(self, column: str, parameter: int | str) -> User | None:
+        if column not in ("id", "username"):
+            raise ValueError(f"Invalid column '{column}'")
+
+        try:
+            with self._connect() as conn:
+                cursor = conn.cursor(row_factory=dict_row)
+                cursor.execute(
+                    f"""
+                    SELECT
+                        id,
+                        username,
+                        password_hash,
+                        email,
+                        role,
+                        is_active,
+                        created_at,
+                        updated_at
+                    FROM users
+                    WHERE {column} = %s
+                    """,
+                    (parameter,),
+                )
+                row = cursor.fetchone()
+                if row is None:
+                    return None
+                return self._row_to_user(row)
+        except PgError as e:
+            raise DatabaseError(
+                f"Database error retrieving user {column}={parameter}"
+            ) from e
+
+    def user_get_by_id(self, user_id: int) -> User | None:
+        return self._user_get("id", user_id)
+
+    def user_get_by_username(self, username: str) -> User | None:
+        return self._user_get("username", username)
+
+    def user_is_active(self, user_id: int) -> bool:
+        try:
+            with self._connect() as conn:
+                cursor = conn.cursor(row_factory=dict_row)
+                cursor.execute(
+                    "SELECT is_active FROM users WHERE id = %s",
+                    (user_id,),
+                )
+                row = cursor.fetchone()
+                return bool(row["is_active"]) if row is not None else False
+        except PgError as e:
+            raise DatabaseError(
+                f"Database error checking whether user {user_id} is active"
+            ) from e
+
+    def user_get_list(self, is_active: bool | None = None) -> list[User]:
+        try:
+            with self._connect() as conn:
+                query = """
+                    SELECT
+                        id,
+                        username,
+                        password_hash,
+                        email,
+                        role,
+                        is_active,
+                        created_at,
+                        updated_at
+                    FROM users
+                """
+                params: tuple[Any, ...] = ()
+                if is_active is not None:
+                    query += " WHERE is_active = %s"
+                    params = (bool(is_active),)
+                query += " ORDER BY username"
+
+                cursor = conn.cursor(row_factory=dict_row)
+                cursor.execute(query, params)
+                rows = cursor.fetchall()
+                return [self._row_to_user(row) for row in rows]
+        except PgError as e:
+            raise DatabaseError("Database error retrieving user list") from e
+
+    def user_get_record(self, is_active: bool | None = None) -> list[User]:
+        return self.user_get_list(is_active=is_active)
+
+    def _row_exists(self, conn, table: str, row_id: int) -> bool:
+        if table not in ("users", "projects", "devices", "firmware"):
+            raise ValueError(f"Invalid table '{table}'")
+        cursor = conn.cursor()
+        cursor.execute(f"SELECT 1 FROM {table} WHERE id = %s", (row_id,))
+        return cursor.fetchone() is not None
+
+    def user_update_by_id(
+        self,
+        user_id: int,
+        *,
+        username: str | None = None,
+        email: str | None = None,
+        role: str | None = None,
+    ) -> User:
+        """
+        Partially update a user. Only non-None arguments are written.
+
+        Raises:
+            ValueError: If no field to update is provided.
+            UserNotFoundError: If the user does not exist.
+            UserAlreadyExistsError: If username or email is already taken.
+            DatabaseError: For unexpected database errors.
+        """
+        updates: dict[str, Any] = {}
+        if username is not None:
+            updates["username"] = username
+        if email is not None:
+            updates["email"] = email
+        if role is not None:
+            updates["role"] = role
+        if not updates:
+            raise ValueError("At least one field must be provided to update a user")
+
+        now = datetime.now(UTC)
+        assignments = ", ".join(f"{column} = %s" for column in updates)
+
+        try:
+            with self._connect() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    f"""
+                    UPDATE users
+                    SET
+                        {assignments},
+                        updated_at = %s
+                    WHERE id = %s
+                    """,
+                    (*updates.values(), now.isoformat(), user_id),
+                )
+                if cursor.rowcount == 0 and not self._row_exists(conn, "users", user_id):
+                    raise UserNotFoundError(f"User id={user_id} not found")
+
+                dict_cursor = conn.cursor(row_factory=dict_row)
+                dict_cursor.execute(
+                    """
+                    SELECT
+                        id,
+                        username,
+                        password_hash,
+                        email,
+                        role,
+                        is_active,
+                        created_at,
+                        updated_at
+                    FROM users
+                    WHERE id = %s
+                    """,
+                    (user_id,),
+                )
+                row = dict_cursor.fetchone()
+                conn.commit()
+                return self._row_to_user(row)
+        except psycopg.IntegrityError as e:
+            message = str(e)
+            if "users.username" in message or "username" in message:
+                raise UserAlreadyExistsError(
+                    f"Username '{username}' already exists"
+                ) from e
+            if "users.email" in message or "email" in message:
+                raise UserAlreadyExistsError(
+                    f"Email '{email}' already exists"
+                ) from e
+            raise DatabaseError(
+                f"Database integrity error while updating user id={user_id}: {message}"
+            ) from e
+        except PgError as e:
+            raise DatabaseError(
+                f"Database error updating user id={user_id}"
+            ) from e
+
+    def user_set_password_by_id(self, user_id: int, password_hash: str) -> None:
+        """
+        Replace a user's password hash.
+
+        Raises:
+            UserNotFoundError: If the user does not exist.
+            DatabaseError: For unexpected database errors.
+        """
+        now = datetime.now(UTC)
+        try:
+            with self._connect() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    """
+                    UPDATE users
+                    SET
+                        password_hash = %s,
+                        updated_at = %s
+                    WHERE id = %s
+                    """,
+                    (password_hash, now.isoformat(), user_id),
+                )
+                if cursor.rowcount == 0 and not self._row_exists(conn, "users", user_id):
+                    raise UserNotFoundError(f"User id={user_id} not found")
+                conn.commit()
+        except PgError as e:
+            raise DatabaseError(
+                f"Database error setting password for user id={user_id}"
+            ) from e
+
+    def _row_to_project(self, row: dict[str, Any]) -> Project:
+        return Project(
+            id=row["id"],
+            name=row["name"],
+            display_name=row["display_name"],
+            description=row["description"],
+            created_by=row["created_by"],
+            is_active=bool(row["is_active"]),
+            created_at=self._as_datetime(row["created_at"]),
+            updated_at=self._as_datetime(row["updated_at"]),
+        )
+
+    def project_add(self, project: Project) -> Project:
+        now = datetime.now(UTC)
+        try:
+            with self._connect() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    """
+                    INSERT INTO projects (
+                        name,
+                        display_name,
+                        description,
+                        created_by,
+                        is_active,
+                        created_at,
+                        updated_at
+                    )
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    RETURNING id
+                    """,
+                    (
+                        project.name,
+                        project.display_name,
+                        project.description,
+                        project.created_by,
+                        bool(project.is_active),
+                        now.isoformat(),
+                        now.isoformat(),
+                    ),
+                )
+                project.id = cursor.fetchone()[0]
+                project.created_at = now
+                project.updated_at = now
+                conn.commit()
+                return project
+        except psycopg.IntegrityError as e:
+            message = str(e)
+            if "projects.name" in message or "name" in message:
+                raise ProjectAlreadyExistsError(
+                    f"Project '{project.name}' already exists"
+                ) from e
+            if "projects.created_by" in message or "created_by" in message:
+                raise ProjectNotFoundError(
+                    f"Project creation failed because user id={project.created_by} does not exist"
+                ) from e
+            raise DatabaseError(
+                f"Database integrity error creating project '{project.name}': {message}"
+            ) from e
+        except PgError as e:
+            raise DatabaseError(
+                f"Database error creating project '{project.name}'"
+            ) from e
+
+    def _project_enable_disable(self, column: str, parameter: int | str, op: bool):
+        if column not in ("id", "name"):
+            raise ValueError(f"Invalid column '{column}'")
+
+        new_state = op
+        old_state = not op
+        now = datetime.now(UTC)
+
+        try:
+            with self._connect() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    f"""
+                    UPDATE projects
+                    SET
+                        is_active = %s,
+                        updated_at = %s
+                    WHERE {column} = %s
+                    AND is_active = %s
+                    """,
+                    (new_state, now.isoformat(), parameter, old_state),
+                )
+
+                if cursor.rowcount == 1:
+                    conn.commit()
+                    return
+
+                cursor = conn.cursor(row_factory=dict_row)
+                cursor.execute(
+                    f"SELECT is_active FROM projects WHERE {column} = %s",
+                    (parameter,),
+                )
+                row = cursor.fetchone()
+                if row is None:
+                    raise ProjectNotFoundError(f"Project {column}={parameter} not found")
+
+            if op:
+                raise ProjectAlreadyEnabledError(f"Project {column}={parameter} is already enabled")
+            raise ProjectAlreadyDisabledError(f"Project {column}={parameter} is already disabled")
+        except PgError as e:
+            if op:
+                raise DatabaseError(
+                    f"Database error enabling project {column}={parameter}"
+                ) from e
+            raise DatabaseError(
+                f"Database error disabling project {column}={parameter}"
+            ) from e
+
+    def project_enable_by_id(self, id: int) -> None:
+        return self._project_enable_disable("id", id, True)
+
+    def project_enable_by_name(self, name: str) -> None:
+        return self._project_enable_disable("name", name, True)
+
+    def project_disable_by_id(self, id: int) -> None:
+        return self._project_enable_disable("id", id, False)
+
+    def project_disable_by_name(self, name: str) -> None:
+        return self._project_enable_disable("name", name, False)
+
+    def _project_delete(self, column: str, parameter: int | str) -> None:
+        if column not in ("id", "name"):
+            raise ValueError(f"Invalid column '{column}'")
+
+        try:
+            with self._connect() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    f"DELETE FROM projects WHERE {column} = %s",
+                    (parameter,),
+                )
+                if cursor.rowcount == 0:
+                    raise ProjectNotFoundError(f"Project {column}={parameter} not found")
+                conn.commit()
+        except psycopg.IntegrityError as e:
+            raise ProjectInUseError(
+                f"Project {column}={parameter} cannot be deleted because devices or firmware reference it"
+            ) from e
+        except PgError as e:
+            raise DatabaseError(
+                f"Database error deleting project {column}={parameter}"
+            ) from e
+
+    def project_delete_by_id(self, id: int) -> None:
+        return self._project_delete("id", id)
+
+    def project_delete_by_name(self, name: str) -> None:
+        return self._project_delete("name", name)
+
+    def _project_get(self, column: str, parameter: int | str) -> Project | None:
+        if column not in ("id", "name"):
+            raise ValueError(f"Invalid column '{column}'")
+
+        try:
+            with self._connect() as conn:
+                cursor = conn.cursor(row_factory=dict_row)
+                cursor.execute(
+                    f"""
+                    SELECT
+                        id,
+                        name,
+                        display_name,
+                        description,
+                        created_by,
+                        is_active,
+                        created_at,
+                        updated_at
+                    FROM projects
+                    WHERE {column} = %s
+                    """,
+                    (parameter,),
+                )
+                row = cursor.fetchone()
+                if row is None:
+                    return None
+                return self._row_to_project(row)
+        except PgError as e:
+            raise DatabaseError(
+                f"Database error retrieving project {column}={parameter}"
+            ) from e
+
+    def project_get_by_id(self, id: int) -> Project | None:
+        return self._project_get("id", id)
+
+    def project_get_by_name(self, name: str) -> Project | None:
+        return self._project_get("name", name)
+
+    def project_is_active(self, project_id: int) -> bool:
+        try:
+            with self._connect() as conn:
+                cursor = conn.cursor(row_factory=dict_row)
+                cursor.execute(
+                    "SELECT is_active FROM projects WHERE id = %s",
+                    (project_id,),
+                )
+                row = cursor.fetchone()
+                return bool(row["is_active"]) if row is not None else False
+        except PgError as e:
+            raise DatabaseError(
+                f"Database error checking whether project {project_id} is active"
+            ) from e
+
+    def _build_project_filters(
+        self,
+        is_active: bool | None = None,
+        created_by: int | None = None,
+        created_by_username: str | None = None,
+        *,
+        users_joined: bool = False,
+    ) -> tuple[str, tuple[Any, ...]]:
+        filters: list[str] = []
+        params: list[Any] = []
+        if is_active is not None:
+            filters.append("projects.is_active = %s")
+            params.append(bool(is_active))
+        if created_by is not None:
+            filters.append("projects.created_by = %s")
+            params.append(created_by)
+        if created_by_username is not None:
+            if users_joined:
+                filters.append("users.username = %s")
+            else:
+                filters.append(
+                    "projects.created_by = (SELECT id FROM users WHERE username = %s)"
+                )
+            params.append(created_by_username)
+        where_clause = ""
+        if filters:
+            where_clause = " WHERE " + " AND ".join(filters)
+        return where_clause, tuple(params)
+
+    def project_get_record(
+        self,
+        is_active: bool | None = None,
+        created_by: int | None = None,
+        created_by_username: str | None = None,
+    ) -> list[Project]:
+        try:
+            with self._connect() as conn:
+                where_clause, params = self._build_project_filters(
+                    is_active=is_active,
+                    created_by=created_by,
+                    created_by_username=created_by_username,
+                )
+                cursor = conn.cursor(row_factory=dict_row)
+                cursor.execute(
+                    f"""
+                    SELECT
+                        id,
+                        name,
+                        display_name,
+                        description,
+                        created_by,
+                        is_active,
+                        created_at,
+                        updated_at
+                    FROM projects
+                    {where_clause}
+                    ORDER BY name
+                    """,
+                    params,
+                )
+                return [self._row_to_project(row) for row in cursor.fetchall()]
+        except PgError as e:
+            raise DatabaseError("Database error retrieving projects") from e
+
+    def project_get_list(
+        self,
+        is_active: bool | None = None,
+        created_by: int | None = None,
+        created_by_username: str | None = None,
+    ) -> list[ProjectListItem]:
+        try:
+            with self._connect() as conn:
+                where_clause, params = self._build_project_filters(
+                    is_active=is_active,
+                    created_by=created_by,
+                    created_by_username=created_by_username,
+                    users_joined=True,
+                )
+                cursor = conn.cursor(row_factory=dict_row)
+                cursor.execute(
+                    f"""
+                    SELECT
+                        projects.id,
+                        projects.name,
+                        projects.display_name,
+                        projects.description,
+                        users.username AS created_by_username,
+                        projects.is_active
+                    FROM projects
+                    JOIN users ON users.id = projects.created_by
+                    {where_clause}
+                    ORDER BY projects.name
+                    """,
+                    params,
+                )
+                rows = cursor.fetchall()
+                return [
+                    ProjectListItem(
+                        id=row["id"],
+                        name=row["name"],
+                        display_name=row["display_name"],
+                        description=row["description"],
+                        created_by_username=row["created_by_username"],
+                        is_active=bool(row["is_active"]),
+                    )
+                    for row in rows
+                ]
+        except PgError as e:
+            raise DatabaseError("Database error retrieving project list") from e
+
+    def project_update_by_id(
+        self,
+        project_id: int,
+        *,
+        name: str | None = None,
+        display_name: str | None = None,
+        description: str | None = None,
+    ) -> Project:
+        """
+        Partially update a project. Only non-None arguments are written.
+
+        Raises:
+            ValueError: If no field to update is provided.
+            ProjectNotFoundError: If the project does not exist.
+            ProjectAlreadyExistsError: If the new name is already taken.
+            DatabaseError: For unexpected database errors.
+        """
+        updates: dict[str, Any] = {}
+        if name is not None:
+            updates["name"] = name
+        if display_name is not None:
+            updates["display_name"] = display_name
+        if description is not None:
+            updates["description"] = description
+        if not updates:
+            raise ValueError("At least one field must be provided to update a project")
+
+        now = datetime.now(UTC)
+        assignments = ", ".join(f"{column} = %s" for column in updates)
+
+        try:
+            with self._connect() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    f"""
+                    UPDATE projects
+                    SET
+                        {assignments},
+                        updated_at = %s
+                    WHERE id = %s
+                    """,
+                    (*updates.values(), now.isoformat(), project_id),
+                )
+                if cursor.rowcount == 0 and not self._row_exists(conn, "projects", project_id):
+                    raise ProjectNotFoundError(f"Project id={project_id} not found")
+
+                dict_cursor = conn.cursor(row_factory=dict_row)
+                dict_cursor.execute(
+                    """
+                    SELECT
+                        id,
+                        name,
+                        display_name,
+                        description,
+                        created_by,
+                        is_active,
+                        created_at,
+                        updated_at
+                    FROM projects
+                    WHERE id = %s
+                    """,
+                    (project_id,),
+                )
+                row = dict_cursor.fetchone()
+                conn.commit()
+                return self._row_to_project(row)
+        except psycopg.IntegrityError as e:
+            message = str(e)
+            if "projects.name" in message or "name" in message:
+                raise ProjectAlreadyExistsError(
+                    f"Project '{name}' already exists"
+                ) from e
+            raise DatabaseError(
+                f"Database integrity error updating project id={project_id}: {message}"
+            ) from e
+        except PgError as e:
+            raise DatabaseError(
+                f"Database error updating project id={project_id}"
+            ) from e
+
+    def _row_to_target(self, row: dict[str, Any]) -> Target:
+        return Target(
+            id=row["id"],
+            name=row["name"],
+        )
+
+    def target_add(self, target: Target) -> Target:
+        try:
+            with self._connect() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    """
+                    INSERT INTO targets (name)
+                    VALUES (%s)
+                    RETURNING id
+                    """,
+                    (target.name,),
+                )
+                conn.commit()
+                target.id = cursor.fetchone()[0]
+                return target
+        except UniqueViolation as e:
+            raise TargetAlreadyExistsError(
+                f"Target '{target.name}' already exists"
+            ) from e
+        except PgError as e:
+            raise DatabaseError(
+                f"Database error creating target '{target.name}'"
+            ) from e
+
+    def _target_get(self, column: str, parameter: int | str) -> Target | None:
+        if column not in ("id", "name"):
+            raise ValueError(f"Invalid column '{column}'")
+
+        try:
+            with self._connect() as conn:
+                cursor = conn.cursor(row_factory=dict_row)
+                cursor.execute(
+                    f"""
+                    SELECT id, name
+                    FROM targets
+                    WHERE {column} = %s
+                    """,
+                    (parameter,),
+                )
+                row = cursor.fetchone()
+                if row is None:
+                    return None
+                return self._row_to_target(row)
+        except PgError as e:
+            raise DatabaseError(
+                f"Database error retrieving target {column}={parameter}"
+            ) from e
+
+    def target_get_by_id(self, id: int) -> Target | None:
+        return self._target_get("id", id)
+
+    def target_get_by_name(self, name: str) -> Target | None:
+        return self._target_get("name", name)
+
+    def target_get_list(self) -> list[Target]:
+        try:
+            with self._connect() as conn:
+                cursor = conn.cursor(row_factory=dict_row)
+                cursor.execute(
+                    """
+                    SELECT id, name
+                    FROM targets
+                    ORDER BY name, id
+                    """
+                )
+                return [self._row_to_target(row) for row in cursor.fetchall()]
+        except PgError as e:
+            raise DatabaseError("Database error retrieving targets") from e
+
+    def _row_to_device(self, row: dict[str, Any]) -> Device:
+        return Device(
+            id=row["id"],
+            uuid=row["uuid"],
+            project_id=row["project_id"],
+            target_id=row["target_id"],
+            model=row["model"],
+            serial_number=row["serial_number"],
+            current_version=row["current_version"],
+            last_seen=self._as_datetime(row["last_seen"]),
+            is_active=bool(row["is_active"]),
+            created_at=self._as_datetime(row["created_at"]),
+            updated_at=self._as_datetime(row["updated_at"]),
+        )
+
+    def device_add(self, device: Device) -> Device:
+        now = datetime.now(UTC)
+        try:
+            with self._connect() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    """
+                    INSERT INTO devices (
+                        uuid,
+                        project_id,
+                        target_id,
+                        model,
+                        serial_number,
+                        current_version,
+                        last_seen,
+                        is_active,
+                        created_at,
+                        updated_at
+                    )
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    RETURNING id
+                    """,
+                    (
+                        device.uuid,
+                        device.project_id,
+                        device.target_id,
+                        device.model,
+                        device.serial_number,
+                        device.current_version,
+                        None,
+                        bool(device.is_active),
+                        now.isoformat(),
+                        None,
+                    ),
+                )
+                conn.commit()
+                device.id = cursor.fetchone()[0]
+                device.created_at = now
+                device.updated_at = None
+                return device
+        except psycopg.IntegrityError as e:
+            message = str(e)
+            if "uuid" in message or "serial_number" in message:
+                raise DeviceAlreadyExistsError(
+                    f"Device '{device.uuid}' already exists"
+                ) from e
+            if "project_id" in message or "target_id" in message:
+                raise TargetNotFoundError(
+                    f"Database integrity violation: Project id={device.project_id} or target id={device.target_id} does not exist"
+                ) from e
+            raise DatabaseError(
+                f"Database integrity error creating device '{device.uuid}': {message}"
+            ) from e
+        except PgError as e:
+            raise DatabaseError(
+                f"Database error creating device '{device.uuid}'"
+            ) from e
+
+    def _device_enable_disable(self, column: str, parameter: int | str, op: bool):
+        if column not in ("id", "uuid"):
+            raise ValueError(f"Invalid column '{column}'")
+
+        new_state = op
+        old_state = not op
+        now = datetime.now(UTC)
+
+        try:
+            with self._connect() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    f"""
+                    UPDATE devices
+                    SET
+                        is_active = %s,
+                        updated_at = %s
+                    WHERE {column} = %s
+                    AND is_active = %s
+                    """,
+                    (new_state, now.isoformat(), parameter, old_state),
+                )
+
+                if cursor.rowcount == 1:
+                    conn.commit()
+                    return
+
+                cursor = conn.cursor(row_factory=dict_row)
+                cursor.execute(
+                    f"SELECT is_active FROM devices WHERE {column} = %s",
+                    (parameter,),
+                )
+                row = cursor.fetchone()
+                if row is None:
+                    raise DeviceNotFoundError(f"Device {column}={parameter} not found")
+
+            if op:
+                raise DeviceAlreadyEnabledError(f"Device {column}={parameter} is already enabled")
+            raise DeviceAlreadyDisabledError(f"Device {column}={parameter} is already disabled")
+        except PgError as e:
+            if op:
+                raise DatabaseError(
+                    f"Database error enabling device {column}={parameter}"
+                ) from e
+            raise DatabaseError(
+                f"Database error disabling device {column}={parameter}"
+            ) from e
+
+    def device_enable_by_id(self, id: int) -> None:
+        return self._device_enable_disable("id", id, True)
+
+    def device_enable_by_name(self, name: str) -> None:
+        return self._device_enable_disable("uuid", name, True)
+
+    def device_disable_by_id(self, id: int) -> None:
+        return self._device_enable_disable("id", id, False)
+
+    def device_disable_by_name(self, name: str) -> None:
+        return self._device_enable_disable("uuid", name, False)
+
+    def _device_delete(self, column: str, parameter: int | str) -> None:
+        if column not in ("id", "uuid"):
+            raise ValueError(f"Invalid column '{column}'")
+
+        try:
+            with self._connect() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    f"DELETE FROM devices WHERE {column} = %s",
+                    (parameter,),
+                )
+                if cursor.rowcount == 0:
+                    raise DeviceNotFoundError(f"Device {column}={parameter} not found")
+                conn.commit()
+        except PgError as e:
+            raise DatabaseError(
+                f"Database error deleting device {column}={parameter}"
+            ) from e
+
+    def device_delete_by_id(self, id: int) -> None:
+        return self._device_delete("id", id)
+
+    def device_delete_by_name(self, name: str) -> None:
+        return self._device_delete("uuid", name)
+
+    def _device_change_target(self, column: str, parameter: int | str, target_id: int) -> None:
+        if column not in ("id", "uuid"):
+            raise ValueError(f"Invalid column '{column}'")
+
+        now = datetime.now(UTC)
+
+        try:
+            with self._connect() as conn:
+                cursor = conn.cursor(row_factory=dict_row)
+                cursor.execute(
+                    "SELECT id FROM targets WHERE id = %s",
+                    (target_id,),
+                )
+                if cursor.fetchone() is None:
+                    raise TargetNotFoundError(f"Target id={target_id} not found")
+
+                cursor = conn.cursor()
+                cursor.execute(
+                    f"""
+                    UPDATE devices
+                    SET
+                        target_id = %s,
+                        updated_at = %s
+                    WHERE {column} = %s
+                    """,
+                    (target_id, now.isoformat(), parameter),
+                )
+
+                if cursor.rowcount == 1:
+                    conn.commit()
+                    return
+
+                raise DeviceNotFoundError(f"Device {column}={parameter} not found")
+        except PgError as e:
+            raise DatabaseError(
+                f"Database error changing target for device {column}={parameter}"
+            ) from e
+
+    def device_change_target_by_id(self, id: int, target_id: int) -> None:
+        self._device_change_target("id", id, target_id)
+
+    def device_change_target_by_name(self, name: str, target_id: int) -> None:
+        self._device_change_target("uuid", name, target_id)
+
+    def _device_get(self, column: str, parameter: int | str) -> Device | None:
+        if column not in ("id", "uuid"):
+            raise ValueError(f"Invalid column '{column}'")
+
+        try:
+            with self._connect() as conn:
+                cursor = conn.cursor(row_factory=dict_row)
+                cursor.execute(
+                    f"""
+                    SELECT
+                        id,
+                        uuid,
+                        project_id,
+                        target_id,
+                        model,
+                        serial_number,
+                        current_version,
+                        last_seen,
+                        is_active,
+                        created_at,
+                        updated_at
+                    FROM devices
+                    WHERE {column} = %s
+                    """,
+                    (parameter,),
+                )
+                row = cursor.fetchone()
+                if row is None:
+                    return None
+                return self._row_to_device(row)
+        except PgError as e:
+            raise DatabaseError(
+                f"Database error retrieving device {column}={parameter}"
+            ) from e
+
+    def device_get_by_id(self, id: int) -> Device | None:
+        return self._device_get("id", id)
+
+    def device_get_by_name(self, name: str) -> Device | None:
+        return self._device_get("uuid", name)
+
+    def device_is_active(self, device_id: int) -> bool:
+        try:
+            with self._connect() as conn:
+                cursor = conn.cursor(row_factory=dict_row)
+                cursor.execute(
+                    "SELECT is_active FROM devices WHERE id = %s",
+                    (device_id,),
+                )
+                row = cursor.fetchone()
+                return bool(row["is_active"]) if row is not None else False
+        except PgError as e:
+            raise DatabaseError(
+                f"Database error checking whether device {device_id} is active"
+            ) from e
+
+    @staticmethod
+    def _row_to_user_device(row: dict[str, Any]) -> UserDevice:
+        return UserDevice(
+            user_id=row["user_id"],
+            device_id=row["device_id"],
+            created_at=DatabasePostgreSQLService._as_datetime(row["created_at"]),
+            expires_at=DatabasePostgreSQLService._as_datetime(row["expires_at"]),
+        )
+
+    def user_device_add(self, user_device: UserDevice) -> UserDevice:
+        now = datetime.now(UTC)
+        try:
+            with self._connect() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    """
+                    INSERT INTO users_devices (user_id, device_id, created_at, expires_at)
+                    VALUES (%s, %s, %s, %s)
+                    """,
+                    (
+                        user_device.user_id,
+                        user_device.device_id,
+                        now.isoformat(),
+                        user_device.expires_at.isoformat() if user_device.expires_at else None,
+                    ),
+                )
+                conn.commit()
+                user_device.created_at = now
+                return user_device
+        except psycopg.IntegrityError as e:
+            if isinstance(e, UniqueViolation):
+                raise UserDeviceAlreadyExistsError(
+                    f"User {user_device.user_id} is already assigned to device {user_device.device_id}"
+                ) from e
+            raise DatabaseError("Database integrity error creating user-device assignment") from e
+        except PgError as e:
+            raise DatabaseError("Database error creating user-device assignment") from e
+
+    def user_device_get(self, user_id: int, device_id: int) -> UserDevice | None:
+        try:
+            with self._connect() as conn:
+                cursor = conn.cursor(row_factory=dict_row)
+                cursor.execute(
+                    """
+                    SELECT user_id, device_id, created_at, expires_at
+                    FROM users_devices
+                    WHERE user_id = %s AND device_id = %s
+                    """,
+                    (user_id, device_id),
+                )
+                row = cursor.fetchone()
+                return self._row_to_user_device(row) if row else None
+        except PgError as e:
+            raise DatabaseError("Database error retrieving user-device assignment") from e
+
+    def user_device_is_expired(self, user_id: int, device_id: int) -> bool:
+        user_device = self.user_device_get(user_id, device_id)
+        if user_device is None:
+            raise UserDeviceNotFoundError(
+                f"Assignment user={user_id}, device={device_id} was not found"
+            )
+        if user_device.expires_at is None:
+            return False
+        expires_at = user_device.expires_at
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=UTC)
+        return expires_at <= datetime.now(UTC)
+
+    def user_device_set_expiry(
+        self, user_id: int, device_id: int, expires_at: datetime | None
+    ) -> UserDevice:
+        if self.user_device_get(user_id, device_id) is None:
+            raise UserDeviceNotFoundError(
+                f"Assignment user={user_id}, device={device_id} was not found"
+            )
+        try:
+            with self._connect() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    """
+                    UPDATE users_devices
+                    SET expires_at = %s
+                    WHERE user_id = %s AND device_id = %s
+                    """,
+                    (
+                        expires_at.isoformat() if expires_at else None,
+                        user_id,
+                        device_id,
+                    ),
+                )
+                conn.commit()
+            user_device = self.user_device_get(user_id, device_id)
+            if user_device is None:
+                raise DatabaseError("User-device assignment disappeared after update")
+            return user_device
+        except UserDeviceNotFoundError:
+            raise
+        except PgError as e:
+            raise DatabaseError("Database error updating user-device expiry") from e
+
+    def user_device_delete(self, user_id: int, device_id: int) -> None:
+        if self.user_device_get(user_id, device_id) is None:
+            raise UserDeviceNotFoundError(
+                f"Assignment user={user_id}, device={device_id} was not found"
+            )
+        try:
+            with self._connect() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    """
+                    DELETE FROM users_devices
+                    WHERE user_id = %s AND device_id = %s
+                    """,
+                    (user_id, device_id),
+                )
+                conn.commit()
+        except PgError as e:
+            raise DatabaseError("Database error deleting user-device assignment") from e
+
+    def _build_device_filters(
+        self,
+        is_active: bool | None = None,
+        project_id: int | None = None,
+        target_id: int | None = None,
+        current_version: str | None = None,
+    ) -> tuple[str, tuple[object, ...]]:
+        filters: list[str] = []
+        params: list[object] = []
+        if is_active is not None:
+            filters.append("devices.is_active = %s")
+            params.append(bool(is_active))
+        if project_id is not None:
+            filters.append("devices.project_id = %s")
+            params.append(project_id)
+        if target_id is not None:
+            filters.append("devices.target_id = %s")
+            params.append(target_id)
+        if current_version is not None:
+            filters.append("devices.current_version = %s")
+            params.append(current_version)
+        where_clause = ""
+        if filters:
+            where_clause = " WHERE " + " AND ".join(filters)
+        return where_clause, tuple(params)
+
+    def device_get_record(
+        self,
+        is_active: bool | None = None,
+        project_id: int | None = None,
+    ) -> list[Device]:
+        try:
+            with self._connect() as conn:
+                where_clause, params = self._build_device_filters(
+                    is_active=is_active,
+                    project_id=project_id,
+                )
+                cursor = conn.cursor(row_factory=dict_row)
+                cursor.execute(
+                    f"""
+                    SELECT
+                        id,
+                        uuid,
+                        project_id,
+                        target_id,
+                        model,
+                        serial_number,
+                        current_version,
+                        last_seen,
+                        is_active,
+                        created_at,
+                        updated_at
+                    FROM devices
+                    {where_clause}
+                    ORDER BY project_id, id
+                    """,
+                    params,
+                )
+                return [self._row_to_device(row) for row in cursor.fetchall()]
+        except PgError as e:
+            raise DatabaseError("Database error retrieving devices") from e
+
+    def device_get_list(
+        self,
+        is_active: bool | None = None,
+        project_id: int | None = None,
+        target_id: int | None = None,
+        current_version: str | None = None,
+    ) -> list[DeviceListItem]:
+        try:
+            with self._connect() as conn:
+                where_clause, params = self._build_device_filters(
+                    is_active=is_active,
+                    project_id=project_id,
+                    target_id=target_id,
+                    current_version=current_version,
+                )
+                cursor = conn.cursor(row_factory=dict_row)
+                cursor.execute(
+                    f"""
+                    SELECT
+                        devices.id,
+                        devices.uuid AS uuid,
+                        projects.name AS project_name,
+                        targets.name AS target_name,
+                        devices.model,
+                        devices.serial_number,
+                        devices.current_version,
+                        devices.last_seen,
+                        devices.is_active
+                    FROM devices
+                    JOIN projects ON projects.id = devices.project_id
+                    JOIN targets ON targets.id = devices.target_id
+                    {where_clause}
+                    ORDER BY projects.name, devices.id
+                    """,
+                    params,
+                )
+                rows = cursor.fetchall()
+                return [
+                    DeviceListItem(
+                        id=row["id"],
+                        uuid=row["uuid"],
+                        project_name=row["project_name"],
+                        target_name=row["target_name"],
+                        model=row["model"],
+                        serial_number=row["serial_number"],
+                        current_version=row["current_version"],
+                        last_seen=self._as_datetime(row["last_seen"]),
+                        is_active=bool(row["is_active"]),
+                    )
+                    for row in rows
+                ]
+        except PgError as e:
+            raise DatabaseError("Database error retrieving device list") from e
+
+    def device_update_by_id(
+        self,
+        device_id: int,
+        *,
+        project_id: int | None = None,
+        target_id: int | None = None,
+        model: str | None = None,
+        serial_number: str | None = None,
+        current_version: str | None = None,
+    ) -> Device:
+        """
+        Partially update a device. Only non-None arguments are written.
+
+        Raises:
+            ValueError: If no field to update is provided.
+            DeviceNotFoundError: If the device does not exist.
+            DeviceAlreadyExistsError: If the new serial number is already taken.
+            TargetNotFoundError: If a referenced project or target does not exist.
+            DatabaseError: For unexpected database errors.
+        """
+        updates: dict[str, Any] = {}
+        if project_id is not None:
+            updates["project_id"] = project_id
+        if target_id is not None:
+            updates["target_id"] = target_id
+        if model is not None:
+            updates["model"] = model
+        if serial_number is not None:
+            updates["serial_number"] = serial_number
+        if current_version is not None:
+            updates["current_version"] = current_version
+        if not updates:
+            raise ValueError("At least one field must be provided to update a device")
+
+        now = datetime.now(UTC)
+        assignments = ", ".join(f"{column} = %s" for column in updates)
+
+        try:
+            with self._connect() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    f"""
+                    UPDATE devices
+                    SET
+                        {assignments},
+                        updated_at = %s
+                    WHERE id = %s
+                    """,
+                    (*updates.values(), now.isoformat(), device_id),
+                )
+                if cursor.rowcount == 0 and not self._row_exists(conn, "devices", device_id):
+                    raise DeviceNotFoundError(f"Device id={device_id} not found")
+
+                dict_cursor = conn.cursor(row_factory=dict_row)
+                dict_cursor.execute(
+                    """
+                    SELECT
+                        id,
+                        uuid,
+                        project_id,
+                        target_id,
+                        model,
+                        serial_number,
+                        current_version,
+                        last_seen,
+                        is_active,
+                        created_at,
+                        updated_at
+                    FROM devices
+                    WHERE id = %s
+                    """,
+                    (device_id,),
+                )
+                row = dict_cursor.fetchone()
+                conn.commit()
+                return self._row_to_device(row)
+        except psycopg.IntegrityError as e:
+            message = str(e)
+            if "serial_number" in message or isinstance(e, UniqueViolation):
+                raise DeviceAlreadyExistsError(
+                    f"Device serial number '{serial_number}' already exists"
+                ) from e
+            if "project_id" in message or "target_id" in message:
+                raise TargetNotFoundError(
+                    f"Database integrity violation: Project id={project_id} or target id={target_id} does not exist"
+                ) from e
+            raise DatabaseError(
+                f"Database integrity error updating device id={device_id}: {message}"
+            ) from e
+        except PgError as e:
+            raise DatabaseError(
+                f"Database error updating device id={device_id}"
+            ) from e
+
+    def _row_to_firmware(self, row: dict[str, Any]) -> Firmware:
+        return Firmware(
+            id=row["id"],
+            project_id=row["project_id"],
+            target_id=row["target_id"],
+            version=row["version"],
+            filename=row["filename"],
+            file_size=row["file_size"],
+            checksum=row["checksum"],
+            release_notes=row["release_notes"],
+            channel=row["channel"],
+            is_active=bool(row["is_active"]),
+            created_at=self._as_datetime(row["created_at"]),
+            updated_at=self._as_datetime(row["updated_at"]),
+        )
+
+    def _row_to_firmware_list(self, row: dict[str, Any]) -> FirmwareListItem:
+        return FirmwareListItem(
+            id=row["id"],
+            project_name=row["project_name"],
+            target_name=row["target_name"],
+            version=row["version"],
+            filename=row["filename"],
+            file_size=row["file_size"],
+            channel=row["channel"],
+            is_active=bool(row["is_active"]),
+        )
+
+    def firmware_add(self, firmware: Firmware) -> Firmware:
+        now = datetime.now(UTC)
+        try:
+            with self._connect() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    """
+                    INSERT INTO firmware (
+                        project_id,
+                        target_id,
+                        version,
+                        filename,
+                        file_size,
+                        checksum,
+                        release_notes,
+                        channel,
+                        is_active,
+                        created_at,
+                        updated_at
+                    )
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    RETURNING id
+                    """,
+                    (
+                        firmware.project_id,
+                        firmware.target_id,
+                        firmware.version,
+                        firmware.filename,
+                        firmware.file_size,
+                        firmware.checksum,
+                        firmware.release_notes,
+                        firmware.channel,
+                        bool(firmware.is_active),
+                        now.isoformat(),
+                        None,
+                    ),
+                )
+                conn.commit()
+                firmware.id = cursor.fetchone()[0]
+                firmware.created_at = now
+                firmware.updated_at = None
+                return firmware
+        except psycopg.IntegrityError as e:
+            message = str(e)
+            if "uq_firmware_project_version_target" in message or isinstance(e, UniqueViolation):
+                raise FirmwareAlreadyExistsError(
+                    f"Firmware '{firmware.version}' already exists"
+                ) from e
+            if "project_id" in message or "target_id" in message:
+                raise TargetNotFoundError(
+                    f"Database integrity violation: Project id={firmware.project_id} or target id={firmware.target_id} does not exist"
+                ) from e
+            raise DatabaseError(
+                f"Database integrity error creating firmware '{firmware.version}': {message}"
+            ) from e
+        except PgError as e:
+            raise DatabaseError(
+                f"Database error creating firmware '{firmware.version}'"
+            ) from e
+
+    def firmware_replace(self, firmware_id: int, filename: str, file_size: int, checksum: str) -> Firmware:
+        try:
+            with self._connect() as conn:
+                cursor = conn.cursor(row_factory=dict_row)
+                cursor.execute(
+                    """
+                    SELECT
+                        id,
+                        project_id,
+                        target_id,
+                        version,
+                        filename,
+                        file_size,
+                        checksum,
+                        release_notes,
+                        channel,
+                        is_active,
+                        created_at,
+                        updated_at
+                    FROM firmware
+                    WHERE id = %s
+                    """,
+                    (firmware_id,),
+                )
+                row = cursor.fetchone()
+                if row is None:
+                    raise FirmwareNotFoundError(f"Firmware id={firmware_id} not found")
+
+                updated = self._row_to_firmware(row)
+                updated.filename = filename
+                updated.file_size = file_size
+                updated.checksum = checksum
+                updated.updated_at = datetime.now(UTC)
+
+                cursor = conn.cursor()
+                cursor.execute(
+                    """
+                    UPDATE firmware
+                    SET
+                        filename = %s,
+                        file_size = %s,
+                        checksum = %s,
+                        updated_at = %s
+                    WHERE id = %s
+                    """,
+                    (
+                        updated.filename,
+                        updated.file_size,
+                        updated.checksum,
+                        updated.updated_at.isoformat(),
+                        firmware_id,
+                    ),
+                )
+                conn.commit()
+                return updated
+        except PgError as e:
+            raise DatabaseError(
+                f"Database error updating firmware '{firmware_id}'"
+            ) from e
+
+    def _row_to_firmware_delete_info(self, row: dict[str, Any]) -> FirmwareDeleteInfo:
+        return FirmwareDeleteInfo(
+            id=row["id"],
+            project_name=row["project_name"],
+            filename=row["filename"],
+        )
+
+    def firmware_delete_by_id(self, firmware_id: int) -> FirmwareDeleteInfo:
+        try:
+            with self._connect() as conn:
+                cursor = conn.cursor(row_factory=dict_row)
+                cursor.execute(
+                    """
+                    DELETE FROM firmware
+                    WHERE id = %s
+                    RETURNING
+                        id,
+                        filename,
+                        (
+                            SELECT name
+                            FROM projects
+                            WHERE projects.id = firmware.project_id
+                        ) AS project_name
+                    """,
+                    (firmware_id,),
+                )
+                row = cursor.fetchone()
+                if row is None:
+                    raise FirmwareNotFoundError(f"Firmware id={firmware_id} not found")
+                conn.commit()
+                return self._row_to_firmware_delete_info(row)
+        except PgError as e:
+            raise DatabaseError(
+                f"Database error deleting firmware '{firmware_id}'"
+            ) from e
+
+    def firmware_delete_by_project_version(
+        self,
+        project_id: int,
+        version: str,
+    ) -> FirmwareDeleteInfo:
+        try:
+            with self._connect() as conn:
+                cursor = conn.cursor(row_factory=dict_row)
+                cursor.execute(
+                    """
+                    DELETE FROM firmware
+                    WHERE project_id = %s
+                    AND version = %s
+                    RETURNING
+                        id,
+                        filename,
+                        (
+                            SELECT name
+                            FROM projects
+                            WHERE projects.id = firmware.project_id
+                        ) AS project_name
+                    """,
+                    (project_id, version),
+                )
+                row = cursor.fetchone()
+                if row is None:
+                    raise FirmwareNotFoundError(
+                        f"Firmware project_id={project_id}, version={version} not found"
+                    )
+                conn.commit()
+                return self._row_to_firmware_delete_info(row)
+        except PgError as e:
+            raise DatabaseError(
+                f"Database error deleting firmware project_id={project_id}, version={version}"
+            ) from e
+
+    def _firmware_enable_disable(
+        self,
+        columns: tuple[str, ...],
+        parameters: tuple[int | str, ...],
+        op: bool,
+    ):
+        if not columns:
+            raise ValueError("At least one column is required")
+        if len(columns) != len(parameters):
+            raise ValueError("Number of columns must match number of parameters")
+
+        lookup = ", ".join(f"{column}={parameter}" for column, parameter in zip(columns, parameters))
+        new_state = op
+        old_state = not op
+        where_clause = " AND ".join(f"{column} = %s" for column in columns)
+        now = datetime.now(UTC)
+
+        try:
+            with self._connect() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    f"""
+                    UPDATE firmware
+                    SET
+                        is_active = %s,
+                        updated_at = %s
+                    WHERE {where_clause}
+                    AND is_active = %s
+                    """,
+                    (new_state, now.isoformat(), *parameters, old_state),
+                )
+
+                if cursor.rowcount == 1:
+                    conn.commit()
+                    return
+
+                cursor = conn.cursor(row_factory=dict_row)
+                cursor.execute(
+                    f"SELECT is_active FROM firmware WHERE {where_clause}",
+                    parameters,
+                )
+                row = cursor.fetchone()
+                if row is None:
+                    raise FirmwareNotFoundError(f"Firmware {lookup} not found")
+
+            if op:
+                raise FirmwareAlreadyEnabledError(f"Firmware {lookup} is already enabled")
+            raise FirmwareAlreadyDisabledError(f"Firmware {lookup} is already disabled")
+        except PgError as e:
+            if op:
+                raise DatabaseError(
+                    f"Database error enabling firmware {lookup}"
+                ) from e
+            raise DatabaseError(
+                f"Database error disabling firmware {lookup}"
+            ) from e
+
+    def firmware_enable_by_id(self, id: int) -> None:
+        self._firmware_enable_disable(("id",), (id,), True)
+
+    def firmware_enable_by_project_version(self, project_id: int, version: str) -> None:
+        self._firmware_enable_disable(("project_id", "version"), (project_id, version), True)
+
+    def firmware_disable_by_id(self, id: int) -> None:
+        self._firmware_enable_disable(("id",), (id,), False)
+
+    def firmware_disable_by_project_version(self, project_id: int, version: str) -> None:
+        self._firmware_enable_disable(("project_id", "version"), (project_id, version), False)
+
+    def _firmware_change_target(
+        self,
+        columns: tuple[str, ...],
+        parameters: tuple[int | str, ...],
+        target_id: int,
+    ) -> None:
+        if not columns:
+            raise ValueError("At least one column is required")
+        if len(columns) != len(parameters):
+            raise ValueError("Number of columns must match number of parameters")
+
+        lookup = ", ".join(f"{column}={parameter}" for column, parameter in zip(columns, parameters))
+        where_clause = " AND ".join(f"{column} = %s" for column in columns)
+        now = datetime.now(UTC)
+
+        try:
+            with self._connect() as conn:
+                cursor = conn.cursor(row_factory=dict_row)
+                cursor.execute(
+                    "SELECT id FROM targets WHERE id = %s",
+                    (target_id,),
+                )
+                if cursor.fetchone() is None:
+                    raise TargetNotFoundError(f"Target id={target_id} not found")
+
+                cursor = conn.cursor()
+                cursor.execute(
+                    f"""
+                    UPDATE firmware
+                    SET
+                        target_id = %s,
+                        updated_at = %s
+                    WHERE {where_clause}
+                    """,
+                    (target_id, now.isoformat(), *parameters),
+                )
+
+                if cursor.rowcount == 1:
+                    conn.commit()
+                    return
+
+                raise FirmwareNotFoundError(f"Firmware {lookup} not found")
+        except PgError as e:
+            raise DatabaseError(
+                f"Database error changing target for firmware {lookup}"
+            ) from e
+
+    def firmware_change_target_by_id(self, id: int, target_id: int) -> None:
+        self._firmware_change_target(("id",), (id,), target_id)
+
+    def firmware_change_target_by_project_version(self, project_id: int, version: str, target_id: int) -> None:
+        self._firmware_change_target(("project_id", "version"), (project_id, version), target_id)
+
+    def _firmware_get(
+        self,
+        columns: tuple[str, ...],
+        parameters: tuple[int | str, ...],
+    ) -> Firmware | None:
+        if not columns:
+            raise ValueError("At least one column is required")
+        if len(columns) != len(parameters):
+            raise ValueError("Number of columns must match number of parameters")
+
+        where_clause = " AND ".join(f"{column} = %s" for column in columns)
+
+        try:
+            with self._connect() as conn:
+                cursor = conn.cursor(row_factory=dict_row)
+                cursor.execute(
+                    f"""
+                    SELECT
+                        id,
+                        project_id,
+                        target_id,
+                        version,
+                        filename,
+                        file_size,
+                        checksum,
+                        release_notes,
+                        channel,
+                        is_active,
+                        created_at,
+                        updated_at
+                    FROM firmware
+                    WHERE {where_clause}
+                    """,
+                    parameters,
+                )
+                row = cursor.fetchone()
+                if row is None:
+                    return None
+                return self._row_to_firmware(row)
+        except PgError as e:
+            raise DatabaseError(
+                f"Database error retrieving firmware {columns}={parameters}"
+            ) from e
+
+    def firmware_get_by_id(self, firmware_id: int) -> Firmware | None:
+        return self._firmware_get(("id",), (firmware_id,))
+
+    def firmware_get_by_project_version(
+        self,
+        project_id: int,
+        version: str,
+    ) -> Firmware | None:
+        return self._firmware_get(("project_id", "version"), (project_id, version))
+
+    def firmware_get_by_project_version_target(
+        self,
+        project_id: int,
+        version: str,
+        target_id: int,
+    ) -> Firmware | None:
+        return self._firmware_get(
+            ("project_id", "version", "target_id"),
+            (project_id, version, target_id),
+        )
+
+    def firmware_is_active(self, firmware_id: int) -> bool:
+        try:
+            with self._connect() as conn:
+                cursor = conn.cursor(row_factory=dict_row)
+                cursor.execute(
+                    "SELECT is_active FROM firmware WHERE id = %s",
+                    (firmware_id,),
+                )
+                row = cursor.fetchone()
+                return bool(row["is_active"]) if row is not None else False
+        except PgError as e:
+            raise DatabaseError(
+                f"Database error checking whether firmware {firmware_id} is active"
+            ) from e
+
+    def _build_firmware_filters(
+        self,
+        is_active: bool | None = None,
+        project_id: int | None = None,
+        target_id: int | None = None,
+        channel: str | None = None,
+    ) -> tuple[str, tuple[object, ...]]:
+        filters: list[str] = []
+        params: list[object] = []
+        if is_active is not None:
+            filters.append("firmware.is_active = %s")
+            params.append(bool(is_active))
+        if project_id is not None:
+            filters.append("firmware.project_id = %s")
+            params.append(project_id)
+        if target_id is not None:
+            filters.append("firmware.target_id = %s")
+            params.append(target_id)
+        if channel is not None:
+            filters.append("firmware.channel = %s")
+            params.append(channel)
+        where_clause = ""
+        if filters:
+            where_clause = " WHERE " + " AND ".join(filters)
+        return where_clause, tuple(params)
+
+    def firmware_get_record(
+        self,
+        is_active: bool | None = None,
+        project_id: int | None = None,
+    ) -> list[Firmware]:
+        try:
+            with self._connect() as conn:
+                where_clause, params = self._build_firmware_filters(
+                    is_active=is_active,
+                    project_id=project_id,
+                )
+                cursor = conn.cursor(row_factory=dict_row)
+                cursor.execute(
+                    f"""
+                    SELECT
+                        id,
+                        project_id,
+                        target_id,
+                        version,
+                        filename,
+                        file_size,
+                        checksum,
+                        release_notes,
+                        channel,
+                        is_active,
+                        created_at,
+                        updated_at
+                    FROM firmware
+                    {where_clause}
+                    ORDER BY project_id, id
+                    """,
+                    params,
+                )
+                return [self._row_to_firmware(row) for row in cursor.fetchall()]
+        except PgError as e:
+            raise DatabaseError("Database error retrieving firmware") from e
+
+    def firmware_get_list(
+        self,
+        is_active: bool | None = None,
+        project_id: int | None = None,
+        target_id: int | None = None,
+        channel: str | None = None,
+    ) -> list[FirmwareListItem]:
+        try:
+            with self._connect() as conn:
+                where_clause, params = self._build_firmware_filters(
+                    is_active=is_active,
+                    project_id=project_id,
+                    target_id=target_id,
+                    channel=channel,
+                )
+                cursor = conn.cursor(row_factory=dict_row)
+                cursor.execute(
+                    f"""
+                    SELECT
+                        firmware.id,
+                        projects.name AS project_name,
+                        targets.name AS target_name,
+                        firmware.version,
+                        firmware.filename,
+                        firmware.file_size,
+                        firmware.channel,
+                        firmware.is_active
+                    FROM firmware
+                    JOIN projects ON projects.id = firmware.project_id
+                    JOIN targets ON targets.id = firmware.target_id
+                    {where_clause}
+                    ORDER BY projects.name, firmware.version
+                    """,
+                    params,
+                )
+                return [self._row_to_firmware_list(row) for row in cursor.fetchall()]
+        except PgError as e:
+            raise DatabaseError("Database error retrieving firmware") from e
+
+    def firmware_update_by_id(
+        self,
+        firmware_id: int,
+        *,
+        version: str | None = None,
+        release_notes: str | None = None,
+        channel: str | None = None,
+        target_id: int | None = None,
+        filename: str | None = None,
+        file_size: int | None = None,
+        checksum: str | None = None,
+    ) -> Firmware:
+        """
+        Partially update firmware metadata. Only non-None arguments are written.
+
+        Raises:
+            ValueError: If no field to update is provided or the channel is invalid.
+            FirmwareNotFoundError: If the firmware does not exist.
+            FirmwareAlreadyExistsError: If the new version conflicts with an existing record.
+            TargetNotFoundError: If the referenced target does not exist.
+            DatabaseError: For unexpected database errors.
+        """
+        updates: dict[str, Any] = {}
+        if version is not None:
+            updates["version"] = version
+        if release_notes is not None:
+            updates["release_notes"] = release_notes
+        if channel is not None:
+            updates["channel"] = channel
+        if target_id is not None:
+            updates["target_id"] = target_id
+        if filename is not None:
+            updates["filename"] = filename
+        if file_size is not None:
+            updates["file_size"] = file_size
+        if checksum is not None:
+            updates["checksum"] = checksum
+        if not updates:
+            raise ValueError("At least one field must be provided to update firmware")
+
+        now = datetime.now(UTC)
+        assignments = ", ".join(f"{column} = %s" for column in updates)
+
+        try:
+            with self._connect() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    f"""
+                    UPDATE firmware
+                    SET
+                        {assignments},
+                        updated_at = %s
+                    WHERE id = %s
+                    """,
+                    (*updates.values(), now.isoformat(), firmware_id),
+                )
+                if cursor.rowcount == 0 and not self._row_exists(conn, "firmware", firmware_id):
+                    raise FirmwareNotFoundError(f"Firmware id={firmware_id} not found")
+
+                dict_cursor = conn.cursor(row_factory=dict_row)
+                dict_cursor.execute(
+                    """
+                    SELECT
+                        id,
+                        project_id,
+                        target_id,
+                        version,
+                        filename,
+                        file_size,
+                        checksum,
+                        release_notes,
+                        channel,
+                        is_active,
+                        created_at,
+                        updated_at
+                    FROM firmware
+                    WHERE id = %s
+                    """,
+                    (firmware_id,),
+                )
+                row = dict_cursor.fetchone()
+                conn.commit()
+                return self._row_to_firmware(row)
+        except psycopg.IntegrityError as e:
+            message = str(e)
+            if "uq_firmware_project_version_target" in message or isinstance(e, UniqueViolation):
+                raise FirmwareAlreadyExistsError(
+                    f"Firmware '{version}' already exists"
+                ) from e
+            if "target_id" in message:
+                raise TargetNotFoundError(
+                    f"Database integrity violation: Target id={target_id} does not exist"
+                ) from e
+            if "channel" in message:
+                raise ValueError(
+                    f"Invalid firmware channel '{channel}'"
+                ) from e
+            raise DatabaseError(
+                f"Database integrity error updating firmware id={firmware_id}: {message}"
+            ) from e
+        except PgError as e:
+            raise DatabaseError(
+                f"Database error updating firmware id={firmware_id}"
+            ) from e

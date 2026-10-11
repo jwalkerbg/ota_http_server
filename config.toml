@@ -35,7 +35,7 @@ database = "ota_db"
 dbuser = "ota_user"
 dbpassword = "SlavaUkraini"
 
-[database.postgres]
+[database.postgresql]
 pghost = "localhost"
 pgport = 5432
 pgdatabase = "ota_db"

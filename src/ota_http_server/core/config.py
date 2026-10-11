@@ -668,13 +668,13 @@ class Config:
                     "dbfile": os.getenv("OTA_DB_FILE")
                 },
                 "postgresql": {
-                    "pghost": os.getenv("OTA_DB_HOST"),
-                    "pgport": os.getenv("OTA_DB_PORT"),
-                    "pgdatabase": os.getenv("OTA_DB"),
-                    "pguser": os.getenv("OTA_DB_USER"),
-                    "pgpassword": os.getenv("OTA_DB_PASSWORD"),
-                    "pgpool_size": os.getenv("OTA_DB_POOL_SIZE"),
-                    "pgecho": os.getenv("OTA_DB_ECHO")
+                    "pghost": os.getenv("OTA_PG_HOST"),
+                    "pgport": os.getenv("OTA_PG_PORT"),
+                    "pgdatabase": os.getenv("OTA_PG_DATABASE"),
+                    "pguser": os.getenv("OTA_PG_USER"),
+                    "pgpassword": os.getenv("OTA_PG_PASSWORD"),
+                    "pgpool_size": os.getenv("OTA_PG_POOL_SIZE"),
+                    "pgecho": os.getenv("OTA_PG_ECHO")
                 }
             }
         }
@@ -746,19 +746,19 @@ class Config:
 
             # PostgreSQL database options
             if config_cli.pghost is not None:
-                self.config['database']['postgresql']['dbhost'] = config_cli.pghost
+                self.config['database']['postgresql']['pghost'] = config_cli.pghost
             if config_cli.pgport is not None:
-                self.config['database']['postgresql']['dbport'] = config_cli.pgport
+                self.config['database']['postgresql']['pgport'] = config_cli.pgport
             if config_cli.pgdatabase is not None:
-                self.config['database']['postgresql']['database'] = config_cli.pgdatabase
+                self.config['database']['postgresql']['pgdatabase'] = config_cli.pgdatabase
             if config_cli.pguser is not None:
-                self.config['database']['postgresql']['dbuser'] = config_cli.pguser
+                self.config['database']['postgresql']['pguser'] = config_cli.pguser
             if config_cli.pgpassword is not None:
-                self.config['database']['postgresql']['dbpassword'] = config_cli.pgpassword
+                self.config['database']['postgresql']['pgpassword'] = config_cli.pgpassword
             if config_cli.pgpool_size is not None:
-                self.config['database']['postgresql']['dbpool_size'] = config_cli.pgpool_size
+                self.config['database']['postgresql']['pgpool_size'] = config_cli.pgpool_size
             if config_cli.pgecho is not None:
-                self.config['database']['postgresql']['dbecho'] = config_cli.pgecho
+                self.config['database']['postgresql']['pgecho'] = config_cli.pgecho
 
             # trace sql
             if config_cli.trace_sql is not None:
