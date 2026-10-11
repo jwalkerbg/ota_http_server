@@ -286,7 +286,7 @@ PostgreSQL parameters use the `pg` prefix to distinguish them from the MySQL one
 | `--pgdatabase` | `OTA_PG_DATABASE` | `pgdatabase` | `ota_db` |
 | `--pguser` | `OTA_PG_USER` | `pguser` | `ota_user` |
 | `--pgpassword` | `OTA_PG_PASSWORD` | `pgpassword` | `ota_password` |
-| `--pgpool-size` | `OTA_PG_POOL_SIZE` | `pgpool_size` | `10` (accepted for configuration compatibility; a connection is opened per operation) |
+| `--pgpool-size` | `OTA_PG_POOL_SIZE` | `pgpool_size` | `10` (maximum size of the `psycopg_pool` connection pool) |
 | `--pgecho` / `--no-pgecho` | `OTA_PG_ECHO` | `pgecho` | `false` |
 
 Example:

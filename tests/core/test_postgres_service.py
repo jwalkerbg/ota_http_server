@@ -62,6 +62,7 @@ def db(monkeypatch):
     service = m.DatabasePostgreSQLService(_make_cfg())
     service.init_db()
     yield service
+    service.close()
     _admin_execute(f"DROP SCHEMA {schema} CASCADE")
 
 
@@ -95,6 +96,12 @@ def _firmware(db, project, version="1.0.0", target=None):
         filename=f"fw-{version}.bin", file_size=1, checksum="0" * 64, release_notes="n",
         channel="stable", is_active=False, created_at=None, updated_at=None,
     ))
+
+
+def test_pool_uses_configured_size(db):
+    db.user_get_list()
+    pool = db._get_pool()
+    assert (pool.min_size, pool.max_size) == (1, 1)
 
 
 def test_implements_database_interface():

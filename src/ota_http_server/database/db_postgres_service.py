@@ -1,5 +1,9 @@
 # database/db_postgres_service.py
 
+import atexit
+import threading
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import UTC, datetime
 from typing import Any, NoReturn
 
@@ -7,6 +11,7 @@ import psycopg
 from psycopg import Error as PgError
 from psycopg.errors import UniqueViolation
 from psycopg.rows import dict_row
+from psycopg_pool import ConnectionPool
 
 from ota_http_server.core.config import Config
 from ota_http_server.core.data_models import (
@@ -124,22 +129,48 @@ class DatabasePostgreSQLService:
     def __init__(self, cfg: Config):
         self.cfg = cfg
         self.migration_runner = MigrationPostgreSQLRunner(cfg)
+        self._pool: ConnectionPool | None = None
+        self._pool_lock = threading.Lock()
+        atexit.register(self.close)
 
-    def _connect(self):
+    def _get_pool(self) -> ConnectionPool:
+        with self._pool_lock:
+            if self._pool is None:
+                db_config = self.cfg.config["database"]["postgresql"]
+                max_size = max(1, int(db_config["pgpool_size"]))
+                pool = ConnectionPool(
+                    kwargs={
+                        "host": db_config["pghost"],
+                        "port": db_config["pgport"],
+                        "dbname": db_config["pgdatabase"],
+                        "user": db_config["pguser"],
+                        "password": db_config["pgpassword"],
+                        "autocommit": False,
+                    },
+                    min_size=1,
+                    max_size=max_size,
+                    open=False,
+                )
+                pool.open(wait=True)
+                self._pool = pool
+            return self._pool
+
+    @contextmanager
+    def _connect(self) -> Iterator[Any]:
+        """Borrow a pooled connection; commits on success, rolls back on error."""
         db_config = self.cfg.config["database"]["postgresql"]
-        conn = psycopg.connect(
-            host=db_config["pghost"],
-            port=db_config["pgport"],
-            dbname=db_config["pgdatabase"],
-            user=db_config["pguser"],
-            password=db_config["pgpassword"],
-            autocommit=False,
-        )
         sql_trace_enabled = is_sql_tracing_enabled(
             self.cfg.config["parameters"]["trace_sql"],
             db_config["pgecho"],
         )
-        return with_mysql_sql_tracing(conn, logger, sql_trace_enabled)
+        with self._get_pool().connection() as conn:
+            yield with_mysql_sql_tracing(conn, logger, sql_trace_enabled)
+
+    def close(self) -> None:
+        with self._pool_lock:
+            pool, self._pool = self._pool, None
+        if pool is not None:
+            pool.close()
 
     @staticmethod
     def _as_datetime(value: Any) -> datetime | None:

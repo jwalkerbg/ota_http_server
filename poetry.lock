@@ -1541,6 +1541,29 @@ url = "http://pypi.imc.bg/simple"
 reference = "imc-pypi"
 
 [[package]]
+name = "psycopg-pool"
+version = "3.3.3"
+description = "Connection Pool for Psycopg"
+optional = false
+python-versions = ">=3.10"
+groups = ["main"]
+files = [
+    {file = "psycopg_pool-3.3.3-py3-none-any.whl", hash = "sha256:9b9cd6a4fcec47a410f7e82d408540e7f77b478509e91b44c1a5457a13e5ff37"},
+    {file = "psycopg_pool-3.3.3.tar.gz", hash = "sha256:df87b5d9d0ad7db37f6cdad4fa8ce113d250f5997f6db38e9a99192fb67f9e1d"},
+]
+
+[package.dependencies]
+typing-extensions = ">=4.6"
+
+[package.extras]
+test = ["anyio (>=4.0)", "mypy (>=2.1.0)", "pproxy (>=2.7)", "pytest (>=6.2.5)", "pytest-cov (>=3.0)", "pytest-randomly (>=3.5)"]
+
+[package.source]
+type = "legacy"
+url = "http://pypi.imc.bg/simple"
+reference = "imc-pypi"
+
+[[package]]
 name = "pycparser"
 version = "3.0"
 description = "C parser in Python"
@@ -1977,7 +2000,6 @@ files = [
     {file = "typing_extensions-4.16.0-py3-none-any.whl", hash = "sha256:481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8"},
     {file = "typing_extensions-4.16.0.tar.gz", hash = "sha256:dc983d19a509c94dba722ee6abd33940f7c05a89e243c47e907eb4db6f1a43e5"},
 ]
-markers = {main = "python_version == \"3.12\""}
 
 [package.source]
 type = "legacy"
@@ -2051,4 +2073,4 @@ reference = "imc-pypi"
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12"
-content-hash = "5fa55a0cfe91941b7cefa02de8445fd5404abda9fb288f48d291248f5138403d"
+content-hash = "65ac436fe59fbb12d1a4292822646b699066874d707c823429a0cb3cdb7724ec"
