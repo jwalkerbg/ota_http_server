@@ -35,5 +35,12 @@ database = "ota_db"
 dbuser = "ota_user"
 dbpassword = "SlavaUkraini"
 
+[database.postgres]
+pghost = "localhost"
+pgport = 5432
+pgtabase = "ota_db"
+pguser = "ota_user"
+pgpassword = "SlavaUkraini"
+
 [database.sqlite]
 db_file = "ota_db.sqlite"
