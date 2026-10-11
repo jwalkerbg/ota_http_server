@@ -295,7 +295,7 @@ Example:
 ota_http_server --dbtype postgresql --pghost localhost --pgdatabase ota_db --pguser ota_user --pgpassword <password> db init-db --migrate
 ```
 
-Tests against a real PostgreSQL server (`tests/core/test_postgres_service.py`) are skipped unless `OTA_TEST_PG_HOST`, `OTA_TEST_PG_DB`, `OTA_TEST_PG_USER` and `OTA_TEST_PG_PASSWORD` are set (`OTA_TEST_PG_PORT` is optional). Each test runs in its own temporary schema, which is dropped afterwards.
+Tests against a real PostgreSQL server are described in [Testing](#testing).
 
 ### Database operations
 
@@ -1084,6 +1084,56 @@ Without token
 ```bash
 https://mycompany.com/firmware
 ```
+
+## Testing
+
+Run the whole test suite from the project environment:
+
+```bash
+python -m pytest tests
+```
+
+Tests that need a real MySQL or PostgreSQL server are **skipped** unless the environment variables below are set. Without them the rest of the suite runs normally against SQLite and fakes.
+
+> ⚠️ Use dedicated test databases only. MySQL tests **drop every table** in the test database before and after each test. The MySQL fixture refuses to run unless the database name ends with `_test`.
+
+### MySQL
+
+Tests: `tests/core/test_mysql_delete.py`, `tests/core/test_mysql_pool.py` (the connection-pool exhaustion test). Requires the `mysql-connector-python` package.
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `OTA_TEST_MYSQL_HOST` | yes | – | MySQL server host |
+| `OTA_TEST_MYSQL_PORT` | no | `3306` | MySQL server port |
+| `OTA_TEST_MYSQL_DB` | yes | – | Test database name; must end with `_test` (e.g. `ota_test`) |
+| `OTA_TEST_MYSQL_USER` | yes | – | User with full rights on the test database |
+| `OTA_TEST_MYSQL_PASSWORD` | yes | – | Password of that user |
+
+### PostgreSQL
+
+Test: `tests/core/test_postgres_service.py`. Requires the `psycopg` and `psycopg_pool` packages (the whole module is imported by the PostgreSQL service, so collecting tests fails without them).
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `OTA_TEST_PG_HOST` | yes | – | PostgreSQL server host |
+| `OTA_TEST_PG_PORT` | no | `5432` | PostgreSQL server port |
+| `OTA_TEST_PG_DB` | yes | – | Test database name |
+| `OTA_TEST_PG_USER` | yes | – | User allowed to create and drop schemas |
+| `OTA_TEST_PG_PASSWORD` | yes | – | Password of that user |
+
+Each PostgreSQL test runs in its own temporary schema, which is dropped afterwards, so other data in the database is not touched.
+
+### Example (PowerShell)
+
+```powershell
+$env:OTA_TEST_MYSQL_HOST = "localhost"
+$env:OTA_TEST_MYSQL_DB = "ota_test"
+$env:OTA_TEST_MYSQL_USER = "ota_user"
+$env:OTA_TEST_MYSQL_PASSWORD = "<password>"
+python -m pytest tests/core/test_mysql_delete.py tests/core/test_mysql_pool.py
+```
+
+On Linux/macOS use `export OTA_TEST_MYSQL_HOST=localhost` etc. Do not commit credentials; set them in your shell or CI secrets.
 
 ## Code Quality and Static Analysis
 
