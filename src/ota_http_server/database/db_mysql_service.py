@@ -3,8 +3,11 @@
 from datetime import UTC, datetime
 from typing import Any, NoReturn
 
+import threading
+
 import mysql.connector
 from mysql.connector import Error as MySQLError
+from mysql.connector.pooling import CNX_POOL_MAXSIZE, MySQLConnectionPool
 
 from ota_http_server.core.config import Config
 from ota_http_server.core.data_models import (
@@ -122,17 +125,30 @@ class DatabaseMySQLService:
     def __init__(self, cfg: Config):
         self.cfg = cfg
         self.migration_runner = MigrationMySQLRunner(cfg)
+        self._pool: MySQLConnectionPool | None = None
+        self._pool_lock = threading.Lock()
+
+    def _get_pool(self) -> MySQLConnectionPool:
+        with self._pool_lock:
+            if self._pool is None:
+                db_config = self.cfg.config["database"]["mysql"]
+                # mysql.connector limits pool size to CNX_POOL_MAXSIZE connections
+                pool_size = min(max(1, int(db_config["mypool_size"])), CNX_POOL_MAXSIZE)
+                self._pool = MySQLConnectionPool(
+                    pool_name="ota_http_server",
+                    pool_size=pool_size,
+                    host=db_config["myhost"],
+                    port=db_config["myport"],
+                    database=db_config["mydatabase"],
+                    user=db_config["myuser"],
+                    password=db_config["mypassword"],
+                    autocommit=False,
+                )
+            return self._pool
 
     def _connect(self):
         db_config = self.cfg.config["database"]["mysql"]
-        conn = mysql.connector.connect(
-            host=db_config["myhost"],
-            port=db_config["myport"],
-            database=db_config["mydatabase"],
-            user=db_config["myuser"],
-            password=db_config["mypassword"],
-            autocommit=False,
-        )
+        conn = self._get_pool().get_connection()
         sql_trace_enabled = is_sql_tracing_enabled(
             self.cfg.config["parameters"]["trace_sql"],
             db_config["myecho"],
