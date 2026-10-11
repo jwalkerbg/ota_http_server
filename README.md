@@ -1123,7 +1123,9 @@ Test: `tests/core/test_postgres_service.py`. Requires the `psycopg` and `psycopg
 
 Each PostgreSQL test runs in its own temporary schema, which is dropped afterwards, so other data in the database is not touched.
 
-### Example (PowerShell)
+### Examples (PowerShell)
+
+MySQL:
 
 ```powershell
 $env:OTA_TEST_MYSQL_HOST = "localhost"
@@ -1131,6 +1133,16 @@ $env:OTA_TEST_MYSQL_DB = "ota_test"
 $env:OTA_TEST_MYSQL_USER = "ota_user"
 $env:OTA_TEST_MYSQL_PASSWORD = "<password>"
 python -m pytest tests/core/test_mysql_delete.py tests/core/test_mysql_pool.py
+```
+
+PostgreSQL:
+
+```powershell
+$env:OTA_TEST_PG_HOST = "localhost"
+$env:OTA_TEST_PG_DB = "ota_test"
+$env:OTA_TEST_PG_USER = "ota_user"
+$env:OTA_TEST_PG_PASSWORD = "<password>"
+python -m pytest tests/core/test_postgres_service.py
 ```
 
 On Linux/macOS use `export OTA_TEST_MYSQL_HOST=localhost` etc. Do not commit credentials; set them in your shell or CI secrets.
