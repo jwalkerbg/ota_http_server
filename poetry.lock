@@ -1727,6 +1727,26 @@ url = "http://pypi.imc.bg/simple"
 reference = "imc-pypi"
 
 [[package]]
+name = "python-dotenv"
+version = "1.2.4"
+description = "Read key-value pairs from a .env file and set them as environment variables"
+optional = false
+python-versions = ">=3.10"
+groups = ["test"]
+files = [
+    {file = "python_dotenv-1.2.4-py3-none-any.whl", hash = "sha256:42269a8a5b3fd54ffa6f3d84b18abed50064717576b4ecf03dc4a55d8aa04fdc"},
+    {file = "python_dotenv-1.2.4.tar.gz", hash = "sha256:f0d53e69935a851c0dcc78f3ab7aaccd8cabef0b92382b576b824212902873c0"},
+]
+
+[package.extras]
+cli = ["click (>=5.0)"]
+
+[package.source]
+type = "legacy"
+url = "http://pypi.imc.bg/simple"
+reference = "imc-pypi"
+
+[[package]]
 name = "referencing"
 version = "0.37.0"
 description = "JSON Referencing + Python"
@@ -2073,4 +2093,4 @@ reference = "imc-pypi"
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12"
-content-hash = "65ac436fe59fbb12d1a4292822646b699066874d707c823429a0cb3cdb7724ec"
+content-hash = "0e1a7fa84de71eac79b069f6744fbccbbc045a00bdb1534c32c45675cc88d352"
