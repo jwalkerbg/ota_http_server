@@ -12,6 +12,7 @@ from ota_http_server.database.mysql_sql_tracing import (
     is_sql_tracing_enabled,
     with_mysql_sql_tracing,
 )
+from ota_http_server.database.db_ssl import get_mysql_ssl_kwargs
 from ota_http_server.logger import get_app_logger
 
 logger = get_app_logger(__name__)
@@ -41,12 +42,14 @@ class MigrationMySQLRunner:
 
     def _connect(self) -> Any:
         db_config = self.cfg.config["database"]["mysql"]
+        ssl_kwargs = get_mysql_ssl_kwargs(db_config)
         conn = mysql.connector.connect(
             host=db_config["myhost"],
             port=db_config["myport"],
             database=db_config["mydatabase"],
             user=db_config["myuser"],
             password=db_config["mypassword"],
+            **ssl_kwargs,
         )
         sql_trace_enabled = is_sql_tracing_enabled(
             self.cfg.config["parameters"]["trace_sql"],

@@ -275,6 +275,22 @@ ota_http_server runserver --help
 Server configuration options include host, port, certificate settings, JWT flags, and database connection parameters. The database can be selected with `--dbtype` (`sqlite`, `mysql` or `postgresql`), while SQLite file path is controlled with `--dbfile`.
 To print executed SQL statements in logs for SQLite, MySQL and PostgreSQL, enable SQL tracing with `--trace-sql` (or `--myecho` / `--pgecho` for MySQL / PostgreSQL compatibility) and set logging verbosity to debug (`--verbose 6`).
 
+#### MySQL
+
+| CLI option | Environment variable | `config.toml` key (`[database.mysql]`) | Default |
+|---|---|---|---|
+| `--myhost` | `OTA_MY_HOST` | `myhost` | `localhost` |
+| `--myport` | `OTA_MY_PORT` | `myport` | `3306` |
+| `--mydatabase` | `OTA_MY_DATABASE` | `mydatabase` | `ota_db` |
+| `--myuser` | `OTA_MY_USER` | `myuser` | `ota_user` |
+| `--mypassword` | `OTA_MY_PASSWORD` | `mypassword` | `ota_password` |
+| `--mypool-size` | `OTA_MY_POOL_SIZE` | `mypool_size` | `10` |
+| `--myecho` / `--no-myecho` | `OTA_MY_ECHO` | `myecho` | `false` |
+| `--myssl-mode` | `OTA_MY_SSL_MODE` | `ssl_mode` | `disabled` |
+| `--myssl-ca` | `OTA_MY_SSL_CA` | `ssl_ca` | `null` |
+| `--myssl-cert` | `OTA_MY_SSL_CERT` | `ssl_cert` | `null` |
+| `--myssl-key` | `OTA_MY_SSL_KEY` | `ssl_key` | `null` |
+
 #### PostgreSQL
 
 PostgreSQL parameters use the `pg` prefix to distinguish them from the MySQL ones:
@@ -288,6 +304,26 @@ PostgreSQL parameters use the `pg` prefix to distinguish them from the MySQL one
 | `--pgpassword` | `OTA_PG_PASSWORD` | `pgpassword` | `ota_password` |
 | `--pgpool-size` | `OTA_PG_POOL_SIZE` | `pgpool_size` | `10` (maximum size of the `psycopg_pool` connection pool) |
 | `--pgecho` / `--no-pgecho` | `OTA_PG_ECHO` | `pgecho` | `false` |
+| `--pgssl-mode` | `OTA_PG_SSL_MODE` | `ssl_mode` | `disabled` |
+| `--pgssl-ca` | `OTA_PG_SSL_CA` | `ssl_ca` | `null` |
+| `--pgssl-cert` | `OTA_PG_SSL_CERT` | `ssl_cert` | `null` |
+| `--pgssl-key` | `OTA_PG_SSL_KEY` | `ssl_key` | `null` |
+
+#### Abstract SSL Configuration for Databases
+
+When the database server is hosted over the Internet or an untrusted network, database communication must be encrypted. `ota_http_server` provides a unified abstract set of SSL settings that automatically maps to the specific drivers for MySQL (`mysql-connector-python`) and PostgreSQL (`psycopg`):
+
+| Abstract `ssl_mode` | MySQL Connector Parameter | PostgreSQL (`psycopg`) Parameter | Description |
+|---|---|---|---|
+| `disabled` | `ssl_disabled=True` | `sslmode="disable"` | Unencrypted connection. |
+| `prefer` | `ssl_disabled=False`, `ssl_verify_cert=False` | `sslmode="prefer"` | Attempt SSL; fallback to unencrypted if unsupported. |
+| `required` | `ssl_disabled=False`, `ssl_verify_cert=False` | `sslmode="require"` | Enforce encrypted connection without validating certificates. |
+| `verify_ca` | `ssl_disabled=False`, `ssl_verify_cert=True`, `ssl_ca=<path>` | `sslmode="verify-ca"`, `sslrootcert=<path>` | Enforce SSL and verify server certificate against CA root. |
+| `verify_full` | `ssl_disabled=False`, `ssl_verify_cert=True`, `ssl_verify_identity=True`, `ssl_ca=<path>` | `sslmode="verify-full"`, `sslrootcert=<path>` | Enforce SSL, verify CA root and verify server hostname matches certificate identity. |
+
+Client certificate authentication (mutual TLS / mTLS) is supported by providing `ssl_cert` and `ssl_key`:
+- MySQL: maps to `ssl_cert` and `ssl_key`
+- PostgreSQL: maps to `sslcert` and `sslkey`
 
 Example:
 
@@ -1099,7 +1135,7 @@ Tests that need a real MySQL or PostgreSQL server are **skipped** unless the env
 
 ### MySQL
 
-Tests: `tests/core/test_mysql_delete.py`, `tests/core/test_mysql_pool.py` (the connection-pool exhaustion test). Requires the `mysql-connector-python` package.
+Tests: `tests/core/test_mysql_delete.py`, `tests/core/test_mysql_pool.py` (the connection-pool exhaustion test), and SSL tests in `tests/core/test_db_ssl.py`. Requires the `mysql-connector-python` package.
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
@@ -1108,10 +1144,14 @@ Tests: `tests/core/test_mysql_delete.py`, `tests/core/test_mysql_pool.py` (the c
 | `OTA_TEST_MYSQL_DB` | yes | – | Test database name; must end with `_test` (e.g. `ota_test`) |
 | `OTA_TEST_MYSQL_USER` | yes | – | User with full rights on the test database |
 | `OTA_TEST_MYSQL_PASSWORD` | yes | – | Password of that user |
+| `OTA_TEST_MYSQL_SSL_MODE` | no | `disabled` | Abstract SSL mode (`prefer`, `required`, `verify_ca`, `verify_full`) |
+| `OTA_TEST_MYSQL_SSL_CA` | no | – | Path to CA root certificate file (e.g. `certsd/ca_cert.pem`) |
+| `OTA_TEST_MYSQL_SSL_CERT` | no | – | Path to client certificate file (e.g. `certsd/client_cert.pem`) |
+| `OTA_TEST_MYSQL_SSL_KEY` | no | – | Path to client private key file (e.g. `certsd/client_key.pem`) |
 
 ### PostgreSQL
 
-Test: `tests/core/test_postgres_service.py`. Requires the `psycopg` and `psycopg_pool` packages (the whole module is imported by the PostgreSQL service, so collecting tests fails without them).
+Tests: `tests/core/test_postgres_service.py` and SSL tests in `tests/core/test_db_ssl.py`. Requires the `psycopg` and `psycopg_pool` packages (the whole module is imported by the PostgreSQL service, so collecting tests fails without them).
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
@@ -1120,6 +1160,10 @@ Test: `tests/core/test_postgres_service.py`. Requires the `psycopg` and `psycopg
 | `OTA_TEST_PG_DB` | yes | – | Test database name |
 | `OTA_TEST_PG_USER` | yes | – | User allowed to create and drop schemas |
 | `OTA_TEST_PG_PASSWORD` | yes | – | Password of that user |
+| `OTA_TEST_PG_SSL_MODE` | no | `disabled` | Abstract SSL mode (`prefer`, `required`, `verify_ca`, `verify_full`) |
+| `OTA_TEST_PG_SSL_CA` | no | – | Path to CA root certificate file (e.g. `certsd/ca_cert.pem`) |
+| `OTA_TEST_PG_SSL_CERT` | no | – | Path to client certificate file (e.g. `certsd/client_cert.pem`) |
+| `OTA_TEST_PG_SSL_KEY` | no | – | Path to client private key file (e.g. `certsd/client_key.pem`) |
 
 Each PostgreSQL test runs in its own temporary schema, which is dropped afterwards, so other data in the database is not touched.
 

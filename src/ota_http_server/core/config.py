@@ -103,6 +103,10 @@ class DatabaseMySQLConfig(TypedDict, total=False):
     mypool_size: int
     myecho: bool
     migrations_dir: str
+    ssl_mode: str
+    ssl_ca: str | None
+    ssl_cert: str | None
+    ssl_key: str | None
 
 class databaseSQLiteConfig(TypedDict, total=False):
     db_file: str
@@ -117,6 +121,10 @@ class DatabasePostgreSQLConfig(TypedDict, total=False):
     pgpool_size: int
     pgecho: bool
     migrations_dir: str
+    ssl_mode: str
+    ssl_ca: str | None
+    ssl_cert: str | None
+    ssl_key: str | None
 
 class DatabaseConfig(TypedDict, total=False):
     dbtype: str
@@ -227,7 +235,11 @@ class Config:
                 'mypassword': "ota_password",
                 'mypool_size': 10,
                 'myecho': False,
-                "migrations_dir": str(_MIGRATIONS_DIR / "mysql")
+                "migrations_dir": str(_MIGRATIONS_DIR / "mysql"),
+                "ssl_mode": "disabled",
+                "ssl_ca": None,
+                "ssl_cert": None,
+                "ssl_key": None
             },
             "sqlite": {
                 "db_file": "ota_db.sqlite",
@@ -241,7 +253,11 @@ class Config:
                 "pgpassword": "ota_password",
                 "pgpool_size": 10,
                 "pgecho": False,
-                "migrations_dir": str(_MIGRATIONS_DIR / "postgresql")
+                "migrations_dir": str(_MIGRATIONS_DIR / "postgresql"),
+                "ssl_mode": "disabled",
+                "ssl_ca": None,
+                "ssl_cert": None,
+                "ssl_key": None
             }
         }
     }
@@ -504,6 +520,26 @@ class Config:
                             },
                             "migrations_dir": {
                                 "type": "string"
+                            },
+                            "ssl_mode": {
+                                "type": "string",
+                                "enum": [
+                                    "disabled", "disable", "off", "false", "none",
+                                    "prefer", "preferred",
+                                    "required", "require", "on", "true",
+                                    "verify_ca", "verify-ca",
+                                    "verify_identity", "verify-identity",
+                                    "verify_full", "verify-full"
+                                ]
+                            },
+                            "ssl_ca": {
+                                "type": ["string", "null"]
+                            },
+                            "ssl_cert": {
+                                "type": ["string", "null"]
+                            },
+                            "ssl_key": {
+                                "type": ["string", "null"]
                             }
                         },
                         "additionalProperties": False
@@ -546,6 +582,26 @@ class Config:
                             },
                             "migrations_dir": {
                                 "type": "string"
+                            },
+                            "ssl_mode": {
+                                "type": "string",
+                                "enum": [
+                                    "disabled", "disable", "off", "false", "none",
+                                    "prefer", "preferred",
+                                    "required", "require", "on", "true",
+                                    "verify_ca", "verify-ca",
+                                    "verify_identity", "verify-identity",
+                                    "verify_full", "verify-full"
+                                ]
+                            },
+                            "ssl_ca": {
+                                "type": ["string", "null"]
+                            },
+                            "ssl_cert": {
+                                "type": ["string", "null"]
+                            },
+                            "ssl_key": {
+                                "type": ["string", "null"]
                             }
                         },
                         "additionalProperties": False
@@ -662,7 +718,11 @@ class Config:
                     "myuser": os.getenv("OTA_MY_USER"),
                     "mypassword": os.getenv("OTA_MY_PASSWORD"),
                     "mypool_size": os.getenv("OTA_MY_POOL_SIZE"),
-                    "myecho": os.getenv("OTA_MY_ECHO")
+                    "myecho": os.getenv("OTA_MY_ECHO"),
+                    "ssl_mode": os.getenv("OTA_MY_SSL_MODE"),
+                    "ssl_ca": os.getenv("OTA_MY_SSL_CA"),
+                    "ssl_cert": os.getenv("OTA_MY_SSL_CERT"),
+                    "ssl_key": os.getenv("OTA_MY_SSL_KEY")
                 },
                 "sqlite": {
                     "dbfile": os.getenv("OTA_DB_FILE")
@@ -674,7 +734,11 @@ class Config:
                     "pguser": os.getenv("OTA_PG_USER"),
                     "pgpassword": os.getenv("OTA_PG_PASSWORD"),
                     "pgpool_size": os.getenv("OTA_PG_POOL_SIZE"),
-                    "pgecho": os.getenv("OTA_PG_ECHO")
+                    "pgecho": os.getenv("OTA_PG_ECHO"),
+                    "ssl_mode": os.getenv("OTA_PG_SSL_MODE"),
+                    "ssl_ca": os.getenv("OTA_PG_SSL_CA"),
+                    "ssl_cert": os.getenv("OTA_PG_SSL_CERT"),
+                    "ssl_key": os.getenv("OTA_PG_SSL_KEY")
                 }
             }
         }
@@ -739,6 +803,14 @@ class Config:
                 self.config['database']['mysql']['mypool_size'] = config_cli.mypool_size
             if config_cli.myecho is not None:
                 self.config['database']['mysql']['myecho'] = config_cli.myecho
+            if getattr(config_cli, "myssl_mode", None) is not None:
+                self.config['database']['mysql']['ssl_mode'] = config_cli.myssl_mode
+            if getattr(config_cli, "myssl_ca", None) is not None:
+                self.config['database']['mysql']['ssl_ca'] = config_cli.myssl_ca
+            if getattr(config_cli, "myssl_cert", None) is not None:
+                self.config['database']['mysql']['ssl_cert'] = config_cli.myssl_cert
+            if getattr(config_cli, "myssl_key", None) is not None:
+                self.config['database']['mysql']['ssl_key'] = config_cli.myssl_key
 
             # SQLite database options
             if config_cli.dbfile is not None:
@@ -759,6 +831,14 @@ class Config:
                 self.config['database']['postgresql']['pgpool_size'] = config_cli.pgpool_size
             if config_cli.pgecho is not None:
                 self.config['database']['postgresql']['pgecho'] = config_cli.pgecho
+            if getattr(config_cli, "pgssl_mode", None) is not None:
+                self.config['database']['postgresql']['ssl_mode'] = config_cli.pgssl_mode
+            if getattr(config_cli, "pgssl_ca", None) is not None:
+                self.config['database']['postgresql']['ssl_ca'] = config_cli.pgssl_ca
+            if getattr(config_cli, "pgssl_cert", None) is not None:
+                self.config['database']['postgresql']['ssl_cert'] = config_cli.pgssl_cert
+            if getattr(config_cli, "pgssl_key", None) is not None:
+                self.config['database']['postgresql']['ssl_key'] = config_cli.pgssl_key
 
             # trace sql
             if config_cli.trace_sql is not None:
@@ -1128,6 +1208,21 @@ Environment variables:
   OTA_MY_PASSWORD         Database password, can be overridden by --mypassword CLI option
   OTA_MY_POOL_SIZE        Database connection pool size (default 10), can be overridden by --mypool-size CLI option
   OTA_MY_ECHO             Enable database echo (default False), can be overridden by --myecho CLI option
+  OTA_MY_SSL_MODE         MySQL SSL mode: disabled, prefer, required, verify_ca, verify_full (default 'disabled'), can be overridden by --myssl-mode CLI option
+  OTA_MY_SSL_CA           Path to CA certificate for MySQL SSL, can be overridden by --myssl-ca CLI option
+  OTA_MY_SSL_CERT         Path to client certificate for MySQL SSL, can be overridden by --myssl-cert CLI option
+  OTA_MY_SSL_KEY          Path to client private key for MySQL SSL, can be overridden by --myssl-key CLI option
+  OTA_PG_HOST             PostgreSQL host (default 'localhost'), can be overridden by --pghost CLI option
+  OTA_PG_PORT             PostgreSQL port (default 5432), can be overridden by --pgport CLI option
+  OTA_PG_DATABASE         PostgreSQL database name (default 'ota_db'), can be overridden by --pgdatabase CLI option
+  OTA_PG_USER             PostgreSQL user (default 'ota_user'), can be overridden by --pguser CLI option
+  OTA_PG_PASSWORD         PostgreSQL password, can be overridden by --pgpassword CLI option
+  OTA_PG_POOL_SIZE        PostgreSQL connection pool size (default 10), can be overridden by --pgpool-size CLI option
+  OTA_PG_ECHO             Enable PostgreSQL echo (default False), can be overridden by --pgecho CLI option
+  OTA_PG_SSL_MODE         PostgreSQL SSL mode: disabled, prefer, required, verify_ca, verify_full (default 'disabled'), can be overridden by --pgssl-mode CLI option
+  OTA_PG_SSL_CA           Path to CA certificate for PostgreSQL SSL, can be overridden by --pgssl-ca CLI option
+  OTA_PG_SSL_CERT         Path to client certificate for PostgreSQL SSL, can be overridden by --pgssl-cert CLI option
+  OTA_PG_SSL_KEY          Path to client private key for PostgreSQL SSL, can be overridden by --pgssl-key CLI option
   OTA_APP_DIRECTORY       Path to the application directory (default 'C:\\ProgramData\\ota_http_server'), can be overridden by --app-directory CLI option
 
 Examples:
@@ -1194,6 +1289,10 @@ For use behind a reverse proxy with SSL termination, you can disable certificate
     myecho_group = db_group.add_mutually_exclusive_group()
     myecho_group.add_argument("--myecho", dest="myecho", action="store_const", const=True, help="Enable database echo (default False), overrides OTA_MY_ECHO environment variable")
     myecho_group.add_argument("--no-myecho", dest="myecho", action="store_const", const=False, help="Disable database echo (default False), overrides OTA_MY_ECHO environment variable")
+    db_group.add_argument("--myssl-mode", dest="myssl_mode", type=str, choices=["disabled", "disable", "prefer", "preferred", "required", "require", "verify_ca", "verify-ca", "verify_full", "verify-full"], help="MySQL SSL mode (default 'disabled'), overrides OTA_MY_SSL_MODE environment variable")
+    db_group.add_argument("--myssl-ca", dest="myssl_ca", type=str, help="Path to CA certificate for MySQL SSL, overrides OTA_MY_SSL_CA environment variable")
+    db_group.add_argument("--myssl-cert", dest="myssl_cert", type=str, help="Path to client certificate for MySQL SSL, overrides OTA_MY_SSL_CERT environment variable")
+    db_group.add_argument("--myssl-key", dest="myssl_key", type=str, help="Path to client private key for MySQL SSL, overrides OTA_MY_SSL_KEY environment variable")
     # SQLite options
     db_group.add_argument("--dbfile", dest="dbfile", type=str, help="Path to the SQLite database file (default 'ota_db.sqlite'), overrides OTA_DB_FILE environment variable")
     # PostgreSQL options
@@ -1206,6 +1305,10 @@ For use behind a reverse proxy with SSL termination, you can disable certificate
     pgecho_group = db_group.add_mutually_exclusive_group()
     pgecho_group.add_argument("--pgecho", dest="pgecho", action="store_const", const=True, help="Enable PostgreSQL echo (default False), overrides OTA_PG_ECHO environment variable")
     pgecho_group.add_argument("--no-pgecho", dest="pgecho", action="store_const", const=False, help="Disable PostgreSQL echo (default False), overrides OTA_PG_ECHO environment variable")
+    db_group.add_argument("--pgssl-mode", dest="pgssl_mode", type=str, choices=["disabled", "disable", "prefer", "preferred", "required", "require", "verify_ca", "verify-ca", "verify_full", "verify-full"], help="PostgreSQL SSL mode (default 'disabled'), overrides OTA_PG_SSL_MODE environment variable")
+    db_group.add_argument("--pgssl-ca", dest="pgssl_ca", type=str, help="Path to CA certificate for PostgreSQL SSL, overrides OTA_PG_SSL_CA environment variable")
+    db_group.add_argument("--pgssl-cert", dest="pgssl_cert", type=str, help="Path to client certificate for PostgreSQL SSL, overrides OTA_PG_SSL_CERT environment variable")
+    db_group.add_argument("--pgssl-key", dest="pgssl_key", type=str, help="Path to client private key for PostgreSQL SSL, overrides OTA_PG_SSL_KEY environment variable")
 
     # trace SQL
     trace_sql_group = parser.add_mutually_exclusive_group()

@@ -30,6 +30,7 @@ from ota_http_server.database.mysql_sql_tracing import (
     is_sql_tracing_enabled,
     with_mysql_sql_tracing,
 )
+from ota_http_server.database.db_ssl import get_postgres_ssl_kwargs
 from ota_http_server.database.migration_postgres_runner import MigrationPostgreSQLRunner
 from ota_http_server.logger import get_app_logger
 
@@ -138,6 +139,7 @@ class DatabasePostgreSQLService:
             if self._pool is None:
                 db_config = self.cfg.config["database"]["postgresql"]
                 max_size = max(1, int(db_config["pgpool_size"]))
+                ssl_kwargs = get_postgres_ssl_kwargs(db_config)
                 pool = ConnectionPool(
                     kwargs={
                         "host": db_config["pghost"],
@@ -146,6 +148,7 @@ class DatabasePostgreSQLService:
                         "user": db_config["pguser"],
                         "password": db_config["pgpassword"],
                         "autocommit": False,
+                        **ssl_kwargs,
                     },
                     min_size=1,
                     max_size=max_size,

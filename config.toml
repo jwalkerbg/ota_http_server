@@ -34,6 +34,11 @@ myport = 3306
 mydatabase = "ota_db"
 myuser = "ota_user"
 mypassword = "SlavaUkraini"
+# SSL configuration: disabled, prefer, required, verify_ca, verify_full
+ssl_mode = "disabled"
+#ssl_ca = "certsd/ca_cert.pem"
+#ssl_cert = "certsd/client_cert.pem"
+#ssl_key = "certsd/client_key.pem"
 
 [database.postgresql]
 pghost = "localhost"
@@ -41,6 +46,11 @@ pgport = 5432
 pgdatabase = "ota_db"
 pguser = "ota_user"
 pgpassword = "SlavaUkraini"
+# SSL configuration: disabled, prefer, required, verify_ca, verify_full
+ssl_mode = "disabled"
+#ssl_ca = "certsd/ca_cert.pem"
+#ssl_cert = "certsd/client_cert.pem"
+#ssl_key = "certsd/client_key.pem"
 
 [database.sqlite]
 db_file = "ota_db.sqlite"

@@ -26,6 +26,7 @@ from ota_http_server.database.mysql_sql_tracing import (
     is_sql_tracing_enabled,
     with_mysql_sql_tracing,
 )
+from ota_http_server.database.db_ssl import get_mysql_ssl_kwargs
 from ota_http_server.database.migration_mysql_runner import MigrationMySQLRunner
 from ota_http_server.logger import get_app_logger
 
@@ -134,6 +135,7 @@ class DatabaseMySQLService:
                 db_config = self.cfg.config["database"]["mysql"]
                 # mysql.connector limits pool size to CNX_POOL_MAXSIZE connections
                 pool_size = min(max(1, int(db_config["mypool_size"])), CNX_POOL_MAXSIZE)
+                ssl_kwargs = get_mysql_ssl_kwargs(db_config)
                 self._pool = MySQLConnectionPool(
                     pool_name="ota_http_server",
                     pool_size=pool_size,
@@ -143,6 +145,7 @@ class DatabaseMySQLService:
                     user=db_config["myuser"],
                     password=db_config["mypassword"],
                     autocommit=False,
+                    **ssl_kwargs,
                 )
             return self._pool
 

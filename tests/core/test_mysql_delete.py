@@ -13,6 +13,7 @@ import pytest
 
 from ota_http_server.core.data_models import Device, Firmware, Project, User, UserDevice
 from ota_http_server.database import db_mysql_service as m
+from ota_http_server.database.db_ssl import get_mysql_ssl_kwargs
 
 MIGRATIONS_DIR = (
     Path(__file__).parents[2]
@@ -25,6 +26,10 @@ _ENV = {
     "mydatabase": os.environ.get("OTA_TEST_MYSQL_DB"),
     "myuser": os.environ.get("OTA_TEST_MYSQL_USER"),
     "mypassword": os.environ.get("OTA_TEST_MYSQL_PASSWORD"),
+    "ssl_mode": os.environ.get("OTA_TEST_MYSQL_SSL_MODE", "disabled"),
+    "ssl_ca": os.environ.get("OTA_TEST_MYSQL_SSL_CA"),
+    "ssl_cert": os.environ.get("OTA_TEST_MYSQL_SSL_CERT"),
+    "ssl_key": os.environ.get("OTA_TEST_MYSQL_SSL_KEY"),
 }
 
 pytestmark = pytest.mark.skipif(
@@ -34,9 +39,11 @@ pytestmark = pytest.mark.skipif(
 
 
 def _drop_all_tables() -> None:
+    ssl_kwargs = get_mysql_ssl_kwargs(_ENV)
     conn = mysql.connector.connect(
         host=_ENV["myhost"], port=_ENV["myport"], database=_ENV["mydatabase"],
         user=_ENV["myuser"], password=_ENV["mypassword"],
+        **ssl_kwargs,
     )
     try:
         cursor = conn.cursor()

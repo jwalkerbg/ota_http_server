@@ -17,6 +17,7 @@ import pytest
 from ota_http_server.core.data_models import Device, Firmware, Project, Target, User, UserDevice
 from ota_http_server.database import db_postgres_service as m
 from ota_http_server.database.database_interface import DatabaseInterface
+from ota_http_server.database.db_ssl import get_postgres_ssl_kwargs
 
 MIGRATIONS_DIR = (
     Path(__file__).parents[2]
@@ -29,6 +30,10 @@ _ENV = {
     "pgdatabase": os.environ.get("OTA_TEST_PG_DB"),
     "pguser": os.environ.get("OTA_TEST_PG_USER"),
     "pgpassword": os.environ.get("OTA_TEST_PG_PASSWORD"),
+    "ssl_mode": os.environ.get("OTA_TEST_PG_SSL_MODE", "disabled"),
+    "ssl_ca": os.environ.get("OTA_TEST_PG_SSL_CA"),
+    "ssl_cert": os.environ.get("OTA_TEST_PG_SSL_CERT"),
+    "ssl_key": os.environ.get("OTA_TEST_PG_SSL_KEY"),
 }
 
 pytestmark = pytest.mark.skipif(
@@ -38,9 +43,11 @@ pytestmark = pytest.mark.skipif(
 
 
 def _admin_execute(sql: str) -> None:
+    ssl_kwargs = get_postgres_ssl_kwargs(_ENV)
     with psycopg.connect(
         host=_ENV["pghost"], port=_ENV["pgport"], dbname=_ENV["pgdatabase"],
         user=_ENV["pguser"], password=_ENV["pgpassword"], autocommit=True,
+        **ssl_kwargs,
     ) as conn:
         conn.execute(sql)
 
