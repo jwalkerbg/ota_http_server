@@ -6,6 +6,8 @@ from pathlib import Path
 from datetime import datetime, UTC
 
 from ota_http_server.core.config import Config
+from ota_http_server.core.countries import normalize_country
+from ota_http_server.core.user_fields import validate_user_name
 from ota_http_server.database.migration_sqlite3_runner import MigrationRunner
 from ota_http_server.core.data_models import ProjectListItem, User, Project, Target, Device, DeviceListItem, UserDevice, Firmware, FirmwareListItem, FirmwareDeleteInfo
 from ota_http_server.core.data_models import AppPaths
@@ -130,17 +132,21 @@ class DatabaseSqliteService:
                 For unexpected database errors.
         """
 
+        validate_user_name(user.name)
+        user.country = normalize_country(user.country)
         sql = """
             INSERT INTO users (
                 username,
                 password_hash,
                 email,
                 role,
+                name,
+                country,
                 is_active,
                 created_at,
                 updated_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
 
         now = datetime.now(UTC)
@@ -154,6 +160,8 @@ class DatabaseSqliteService:
                         user.password_hash,
                         user.email,
                         user.role,
+                        user.name,
+                        user.country,
                         1 if user.is_active else 0,
                         now.isoformat(),
                         now.isoformat(),
@@ -301,6 +309,8 @@ class DatabaseSqliteService:
             password_hash=row["password_hash"],
             email=row["email"],
             role=row["role"],
+            name=row["name"],
+            country=row["country"],
             is_active=bool(row["is_active"]),
             created_at=datetime.fromisoformat(row["created_at"])
                 if row["created_at"] else None,
@@ -324,6 +334,8 @@ class DatabaseSqliteService:
                         password_hash,
                         email,
                         role,
+                        name,
+                        country,
                         is_active,
                         created_at,
                         updated_at
@@ -364,7 +376,7 @@ class DatabaseSqliteService:
                 f"Database error checking whether user {user_id} is active"
             ) from e
 
-    def user_get_list(self, is_active: bool | None = None) -> list[User]:
+    def user_get_list(self, is_active: bool | None = None, name: str | None = None, country: str | None = None) -> list[User]:
 
         try:
             with self._connect() as conn:
@@ -375,15 +387,26 @@ class DatabaseSqliteService:
                         password_hash,
                         email,
                         role,
+                        name,
+                        country,
                         is_active,
                         created_at,
                         updated_at
                     FROM users
                 """
-                params: tuple[object, ...] = ()
+                conditions: list[str] = []
+                params: list[object] = []
                 if is_active is not None:
-                    query += " WHERE is_active = ?"
-                    params = (1 if is_active else 0,)
+                    conditions.append("is_active = ?")
+                    params.append(1 if is_active else 0)
+                if name is not None:
+                    conditions.append("instr(lower(name), lower(?)) > 0")
+                    params.append(name)
+                if country is not None:
+                    conditions.append("country = ?")
+                    params.append(normalize_country(country))
+                if conditions:
+                    query += " WHERE " + " AND ".join(conditions)
                 query += " ORDER BY username"
 
                 cursor = conn.execute(query, params)
@@ -399,8 +422,8 @@ class DatabaseSqliteService:
                 "Database error retrieving users"
             ) from e
 
-    def user_get_record(self, is_active: bool | None = None) -> list[User]:
-        return self.user_get_list(is_active=is_active)
+    def user_get_record(self, is_active: bool | None = None, name: str | None = None, country: str | None = None) -> list[User]:
+        return self.user_get_list(is_active=is_active, name=name, country=country)
 
     def user_update_by_id(
         self,
@@ -409,6 +432,8 @@ class DatabaseSqliteService:
         username: str | None = None,
         email: str | None = None,
         role: str | None = None,
+        name: str | None = None,
+        country: str | None = None,
     ) -> User:
         """
         Partially update a user. Only non-None arguments are written.
@@ -427,6 +452,10 @@ class DatabaseSqliteService:
             updates["email"] = email
         if role is not None:
             updates["role"] = role
+        if name is not None:
+            updates["name"] = validate_user_name(name)
+        if country is not None:
+            updates["country"] = normalize_country(country)
         if not updates:
             raise ValueError("At least one field must be provided to update a user")
 
@@ -457,6 +486,8 @@ class DatabaseSqliteService:
                         password_hash,
                         email,
                         role,
+                        name,
+                        country,
                         is_active,
                         created_at,
                         updated_at

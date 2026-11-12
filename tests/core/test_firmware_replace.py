@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 import pytest
 import jwt
 
-from ota_http_server.core.config import parse_args
+from ota_http_server.core.config import Config, parse_args
 from ota_http_server.core.data_models import Firmware, Project, Target, User, Device
 from ota_http_server.device.device_service import DeviceService
 from ota_http_server.firmware.filename_validation import validate_firmware_filename
@@ -802,7 +802,37 @@ def test_user_service_filters_list_by_status():
 
     UserService(cfg)._list_users()
 
-    cfg.config["db_service"].user_get_record.assert_called_once_with(is_active=True)
+    cfg.config["db_service"].user_get_record.assert_called_once_with(is_active=True, name=None, country=None)
+
+
+def test_user_cli_name_and_country_filters(monkeypatch):
+    monkeypatch.setattr(
+        sys, "argv",
+        ["ota_http_server", "--dbtype", "sqlite", "user", "list",
+         "--enabled", "--full-name", "Petrov", "--country", "BGR"],
+    )
+    parsed = parse_args()
+    assert (parsed.user_full_name, parsed.user_country, parsed.user_status) == ("Petrov", "BGR", "enabled")
+    merged = Config().merge_cli_options(parsed)
+    assert (merged["parameters"]["user_full_name"], merged["parameters"]["user_country"]) == ("Petrov", "BGR")
+    cfg = SimpleNamespace(config={
+        "parameters": {"user_status": "enabled", "user_full_name": "Petrov", "user_country": "BGR"},
+        "db_service": MagicMock(),
+    })
+    UserService(cfg)._list_users()
+    cfg.config["db_service"].user_get_list.assert_called_once_with(is_active=True, name="Petrov", country="BGR")
+
+
+def test_user_cli_add_name_and_country(monkeypatch):
+    monkeypatch.setattr(
+        sys, "argv",
+        ["ota_http_server", "--dbtype", "sqlite", "user", "add",
+         "--name", "ivan", "--password", "secret", "--email", "ivan@example.com",
+         "--role", "viewer", "--full-name", "Ivan Petrov", "--country", "BGR"],
+    )
+    merged = Config().merge_cli_options(parse_args())
+    assert (merged["parameters"]["username"], merged["parameters"]["user_full_name"],
+            merged["parameters"]["user_country"]) == ("ivan", "Ivan Petrov", "BGR")
 
 
 def test_parse_args_device_list_filters(monkeypatch):

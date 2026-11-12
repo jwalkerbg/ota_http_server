@@ -87,7 +87,12 @@ class UserService:
 
         password_hash = Passwords.hash(password)
 
-        user = User(id=None, username=username, password_hash=password_hash, email=email, role=role, is_active=True, created_at=None, updated_at=None)
+        user = User(
+            id=None, username=username, password_hash=password_hash, email=email,
+            role=role, is_active=True, created_at=None, updated_at=None,
+            name=self.cfg.config["parameters"].get("user_full_name") or "",
+            country=self.cfg.config["parameters"].get("user_country") or "",
+        )
 
         db_service: DatabaseService = self.cfg.config["db_service"]
         db_service.user_add(user)
@@ -161,11 +166,13 @@ class UserService:
         user_record = self.cfg.config["parameters"].get("user_record", False)
         user_status = self.cfg.config["parameters"].get("user_status")
         is_active = None if user_status is None else user_status == "enabled"
+        name = self.cfg.config["parameters"].get("user_full_name")
+        country = self.cfg.config["parameters"].get("user_country")
 
         if user_record:
-            users = db_service.user_get_record(is_active=is_active)
+            users = db_service.user_get_record(is_active=is_active, name=name, country=country)
         else:
-            users = db_service.user_get_list(is_active=is_active)
+            users = db_service.user_get_list(is_active=is_active, name=name, country=country)
 
         if users:
             logger.info("\n%s", UserFormatter.format_list(users))

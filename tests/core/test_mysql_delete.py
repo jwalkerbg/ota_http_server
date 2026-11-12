@@ -94,6 +94,16 @@ def _device(db, project, uuid="uuid-1"):
     ))
 
 
+def test_user_name_and_country(db):
+    user = _user(db)
+    updated = db.user_update_by_id(user.id, name="Ivan Petrov", country="BGR")
+    assert (updated.name, updated.country) == ("Ivan Petrov", "BG")
+    assert db.user_get_by_username("alice").name == "Ivan Petrov"
+    assert [u.username for u in db.user_get_list(is_active=True, name="petrov", country="BG")] == ["alice"]
+    with pytest.raises(ValueError):
+        db.user_update_by_id(user.id, country="ZZ")
+
+
 def test_delete_user_by_id_and_username(db):
     first, second = _user(db, "alice"), _user(db, "bob")
 

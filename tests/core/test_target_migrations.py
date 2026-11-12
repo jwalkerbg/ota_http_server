@@ -56,7 +56,7 @@ def test_default_migration_paths_resolve_from_package_outside_repository(tmp_pat
     for backend in ("mysql", "sqlite"):
         migrations_dir = Path(cfg["database"][backend]["migrations_dir"])
         assert migrations_dir.is_dir()
-        assert len(list(migrations_dir.glob("[0-9]*.py"))) == 8
+        assert len(list(migrations_dir.glob("[0-9]*.py"))) == 9
 
 
 def test_mysql_migration_runner_rejects_empty_migration_directory(tmp_path):
@@ -86,6 +86,34 @@ def test_sqlite_migration_runner_rejects_empty_migration_directory(tmp_path):
 
     with pytest.raises(SQLiteMigrationError, match="No SQLite migration files found"):
         runner.migrate_up()
+
+
+def test_user_fields_migration_preserves_existing_users_and_rolls_back(tmp_path):
+    migrations = Path(__file__).parents[2] / "src" / "ota_http_server" / "database" / "migrations" / "sqlite"
+    db_path = tmp_path / "ota.sqlite"
+    cfg = SimpleNamespace(config={
+        "database": {"sqlite": {"migrations_dir": str(migrations)}},
+        "parameters": {
+            "app_paths": SimpleNamespace(database_sqlite=db_path),
+            "init_db_migrate": True, "migrate_dry_run": False, "trace_sql": False,
+        },
+    })
+    runner = MigrationRunner(cfg)
+    runner.migrate_up()
+    runner.migrate_down()
+    with sqlite3.connect(db_path) as conn:
+        conn.execute(
+            "INSERT INTO users (username, password_hash, email, role) VALUES (?, ?, ?, ?)",
+            ("existing", "hash", "existing@example.com", "viewer"),
+        )
+    runner.migrate_up()
+    with sqlite3.connect(db_path) as conn:
+        assert conn.execute("SELECT username, name, country FROM users").fetchone() == ("existing", "", "")
+    runner.migrate_down()
+    with sqlite3.connect(db_path) as conn:
+        assert conn.execute("SELECT username FROM users").fetchone() == ("existing",)
+        assert "name" not in {row[1] for row in conn.execute("PRAGMA table_info(users)")}
+    runner.migrate_up()
 
 
 def test_sqlite_connection_helpers_close_connections_on_exit(tmp_path):

@@ -38,6 +38,8 @@ class User:
     is_active: bool     # lets you disable a user account without deleting its audit history.
     created_at: Optional[datetime]
     updated_at: Optional[datetime]  # useful for auditing and future administration features.
+    name: str = ""
+    country: str = ""
 
     def __str__(self) -> str:
         status = "active" if self.is_active else "disabled"
@@ -57,6 +59,8 @@ class User:
             f"User("
             f"ID:{self.id}, "
             f"username:{self.username}, "
+            f"name:{self.name}, "
+            f"country:{self.country}, "
             f"email:{self.email}, "
             f"role:{self.role}, "
             f"status:{status}, "

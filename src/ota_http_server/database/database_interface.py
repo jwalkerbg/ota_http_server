@@ -46,10 +46,10 @@ class DatabaseInterface(Protocol):
     def user_is_active(self, user_id: int) -> bool:
         ...
 
-    def user_get_list(self, is_active: bool | None = None) -> list[User]:
+    def user_get_list(self, is_active: bool | None = None, name: str | None = None, country: str | None = None) -> list[User]:
         ...
 
-    def user_get_record(self, is_active: bool | None = None) -> list[User]:
+    def user_get_record(self, is_active: bool | None = None, name: str | None = None, country: str | None = None) -> list[User]:
         ...
 
     def user_update_by_id(
@@ -59,6 +59,8 @@ class DatabaseInterface(Protocol):
         username: str | None = None,
         email: str | None = None,
         role: str | None = None,
+        name: str | None = None,
+        country: str | None = None,
     ) -> User:
         ...
 

@@ -349,6 +349,8 @@ These commands are used to prepare the database and to keep the schema synchroni
 ota_http_server user add --name admin --password secret --email admin@example.com --role admin
 ota_http_server user list --record
 ota_http_server user list --enabled
+ota_http_server user add --name ivan --password secret --email ivan@example.com --role viewer --full-name "Ivan Dimitrov Petrov" --country BGR
+ota_http_server user list --enabled --country BG --full-name Petrov
 ota_http_server user get --username admin
 ota_http_server user enable --user-id 1
 ota_http_server user disable --username admin
@@ -969,15 +971,22 @@ Login and `/auth/me` are available to every role. Authorization does not trust a
 
 | Method | Endpoint | Description |
 | --- | --- | --- |
-| `GET` | `/api/v1/users?state=enabled\|disabled` | List users, optionally filtered by active state. |
-| `POST` | `/api/v1/users` | Create a user. Required JSON fields: `username`, `password`, `email`, `role`. |
+| `GET` | `/api/v1/users?state=enabled\|disabled&name=Petrov&country=BG` | List users, optionally combining active state, name substring and country filters. |
+| `POST` | `/api/v1/users` | Create a user. Required JSON fields: `username`, `password`, `email`, `role`; optional: `name`, `country`. |
 | `GET` | `/api/v1/users/<id>` | Get a user. Password hashes are never returned. |
-| `PATCH` | `/api/v1/users/<id>` | Update one or more of `username`, `email`, and `role`. |
+| `PATCH` | `/api/v1/users/<id>` | Update one or more of `username`, `email`, `role`, `name`, and `country`. |
 | `DELETE` | `/api/v1/users/<id>` | Permanently delete a user. Returns `409` if the user still owns projects. |
 | `POST` | `/api/v1/users/<id>/activate` | Activate a user. |
 | `POST` | `/api/v1/users/<id>/deactivate` | Deactivate a user. |
 | `POST` | `/api/v1/users/me/password` | Self-service password change. JSON body: `{"current_password": "old-secret", "new_password": "new-secret", "confirm_password": "new-secret"}`. Requires the current password. |
 | `POST` | `/api/v1/users/<id>/password` | Administrative password reset; the current password is not required. JSON body: `{"new_password": "new-secret", "confirm_password": "new-secret"}`. Requires the `users.update` permission. |
+
+`name` and `country` can be empty strings; names are limited to 1024 characters.
+Country accepts valid ISO 3166-1
+alpha-2 or alpha-3 codes, case-insensitively, and is stored and returned as
+uppercase alpha-2 (for example, `BGR` becomes `BG`). Name filters match literal
+substrings without SQL wildcard interpretation; case matching follows the
+database's lowercase rules.
 
 Password management details:
 

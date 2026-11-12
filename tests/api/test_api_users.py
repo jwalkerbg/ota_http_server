@@ -287,3 +287,63 @@ def test_list_users_invalid_state(client):
     response = client.get("/api/v1/users?state=bogus")
 
     assert response.status_code == 400
+
+
+def test_user_name_and_country_create_update_and_clear(client, db):
+    response = client.post("/api/v1/users", json={
+        "username": "ivan", "password": "secret", "email": "ivan@example.com",
+        "role": "viewer", "name": "Ivan Dimitrov Petrov", "country": "bgr",
+    })
+    assert response.status_code == 201
+    data = response.get_json()
+    assert (data["name"], data["country"]) == ("Ivan Dimitrov Petrov", "BG")
+    assert (db.user_get_by_id(data["id"]).name, db.user_get_by_id(data["id"]).country) == (
+        "Ivan Dimitrov Petrov", "BG"
+    )
+    response = client.patch(f"/api/v1/users/{data['id']}", json={"name": "", "country": ""})
+    assert response.status_code == 200
+    assert (response.get_json()["name"], response.get_json()["country"]) == ("", "")
+    assert client.get(f"/api/v1/users/{data['id']}").get_json()["country"] == ""
+
+
+@pytest.mark.parametrize("country", ["ZZ", "ZZZ", "B", "BULGARIA", "12", "éé"])
+def test_invalid_country_rejected_on_create_update_and_search(client, user, country):
+    response = client.post("/api/v1/users", json={
+        "username": "bad", "password": "secret", "email": "bad@example.com",
+        "role": "viewer", "country": country,
+    })
+    assert response.status_code == 400
+    assert client.patch(f"/api/v1/users/{user.id}", json={"country": country}).status_code == 400
+    assert client.get("/api/v1/users", query_string={"country": country}).status_code == 400
+
+
+def test_search_users_by_name_country_and_state(client, make_user):
+    make_user(username="ivan", name="Ivan Dimitrov Petrov", country="BG")
+    make_user(username="peter", name="Peter Petrov Angelov", country="BGR")
+    make_user(username="disabled", name="Petrov", country="BG", is_active=False)
+    make_user(username="foreign", name="Petrov", country="FR")
+    make_user(username="literal", name="100% Real", country="RO")
+
+    def usernames(**filters):
+        response = client.get("/api/v1/users", query_string=filters)
+        assert response.status_code == 200
+        return {u["username"] for u in response.get_json()["users"]}
+
+    assert usernames(name="petrov") == {"ivan", "peter", "disabled", "foreign"}
+    assert usernames(name="Petrov", country="bgr", state="enabled") == {"ivan", "peter"}
+    assert usernames(country="BG", state="disabled") == {"disabled"}
+    assert usernames(name="%") == {"literal"}
+    assert usernames(country="") == {"api-auth-user"}
+
+
+def test_user_optional_fields_and_invalid_types(client):
+    body = {"username": "bob", "password": "secret", "email": "bob@example.com", "role": "viewer"}
+    response = client.post("/api/v1/users", json=body)
+    assert (response.get_json()["name"], response.get_json()["country"]) == ("", "")
+    for field in ("name", "country"):
+        assert client.post("/api/v1/users", json={**body, field: 42}).status_code == 400
+
+
+def test_user_name_length_limit(client, user):
+    assert client.patch(f"/api/v1/users/{user.id}", json={"name": "a" * 1024}).status_code == 200
+    assert client.patch(f"/api/v1/users/{user.id}", json={"name": "a" * 1025}).status_code == 400

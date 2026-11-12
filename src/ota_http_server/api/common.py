@@ -227,6 +227,8 @@ def user_to_dict(user: User) -> dict[str, Any]:
     return {
         "id": user.id,
         "username": user.username,
+        "name": user.name,
+        "country": user.country,
         "email": user.email,
         "role": user.role,
         "is_active": user.is_active,

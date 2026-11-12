@@ -68,6 +68,8 @@ class ParametersConfig(TypedDict, total=False):
     user_password: str
     user_email: str
     user_role: str
+    user_full_name: str | None
+    user_country: str | None
     user_record: bool
     user_status: str | None
     project_id: int
@@ -199,6 +201,8 @@ class Config:
             'user_password': None,
             'user_email': None,
             'user_role': None,
+            'user_full_name': None,
+            'user_country': None,
             'user_record': False,
             'user_status': None,
             'project_id': None,
@@ -408,6 +412,12 @@ class Config:
                         "type": "string"
                     },
                     "user_role": {
+                        "type": "string"
+                    },
+                    "user_full_name": {
+                        "type": "string"
+                    },
+                    "user_country": {
                         "type": "string"
                     },
                     "user_record": {
@@ -907,6 +917,8 @@ class Config:
                         self.config["parameters"]["user_email"] = config_cli.user_email
                     if config_cli.user_role is not None:
                         self.config["parameters"]["user_role"] = config_cli.user_role
+                    self.config["parameters"]["user_full_name"] = config_cli.user_full_name
+                    self.config["parameters"]["user_country"] = config_cli.user_country
                 # enable
                 if config_cli.user_command == 'enable':
                     if config_cli.user_id is not None:
@@ -933,6 +945,8 @@ class Config:
                         self.config["parameters"]["username"] = config_cli.username
                 # list
                 if config_cli.user_command == 'list':
+                    self.config["parameters"]["user_full_name"] = config_cli.user_full_name
+                    self.config["parameters"]["user_country"] = config_cli.user_country
                     if getattr(config_cli, 'user_record', None) is not None:
                         self.config["parameters"]["user_record"] = config_cli.user_record
                     else:
@@ -1374,6 +1388,8 @@ For use behind a reverse proxy with SSL termination, you can disable certificate
     add_user_parser.add_argument("--password", dest="user_password", type=str, required=True, help="Password of the new created user")
     add_user_parser.add_argument("--email", dest="user_email", type=str, required=True, help="Email of the new created user")
     add_user_parser.add_argument("--role", dest="user_role", type=str, required=True, choices=USER_ROLES, help="Password of the new created user")
+    add_user_parser.add_argument("--full-name", dest="user_full_name", help="Optional full name")
+    add_user_parser.add_argument("--country", dest="user_country", help="Optional ISO 3166-1 alpha-2 or alpha-3 country code")
     # user enable
     enable_user_parser = user_subparsers.add_parser(name="enable", help="Enable user")
     enable_user_parser.add_argument("--user-id", dest="user_id", type=int, required=False, help="ID of the user to be enabled")
@@ -1398,6 +1414,8 @@ For use behind a reverse proxy with SSL termination, you can disable certificate
     # list
     list_user_parser = user_subparsers.add_parser(name="list", help="List all users")
     list_user_parser.add_argument("--record", dest="user_record", action="store_const", const=True, help="List full records of users, including all fields. If not specified, only a summary of users will be listed.")
+    list_user_parser.add_argument("--full-name", dest="user_full_name", help="Filter by full name substring")
+    list_user_parser.add_argument("--country", dest="user_country", help="Filter by ISO 3166-1 country code")
     user_status_group = list_user_parser.add_mutually_exclusive_group()
     user_status_group.add_argument("--enabled", dest="user_status", action="store_const", const="enabled", help="List enabled users only")
     user_status_group.add_argument("--disabled", dest="user_status", action="store_const", const="disabled", help="List disabled users only")

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from flask import Blueprint, abort, current_app, jsonify
+from flask import Blueprint, abort, current_app, jsonify, request
 
 from ota_http_server.core.config import USER_ROLES
 from ota_http_server.core.data_models import User
@@ -72,8 +72,15 @@ def _log_password_activity(
 @api_v1_users.route("/", methods=["GET"])
 @require_permission(USERS_READ)
 def list_users():
-    """List users, optionally filtered by ?state=enabled|disabled."""
-    users = get_db().user_get_list(is_active=parse_state_filter())
+    """List users with optional state, name substring and country filters."""
+    try:
+        users = get_db().user_get_list(
+            is_active=parse_state_filter(),
+            name=request.args.get("name"),
+            country=request.args.get("country"),
+        )
+    except ValueError as exc:
+        return error_response(400, str(exc))
     return jsonify({"users": [user_to_dict(user) for user in users]}), 200
 
 
@@ -82,7 +89,7 @@ def list_users():
 @require_permission(USERS_CREATE)
 def create_user():
     data = json_body()
-    reject_unknown_fields(data, {"username", "password", "email", "role"})
+    reject_unknown_fields(data, {"username", "password", "email", "role", "name", "country"})
 
     username = required_str(data, "username")
     password = required_str(data, "password")
@@ -100,10 +107,14 @@ def create_user():
         is_active=True,
         created_at=None,
         updated_at=None,
+        name=optional_str(data, "name") or "",
+        country=optional_str(data, "country") or "",
     )
 
     try:
         created = get_db().user_add(user)
+    except ValueError as exc:
+        return error_response(400, str(exc))
     except USER_ALREADY_EXISTS as exc:
         return error_response(409, str(exc))
 
@@ -123,11 +134,13 @@ def get_user(user_id: int):
 @require_permission(USERS_UPDATE)
 def update_user(user_id: int):
     data = json_body()
-    reject_unknown_fields(data, {"username", "email", "role"})
+    reject_unknown_fields(data, {"username", "email", "role", "name", "country"})
 
     username = optional_str(data, "username")
     email = optional_str(data, "email")
     role = optional_str(data, "role")
+    name = optional_str(data, "name")
+    country = optional_str(data, "country")
     if role is not None and role not in USER_ROLES:
         return error_response(400, f"Field 'role' must be one of: {', '.join(sorted(USER_ROLES))}")
 
@@ -137,6 +150,8 @@ def update_user(user_id: int):
             username=username,
             email=email,
             role=role,
+            name=name,
+            country=country,
         )
     except ValueError as exc:
         return error_response(400, str(exc))

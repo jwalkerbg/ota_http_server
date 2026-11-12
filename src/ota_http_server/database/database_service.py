@@ -74,11 +74,11 @@ class DatabaseService:
     def user_is_active(self, user_id: int) -> bool:
         return self._database.user_is_active(user_id)
 
-    def user_get_list(self, is_active: bool | None = None) -> list[User]:
-        return self._database.user_get_list(is_active=is_active)
+    def user_get_list(self, is_active: bool | None = None, name: str | None = None, country: str | None = None) -> list[User]:
+        return self._database.user_get_list(is_active=is_active, name=name, country=country)
 
-    def user_get_record(self, is_active: bool | None = None) -> list[User]:
-        return self._database.user_get_record(is_active=is_active)
+    def user_get_record(self, is_active: bool | None = None, name: str | None = None, country: str | None = None) -> list[User]:
+        return self._database.user_get_record(is_active=is_active, name=name, country=country)
 
     def user_update_by_id(
         self,
@@ -87,12 +87,16 @@ class DatabaseService:
         username: str | None = None,
         email: str | None = None,
         role: str | None = None,
+        name: str | None = None,
+        country: str | None = None,
     ) -> User:
         return self._database.user_update_by_id(
             user_id,
             username=username,
             email=email,
             role=role,
+            name=name,
+            country=country,
         )
 
     def user_set_password_by_id(self, user_id: int, password_hash: str) -> None:

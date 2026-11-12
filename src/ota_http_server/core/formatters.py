@@ -69,6 +69,8 @@ class UserFormatter:
     COLUMNS = [
         Column('ID', ID_WIDTH, ">"),
         Column('Username', USERNAME_WIDTH, "^"),
+        Column('Name', 30, "^"),
+        Column('Country', 7, "^"),
         Column('Email', EMAIL_WIDTH, "^"),
         Column('Role', ROLE_WIDTH, "^"),
         Column('Status', STATUS_WIDTH, "^"),
@@ -95,6 +97,8 @@ class UserFormatter:
         values = [
             str(user.id),
             user.username,
+            user.name,
+            user.country,
             user.email,
             user.role,
             status,

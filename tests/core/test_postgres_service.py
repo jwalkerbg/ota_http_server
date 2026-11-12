@@ -119,7 +119,7 @@ def test_implements_database_interface():
 
 def test_migrate_is_idempotent_and_rolls_back(db):
     db.migrate()
-    for _ in range(8):
+    for _ in range(9):
         db.rollback()
     with psycopg.connect(
         host=_ENV["pghost"], port=_ENV["pgport"], dbname=_ENV["pgdatabase"],
@@ -152,6 +152,13 @@ def test_user_lifecycle(db):
     assert [u.username for u in db.user_get_list(is_active=True)] == ["alice"]
     assert [u.username for u in db.user_get_list(is_active=False)] == ["bob"]
     assert [u.username for u in db.user_get_list()] == ["alice", "bob"]
+
+    updated = db.user_update_by_id(user.id, name="Ivan Petrov", country="BGR")
+    assert (updated.name, updated.country) == ("Ivan Petrov", "BG")
+    assert [u.username for u in db.user_get_list(is_active=True, name="petrov", country="BG")] == ["alice"]
+    assert db.user_get_by_username("alice").country == "BG"
+    with pytest.raises(ValueError):
+        db.user_update_by_id(user.id, country="ZZ")
 
     updated = db.user_update_by_id(user.id, role="user", email="a@x.org")
     assert (updated.role, updated.email, updated.updated_at is not None) == ("user", "a@x.org", True)

@@ -14,6 +14,8 @@ from psycopg.rows import dict_row
 from psycopg_pool import ConnectionPool
 
 from ota_http_server.core.config import Config
+from ota_http_server.core.countries import normalize_country
+from ota_http_server.core.user_fields import validate_user_name
 from ota_http_server.core.data_models import (
     Device,
     DeviceListItem,
@@ -204,23 +206,29 @@ class DatabasePostgreSQLService:
             password_hash=row["password_hash"],
             email=row["email"],
             role=row["role"],
+            name=row["name"],
+            country=row["country"],
             is_active=bool(row["is_active"]),
             created_at=self._as_datetime(row["created_at"]),
             updated_at=self._as_datetime(row["updated_at"]),
         )
 
     def user_add(self, user: User) -> User:
+        validate_user_name(user.name)
+        user.country = normalize_country(user.country)
         sql = """
             INSERT INTO users (
                 username,
                 password_hash,
                 email,
                 role,
+                name,
+                country,
                 is_active,
                 created_at,
                 updated_at
             )
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING id
         """
 
@@ -236,6 +244,8 @@ class DatabasePostgreSQLService:
                         user.password_hash,
                         user.email,
                         user.role,
+                        user.name,
+                        user.country,
                         bool(user.is_active),
                         now.isoformat(),
                         now.isoformat(),
@@ -370,6 +380,8 @@ class DatabasePostgreSQLService:
                         password_hash,
                         email,
                         role,
+                        name,
+                        country,
                         is_active,
                         created_at,
                         updated_at
@@ -408,7 +420,7 @@ class DatabasePostgreSQLService:
                 f"Database error checking whether user {user_id} is active"
             ) from e
 
-    def user_get_list(self, is_active: bool | None = None) -> list[User]:
+    def user_get_list(self, is_active: bool | None = None, name: str | None = None, country: str | None = None) -> list[User]:
         try:
             with self._connect() as conn:
                 query = """
@@ -418,15 +430,26 @@ class DatabasePostgreSQLService:
                         password_hash,
                         email,
                         role,
+                        name,
+                        country,
                         is_active,
                         created_at,
                         updated_at
                     FROM users
                 """
-                params: tuple[Any, ...] = ()
+                conditions: list[str] = []
+                params: list[Any] = []
                 if is_active is not None:
-                    query += " WHERE is_active = %s"
-                    params = (bool(is_active),)
+                    conditions.append("is_active = %s")
+                    params.append(bool(is_active))
+                if name is not None:
+                    conditions.append("strpos(lower(name), lower(%s)) > 0")
+                    params.append(name)
+                if country is not None:
+                    conditions.append("country = %s")
+                    params.append(normalize_country(country))
+                if conditions:
+                    query += " WHERE " + " AND ".join(conditions)
                 query += " ORDER BY username"
 
                 cursor = conn.cursor(row_factory=dict_row)
@@ -436,8 +459,8 @@ class DatabasePostgreSQLService:
         except PgError as e:
             raise DatabaseError("Database error retrieving user list") from e
 
-    def user_get_record(self, is_active: bool | None = None) -> list[User]:
-        return self.user_get_list(is_active=is_active)
+    def user_get_record(self, is_active: bool | None = None, name: str | None = None, country: str | None = None) -> list[User]:
+        return self.user_get_list(is_active=is_active, name=name, country=country)
 
     def _row_exists(self, conn, table: str, row_id: int) -> bool:
         if table not in ("users", "projects", "devices", "firmware"):
@@ -453,6 +476,8 @@ class DatabasePostgreSQLService:
         username: str | None = None,
         email: str | None = None,
         role: str | None = None,
+        name: str | None = None,
+        country: str | None = None,
     ) -> User:
         """
         Partially update a user. Only non-None arguments are written.
@@ -470,6 +495,10 @@ class DatabasePostgreSQLService:
             updates["email"] = email
         if role is not None:
             updates["role"] = role
+        if name is not None:
+            updates["name"] = validate_user_name(name)
+        if country is not None:
+            updates["country"] = normalize_country(country)
         if not updates:
             raise ValueError("At least one field must be provided to update a user")
 
@@ -501,6 +530,8 @@ class DatabasePostgreSQLService:
                         password_hash,
                         email,
                         role,
+                        name,
+                        country,
                         is_active,
                         created_at,
                         updated_at

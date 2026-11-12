@@ -82,7 +82,7 @@ def db(app):
 
 @pytest.fixture()
 def make_user(db):
-    def _make(username="alice", email=None, role="admin", is_active=True):
+    def _make(username="alice", email=None, role="admin", is_active=True, name="", country=""):
         return db.user_add(
             User(
                 id=None,
@@ -93,6 +93,8 @@ def make_user(db):
                 is_active=is_active,
                 created_at=None,
                 updated_at=None,
+                name=name,
+                country=country,
             )
         )
 
