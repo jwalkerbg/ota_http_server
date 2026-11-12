@@ -29,7 +29,7 @@ verbose = 3
 dbtype = "sqlite"
 
 [database.mysql]
-myhost = "localhost"
+myhost = "192.168.88.20"
 myport = 3306
 mydatabase = "ota_db"
 myuser = "ota_user"
@@ -41,7 +41,7 @@ ssl_mode = "disabled"
 #ssl_key = "certsd/client_key.pem"
 
 [database.postgresql]
-pghost = "localhost"
+pghost = "192.168.88.20"
 pgport = 5432
 pgdatabase = "ota_db"
 pguser = "ota_user"
